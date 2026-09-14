@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/uf-cli/uf/internal/engine"
+	"github.com/uf-cli/uf/internal/generator"
 	"github.com/uf-cli/uf/internal/spec"
 	"github.com/uf-cli/uf/internal/tty"
 	"github.com/uf-cli/uf/internal/ui"
@@ -66,7 +68,7 @@ func runWidget(args []string) int {
 func interact(eng *engine.Engine, st ui.State) (ui.State, ui.Outcome, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
-	pre, err := ui.Prepare(eng, st)
+	pre, err := ui.Prepare(eng, st, newDynamic())
 	if err != nil {
 		return st, ui.Cancelled, err
 	}
@@ -86,6 +88,33 @@ func interact(eng *engine.Engine, st ui.State) (ui.State, ui.Outcome, error) {
 	rend := ui.NewRenderer(term.Out(), w, h, simpleMode())
 
 	return pre.Session(term, rend).Run()
+}
+
+// newDynamic menyiapkan sumber kandidat dinamis.
+//
+// Generator MENJALANKAN PERINTAH sebagai efek samping mengetik, jadi
+// kebijakannya dibaca dari lingkungan setiap kali dipanggil, bukan disimpan
+// sebagai state: pengguna harus bisa mematikannya untuk satu sesi tanpa
+// memasang ulang apa pun.
+func newDynamic() *generator.Source {
+	return &generator.Source{
+		Dir:     generator.CurrentDir(),
+		Timeout: generatorTimeout(),
+		Cache:   generator.NewCache(),
+	}
+}
+
+// generatorTimeout membaca batas waktu dari lingkungan.
+func generatorTimeout() time.Duration {
+	v := os.Getenv(generator.EnvTimeout)
+	if v == "" {
+		return generator.DefaultTimeout
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		return generator.DefaultTimeout
+	}
+	return d
 }
 
 // simpleMode mematikan warna dan sorotan pada terminal yang terbatas.

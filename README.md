@@ -51,12 +51,14 @@ menyaringnya menjadi skema uf.
 Yang dibuang saat transpile adalah segala sesuatu yang membutuhkan mesin
 JavaScript saat runtime: generator berbentuk fungsi dan `custom`, `postProcess`,
 `generateSpec`, dan `parserDirectives`. Dari 5.073 generator, **3.438 terbawa dan
-1.635 dibuang** — jadi sebagian argumen dinamis akan kosong sampai layer generator
-dibangun. Contohnya `kubectl get <TAB>` belum menawarkan tipe resource, karena
-spec Fig memasoknya lewat closure JS.
+1.635 dibuang** — jadi sebagian argumen dinamis tetap kosong. Contohnya
+`kubectl get <TAB>` belum menawarkan tipe resource, karena spec Fig memasoknya
+lewat closure JS.
 
-Tidak ada satu pun generator yang berbentuk string shell, sehingga tidak ada
-perintah yang perlu dilewatkan ke `sh -c`.
+Tidak ada generator yang `script`-nya berupa string shell. Tetapi bentuk argv
+sendiri tidak mencegah eksekusi shell: 194 di antaranya berisi
+`["bash","-c","<skrip>"]`. Itu ditangani oleh kebijakan generator, bukan oleh
+bentuk datanya.
 
 Spec disimpan ter-gzip dan dibaca langsung dari bentuk itu. Ini bukan penghematan
 disk semata: rencana SSH mengharuskan spec ikut dikirim ke host remote, dan 7,7 MB
@@ -194,6 +196,7 @@ internal/spec/     model skema spec Fig + loader JSON
 internal/parser/   tokenizer sadar-kutip + resolusi posisi kursor
 internal/engine/   penelusuran pohon spec → daftar kandidat
 internal/ui/       pencocokan fuzzy, renderer diff, loop interaktif
+internal/generator/ eksekusi generator, kebijakannya, cache, template berkas
 internal/tty/      mode raw, ukuran layar, penguraian tombol
 internal/shellinit/ skrip integrasi shell, disematkan ke binary
 tools/transpile/   pengubah spec Fig menjadi skema uf
@@ -226,13 +229,27 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
    Mode degradasi `UF_SIMPLE=1` mematikan warna dan sorotan, dan menyala
    otomatis untuk `TERM` bernilai `dumb`, `vt100`, `vt102`, atau `ansi`.
 
-   Waktu hitung per ketikan, jauh di bawah anggaran 16 ms:
+   Waktu hitung engine per ketikan:
 
    | | |
    |---|---|
    | spec sudah di cache | 1,9 µs |
    | lewat `loadSpec` (aws s3) | 2,3 µs |
    | muat dingin, buka gzip + urai | 1,2 ms |
+
+   Yang dirasakan pengguna lebih besar dari itu, karena `uf` adalah proses
+   baru setiap kali Tab ditekan:
+
+   | | |
+   |---|---|
+   | menyalakan proses saja | 8 ms |
+   | completion statis | 11 ms |
+   | dengan generator, cache panas | 18 ms |
+   | dengan generator, cache dingin | 44 ms |
+
+   Jadi biaya terbesarnya adalah menyalakan proses, bukan menghitung. Daemon
+   yang tetap hidup akan memangkas 8 ms itu; belum dibangun karena 18 ms sudah
+   jauh di bawah ambang yang terasa.
 2. **Generator butuh policy layer.** Generator mengeksekusi perintah sebagai efek
    samping mengetik. Karena itu `internal/engine` sengaja hanya *melaporkan*
    generator yang relevan tanpa menjalankannya — eksekusinya ditaruh di satu
@@ -266,6 +283,70 @@ baris memuat karakter non-ASCII, dan tiap satuan berpisah pada titik berbeda:
 | `🚀` | 4 | 1 | **2** |
 
 Diuji di keempat shell dengan `café`, `日本語`, dan emoji.
+
+## Generator
+
+Sebagian argumen tidak bisa diketahui dari berkas spec: nama branch, nama pod,
+nama container. Untuk itu spec menyimpan **generator**, yaitu perintah yang
+dijalankan untuk menghasilkan kandidat.
+
+```
+git checkout <TAB>   ->  git branch      ->  nama branch di repo ini
+git push <TAB>       ->  git remote      ->  nama remote sungguhan
+cat <TAB>            ->  dibaca langsung ->  nama berkas, tanpa proses baru
+```
+
+### Kebijakan
+
+Menekan Tab akan **menjalankan perintah** — bukan membaca berkas, melainkan
+menumbuhkan proses di direktori kerjamu dengan hak aksesmu. Karena itu
+kebijakannya ketat secara bawaan:
+
+| Aturan | Alasan |
+|---|---|
+| Hanya menjalankan perintah yang sedang kamu ketik | `git checkout` boleh memanggil `git`, dan hanya `git` |
+| Interpreter selalu ditolak | `bash`, `sh`, `python`, `node`, `sudo`, `env`, `xargs` — argumennya adalah kode, bukan data |
+| Mati saat berjalan sebagai root | Di server, satu Tab yang salah jauh lebih mahal |
+| Batas waktu keras 1,2 detik | Generator lambat tidak boleh menahan tombol |
+| Tidak pernah lewat shell | argv dieksekusi langsung; tidak ada string yang diurai sebagai perintah |
+| Seluruh keturunan proses ikut dimatikan | Cucu proses yang tertinggal akan menumpuk |
+
+Larangan interpreter bukan kehati-hatian berlebih. **194 generator di paket
+spec Fig berbentuk `["bash","-c","<skrip>"]`** — bentuk argv sendiri tidak
+mencegah eksekusi shell, hanya memindahkan pintunya. Ada pula generator yang
+memanggil `curl`, yang berarti permintaan jaringan sebagai efek samping
+mengetik.
+
+Akibatnya sebagian generator memang tidak akan pernah berjalan. Itu pilihan
+sadar: Tab yang tidak menawarkan apa-apa jauh lebih murah daripada Tab yang
+menjalankan sesuatu yang tidak kamu minta.
+
+```sh
+UF_NO_GENERATORS=1               # matikan seluruhnya
+UF_GENERATOR_ALLOW=tmux,kubectl  # izinkan biner tambahan
+UF_GENERATOR_ALLOW_ROOT=1        # izinkan berjalan sebagai root
+UF_GENERATOR_TIMEOUT=800ms       # ubah batas waktu
+```
+
+`uf complete --line "..."` menjalankan jalur yang sama persis dengan Tab, dan
+mencetak alasan setiap penolakan ke stderr — jadi apa yang akan dijalankan uf
+bisa diperiksa sebelum dipasang.
+
+### Keluaran mentah
+
+`postProcess` milik Fig berupa closure JavaScript dan tidak ikut ter-transpile,
+sehingga keluaran perintah dinormalkan dengan aturan yang sedikit dan
+eksplisit: tab atau dua spasi memisahkan nama dari keterangannya, penanda `* `
+milik git dibuang, dan kandidat yang masih mengandung spasi dibuang seluruhnya
+— teks yang tidak bisa disisipkan apa adanya menghasilkan perintah yang rusak,
+bukan sekadar tampilan yang jelek.
+
+### Cache
+
+Keluaran generator disimpan di disk, bukan di memori: `uf` adalah proses baru
+setiap kali Tab ditekan, jadi cache dalam memori tidak akan pernah terpakai
+sekali pun. Kuncinya mencakup direktori kerja, karena `git branch` menjawab
+berbeda di setiap repo.
 
 ## Windows
 

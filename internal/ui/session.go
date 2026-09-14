@@ -6,6 +6,16 @@ import (
 	"github.com/uf-cli/uf/internal/engine"
 )
 
+// Dynamic menghasilkan kandidat yang tidak ada di dalam berkas spec, yaitu
+// keluaran generator dan template berkas.
+//
+// Dibuat sebagai interface supaya seluruh pengujian di paket ini tidak pernah
+// menjalankan proses apa pun: sesi interaktif diuji dengan sumber palsu, dan
+// implementasi sungguhannya diuji terpisah bersama kebijakannya.
+type Dynamic interface {
+	Candidates(res *engine.Result) []engine.Candidate
+}
+
 // State adalah isi baris perintah beserta posisi kursornya.
 type State struct {
 	Line   string

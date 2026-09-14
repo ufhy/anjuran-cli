@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 
 	"github.com/uf-cli/uf/internal/engine"
+	"github.com/uf-cli/uf/internal/generator"
 	"github.com/uf-cli/uf/internal/spec"
+	"github.com/uf-cli/uf/internal/ui"
 )
 
 // version diisi saat build lewat -ldflags. Nilai "dev" berarti binary ini
@@ -36,6 +38,8 @@ Opsi:
   --line    baris perintah yang sedang diketik
   --cursor  posisi kursor dalam byte (default: akhir baris)
   --json    keluarkan hasil mentah sebagai JSON
+  --no-generators
+            jangan jalankan generator; hanya kandidat dari berkas spec
   --specs   direktori spec, boleh beberapa dipisah titik dua
             (default: $UF_SPECS, ~/.config/uf/specs, ./specs, lalu bawaan)
 
@@ -53,6 +57,17 @@ Lingkungan:
   UF_SPECS  direktori spec
   UF_SIMPLE bila diisi, matikan warna dan sorotan
   UF_KEY    tombol pemicu, dibaca oleh skrip init
+
+Generator menjalankan perintah sebagai efek samping mengetik, jadi
+kebijakannya ketat secara bawaan dan diatur lewat lingkungan:
+
+  UF_NO_GENERATORS        bila diisi, matikan seluruh generator
+  UF_GENERATOR_ALLOW      biner tambahan yang boleh dijalankan, dipisah koma
+  UF_GENERATOR_ALLOW_ROOT bila diisi, izinkan generator berjalan sebagai root
+  UF_GENERATOR_TIMEOUT    batas waktu, misalnya 800ms
+
+Secara bawaan uf hanya menjalankan perintah yang sedang kamu ketik sendiri,
+dan tidak pernah menjalankan interpreter seperti bash, python, atau sudo.
 `
 
 func main() {
@@ -83,6 +98,7 @@ func runComplete(args []string) int {
 	line := fs.String("line", "", "baris perintah")
 	cursor := fs.Int("cursor", -1, "posisi kursor dalam byte")
 	asJSON := fs.Bool("json", false, "keluarkan JSON")
+	noGen := fs.Bool("no-generators", false, "jangan jalankan generator")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -98,29 +114,51 @@ func runComplete(args []string) int {
 		return 1
 	}
 
+	// Jalur yang dipakai sama persis dengan mode widget — engine, generator,
+	// penyaringan, dan pemeringkatan yang sama — supaya hasil pemeriksaan di
+	// sini tidak pernah berbeda dari yang muncul saat Tab ditekan.
 	eng := engine.New(spec.NewRegistryDirs(dirs...))
-	res, err := eng.Complete(*line, *cursor)
+
+	var src *generator.Source
+	var dyn ui.Dynamic
+	if !*noGen {
+		src = newDynamic()
+		dyn = src
+	}
+
+	pre, err := ui.Prepare(eng, ui.State{Line: *line, Cursor: *cursor}, dyn)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
 	}
 
+	var denied []string
+	if src != nil {
+		denied = src.Denied
+	}
+
 	if *asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(res); err != nil {
+		if err := enc.Encode(struct {
+			Candidates []engine.Candidate `json:"candidates"`
+			Denied     []string           `json:"denied,omitempty"`
+		}{pre.Candidates(), denied}); err != nil {
 			fmt.Fprintln(os.Stderr, "uf:", err)
 			return 1
 		}
 		return 0
 	}
 
-	for _, c := range res.Candidates {
+	for _, c := range pre.Candidates() {
 		if c.Description == "" {
 			fmt.Printf("%s\t%s\n", c.Name, c.Kind)
 			continue
 		}
 		fmt.Printf("%s\t%s\t%s\n", c.Name, c.Kind, c.Description)
+	}
+	for _, d := range denied {
+		fmt.Fprintln(os.Stderr, "uf: generator ditolak:", d)
 	}
 	return 0
 }

@@ -80,6 +80,9 @@ func makeInsert(name, insertValue, prefix string) (string, int) {
 
 // Result adalah jawaban lengkap engine untuk satu posisi kursor.
 type Result struct {
+	// Command adalah nama perintah yang sedang dilengkapi. Dibawa keluar
+	// karena kebijakan generator memutuskan berdasarkan nama itu.
+	Command string `json:"command,omitempty"`
 	// Prefix adalah teks yang sudah diketik pada token kursor.
 	Prefix string `json:"prefix"`
 	// ReplaceStart dan ReplaceEnd adalah rentang byte pada baris asli yang
@@ -91,6 +94,9 @@ type Result struct {
 	// belum dieksekusi. Eksekusi ditunda ke layer terpisah supaya kebijakan
 	// keamanannya (allowlist, timeout, mati saat UID 0) punya satu tempat.
 	Generators []spec.Generator `json:"generators,omitempty"`
+	// Templates adalah sumber bawaan seperti filepaths dan folders, yang
+	// dikerjakan tanpa menjalankan proses apa pun.
+	Templates []string `json:"templates,omitempty"`
 }
 
 // Engine memegang registry spec.
@@ -109,6 +115,9 @@ func (e *Engine) Complete(line string, cursor int) (*Result, error) {
 	res.ReplaceStart, res.ReplaceEnd = replaceRange(l)
 
 	words, _ := l.Words()
+	if len(words) > 0 {
+		res.Command = words[0].Value
+	}
 	if len(words) == 0 {
 		// Kursor berada di posisi nama perintah. Melengkapi biner di PATH
 		// adalah pekerjaan tahap lain; di sini kita berhenti.
@@ -388,6 +397,10 @@ func (e *Engine) addArg(res *Result, a *spec.Arg, prefix, insertPrefix string) {
 		}
 	}
 	res.Generators = append(res.Generators, a.Generators...)
+	res.Templates = append(res.Templates, a.Template...)
+	for _, g := range a.Generators {
+		res.Templates = append(res.Templates, g.Template...)
+	}
 	sortCandidates(res.Candidates)
 }
 

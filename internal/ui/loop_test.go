@@ -228,3 +228,98 @@ func candNames(rs []ranked) []string {
 	}
 	return out
 }
+
+// fakeDynamic menyediakan kandidat dinamis tanpa menjalankan proses apa pun.
+type fakeDynamic struct {
+	names   []string
+	panggil int
+}
+
+func (f *fakeDynamic) Candidates(res *engine.Result) []engine.Candidate {
+	f.panggil++
+	out := make([]engine.Candidate, len(f.names))
+	for i, n := range f.names {
+		out[i] = engine.Candidate{
+			Name: n, Insert: n, CursorOffset: len(n),
+			Kind: engine.KindArg, Priority: engine.DefaultPriority,
+		}
+	}
+	return out
+}
+
+func prepare(t *testing.T, line string, dyn Dynamic) *Preflight {
+	t.Helper()
+	p, err := Prepare(newEngine(), State{Line: line, Cursor: len(line)}, dyn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// Kandidat dinamis harus bersaing dalam daftar yang SAMA dengan kandidat
+// statis. Menampilkannya sebagai dua daftar terpisah akan membuat nama branch
+// selalu kalah atau selalu menang, bukan diurutkan menurut relevansi.
+func TestKandidatDinamisIkutDisaring(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"fitur-a", "fitur-b", "main"}}
+	p := prepare(t, "git checkout fit", dyn)
+
+	got := p.Candidates()
+	if len(got) != 2 {
+		t.Fatalf("kandidat = %v, mau hanya yang cocok 'fit'", candNamesOf(got))
+	}
+	for _, c := range got {
+		if c.Name != "fitur-a" && c.Name != "fitur-b" {
+			t.Errorf("kandidat tak terduga: %q", c.Name)
+		}
+	}
+}
+
+func TestKandidatDinamisBersaingDenganStatis(t *testing.T) {
+	// "-" adalah saran statis pada spec checkout buatan tangan? Tidak; yang
+	// diuji di sini adalah keduanya muncul dalam satu daftar terurut.
+	dyn := &fakeDynamic{names: []string{"fitur-a"}}
+	p := prepare(t, "git checkout ", dyn)
+
+	var adaStatis, adaDinamis bool
+	for _, c := range p.Candidates() {
+		if c.Name == "fitur-a" {
+			adaDinamis = true
+		}
+		if c.Kind == engine.KindOption {
+			adaStatis = true
+		}
+	}
+	if !adaDinamis || !adaStatis {
+		t.Errorf("kedua sumber harus muncul dalam satu daftar; dinamis=%v statis=%v", adaDinamis, adaStatis)
+	}
+}
+
+func TestTanpaDynamicTetapBerjalan(t *testing.T) {
+	p := prepare(t, "git ", nil)
+	if len(p.Candidates()) == 0 {
+		t.Error("kandidat statis harus tetap ada tanpa sumber dinamis")
+	}
+}
+
+// Kandidat tunggal tidak membuka dropdown sama sekali, termasuk ketika satu-
+// satunya kandidat berasal dari generator.
+func TestKandidatDinamisTunggalLangsungDisisipkan(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"fitur-unik"}}
+	p := prepare(t, "git checkout fitur-uni", dyn)
+
+	st, out, done := p.Immediate()
+	if !done || out != Accepted {
+		t.Fatalf("outcome = %v, done = %v; mau langsung disisipkan", out, done)
+	}
+	if st.Line != "git checkout fitur-unik" {
+		t.Errorf("Line = %q", st.Line)
+	}
+}
+
+func candNamesOf(cs []engine.Candidate) []string {
+	out := make([]string, len(cs))
+	for i, c := range cs {
+		out[i] = c.Name
+	}
+	return out
+}

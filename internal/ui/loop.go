@@ -28,18 +28,41 @@ const (
 // SSH, itu beberapa round-trip yang tidak jadi terjadi setiap kali Tab.
 type Preflight struct {
 	eng *engine.Engine
+	dyn Dynamic
 	res *engine.Result
 	rs  []ranked
 	st  State
 }
 
 // Prepare menghitung dan memeringkat kandidat untuk sebuah state.
-func Prepare(eng *engine.Engine, st State) (*Preflight, error) {
+//
+// dyn boleh nil; tanpa itu hanya kandidat statis dari spec yang dipakai.
+func Prepare(eng *engine.Engine, st State, dyn Dynamic) (*Preflight, error) {
 	res, err := eng.Complete(st.Line, st.Cursor)
 	if err != nil {
 		return nil, err
 	}
-	return &Preflight{eng: eng, res: res, rs: filter(res.Candidates, res.Prefix), st: st}, nil
+
+	if dyn != nil {
+		// Kandidat dinamis ditambahkan SETELAH yang statis, lalu penyaringan
+		// dan pemeringkatan berjalan atas keduanya sekaligus. Dengan begitu
+		// nama branch dan nama subcommand bersaing dengan aturan yang sama,
+		// bukan tampil sebagai dua daftar terpisah.
+		res.Candidates = append(res.Candidates, dyn.Candidates(res)...)
+	}
+
+	return &Preflight{eng: eng, dyn: dyn, res: res, rs: filter(res.Candidates, res.Prefix), st: st}, nil
+}
+
+// Candidates mengembalikan kandidat dalam urutan yang akan ditampilkan,
+// sudah disaring terhadap prefix. Dipakai oleh mode pemeriksaan agar yang
+// terlihat di sana sama persis dengan yang muncul saat Tab ditekan.
+func (p *Preflight) Candidates() []engine.Candidate {
+	out := make([]engine.Candidate, len(p.rs))
+	for i, r := range p.rs {
+		out[i] = r.cand
+	}
+	return out
 }
 
 // Immediate menangani kasus yang tidak memerlukan terminal. Nilai ketiga
@@ -57,6 +80,7 @@ func (p *Preflight) Immediate() (State, Outcome, bool) {
 // Session menjalankan interaksi dropdown untuk satu penekanan tombol pelengkap.
 type Session struct {
 	eng  *engine.Engine
+	dyn  Dynamic
 	term Terminal
 	rend *Renderer
 
@@ -79,6 +103,7 @@ type Session struct {
 func (p *Preflight) Session(term Terminal, rend *Renderer) *Session {
 	return &Session{
 		eng:      p.eng,
+		dyn:      p.dyn,
 		term:     term,
 		rend:     rend,
 		st:       p.st,
@@ -210,6 +235,9 @@ func (s *Session) recompute() (*engine.Result, []ranked, error) {
 	res, err := s.eng.Complete(s.st.Line, s.st.Cursor)
 	if err != nil {
 		return nil, nil, err
+	}
+	if s.dyn != nil {
+		res.Candidates = append(res.Candidates, s.dyn.Candidates(res)...)
 	}
 	return res, filter(res.Candidates, res.Prefix), nil
 }
