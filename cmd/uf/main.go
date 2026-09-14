@@ -19,6 +19,7 @@ import (
 const usage = `uf - autocomplete lintas platform untuk shell
 
 Penggunaan:
+  uf init     <zsh|bash|fish>
   uf complete --line <baris> [--cursor N] [--json]
   uf widget   --line <baris> --cursor <N>
 
@@ -29,12 +30,20 @@ Opsi:
   --specs   direktori spec, boleh beberapa dipisah titik dua
             (default: $UF_SPECS, ~/.config/uf/specs, ./specs, lalu bawaan)
 
+init mencetak skrip integrasi shell. Pasang dengan menambahkan satu baris ke
+berkas konfigurasi shell:
+
+  zsh   ~/.zshrc                     eval "$(uf init zsh)"
+  bash  ~/.bashrc                    eval "$(uf init bash)"
+  fish  ~/.config/fish/config.fish   uf init fish | source
+
 widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
 
 Lingkungan:
   UF_SPECS  direktori spec
   UF_SIMPLE bila diisi, matikan warna dan sorotan
+  UF_KEY    tombol pemicu, dibaca oleh skrip init
 `
 
 func main() {
@@ -44,6 +53,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "init":
+		os.Exit(runInit(os.Args[2:]))
 	case "complete":
 		os.Exit(runComplete(os.Args[2:]))
 	case "widget":

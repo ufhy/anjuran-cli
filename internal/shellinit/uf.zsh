@@ -2,11 +2,11 @@
 #
 # Pasang dengan menambahkan satu baris ini ke ~/.zshrc:
 #
-#     source /path/ke/uf.zsh
+#     eval "$(uf init zsh)"
 #
-# Tombol pemicu bisa diganti lewat UF_KEY sebelum source, misalnya:
+# Tombol pemicu bisa diganti lewat UF_KEY sebelum eval, misalnya:
 #
-#     UF_KEY='^ ' source /path/ke/uf.zsh    # Ctrl-Spasi, Tab tetap bawaan zsh
+#     UF_KEY='^ ' eval "$(uf init zsh)"     # Ctrl-Spasi, Tab tetap bawaan zsh
 
 # Jangan pasang apa pun bila binary-nya tidak ada, agar .zshrc tetap aman
 # disalin ke mesin yang belum terpasang uf.

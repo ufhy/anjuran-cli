@@ -64,8 +64,8 @@ dihasilkan mesin.
 
 ## Status
 
-Tahap 3 dari 6: sudah bisa dipakai di zsh, dengan **716 CLI** hasil impor dari
-paket spec Fig — git, docker, kubectl, terraform, aws, az, gcloud, npm, systemctl,
+Tahap 4 dari 6: sudah bisa dipakai di **zsh, bash, dan fish**, dengan **716 CLI**
+hasil impor dari paket spec Fig — git, docker, kubectl, terraform, aws, az, gcloud, npm, systemctl,
 dan seterusnya.
 
 | Tahap | Isi | Status |
@@ -73,19 +73,29 @@ dan seterusnya.
 | 1 | Parser + engine + spec buatan tangan | selesai |
 | 2 | Renderer ANSI + integrasi zsh | selesai |
 | 3 | Transpiler spec Fig → JSON, impor massal | selesai |
-| 4 | Integrasi bash + fish | belum |
+| 4 | Integrasi bash + fish | selesai |
 | 5 | PowerShell / Windows Terminal | belum |
 | 6 | Rilis: brew, deb/rpm, scoop/winget | belum |
 
-## Pasang di zsh
+## Pasang
 
 ```sh
 make specs                              # unduh + transpile spec Fig (butuh node)
 make build
 sudo cp bin/uf /usr/local/bin/          # atau taruh di mana pun dalam PATH
 mkdir -p ~/.config/uf && cp -r specs ~/.config/uf/
-echo 'source /path/ke/uf-cli/shell/uf.zsh' >> ~/.zshrc
 ```
+
+Lalu satu baris di berkas konfigurasi shell:
+
+| Shell | Berkas | Baris |
+|---|---|---|
+| zsh | `~/.zshrc` | `eval "$(uf init zsh)"` |
+| bash | `~/.bashrc` | `eval "$(uf init bash)"` |
+| fish | `~/.config/fish/config.fish` | `uf init fish \| source` |
+
+Skrip integrasinya disematkan di dalam binary, jadi tidak ada path repo yang
+perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas.
 
 Tab kini membuka dropdown. Tombol di dalamnya:
 
@@ -98,14 +108,34 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 | Spasi | sisipkan lalu tutup, siap mengetik argumen berikutnya |
 | Esc, Ctrl-C | batal, baris dibiarkan apa adanya |
 
-Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik zsh:
+Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik shell:
 
 ```sh
-UF_KEY='^ ' source /path/ke/uf-cli/shell/uf.zsh   # Ctrl-Spasi
+UF_KEY='^ '   eval "$(uf init zsh)"     # zsh:  Ctrl-Spasi
+UF_KEY='\C-@' eval "$(uf init bash)"    # bash: Ctrl-Spasi
+set -gx UF_KEY \cspace                  # fish: Ctrl-Spasi
 ```
 
-Bila sebuah perintah tidak punya spec, `uf` menyerahkannya kembali ke
-`expand-or-complete` bawaan zsh — jadi Tab tidak pernah terasa mati.
+### Saat sebuah perintah tidak punya spec
+
+`uf` mengembalikan tombolnya ke shell, jadi Tab tidak pernah terasa mati:
+
+| Shell | Yang terjadi |
+|---|---|
+| zsh | `expand-or-complete` bawaan, utuh |
+| fish | `commandline -f complete` bawaan, utuh |
+| bash | melengkapi nama berkas saja |
+
+Bash memang lebih terbatas, dan itu batasan readline, bukan pilihan desain:
+`bind -x` mengambil alih tombolnya sepenuhnya dan tidak menyediakan cara
+memanggil kembali fungsi yang didaftarkan `complete`. Yang ditiru karena itu
+hanya perilaku bawaan readline, yaitu melengkapi path. Siapa pun yang lebih
+membutuhkan bash-completion daripada uf sebaiknya memindahkan pemicunya ke
+tombol lain lewat `UF_KEY`.
+
+Bash 4.0 ke atas dibutuhkan, karena `READLINE_LINE` dan `READLINE_POINT` baru
+ada sejak versi itu. Bash 3.2 bawaan macOS tidak didukung; pasang lewat
+`brew install bash`.
 
 ## Coba tanpa memasang
 
@@ -130,7 +160,7 @@ internal/parser/   tokenizer sadar-kutip + resolusi posisi kursor
 internal/engine/   penelusuran pohon spec → daftar kandidat
 internal/ui/       pencocokan fuzzy, renderer diff, loop interaktif
 internal/tty/      mode raw, ukuran layar, penguraian tombol
-shell/             integrasi per-shell
+internal/shellinit/ skrip integrasi shell, disematkan ke binary
 tools/transpile/   pengubah spec Fig menjadi skema uf
 specs/             DIHASILKAN oleh `make specs`, tidak masuk git
 internal/testdata/ spec buatan tangan sebagai fixture pengujian
@@ -176,6 +206,22 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
 
 Skema generator juga sudah berbentuk argv (`["git","branch"]`), bukan string shell,
 sehingga tidak ada jalur injeksi lewat berkas spec.
+
+## Satuan posisi kursor
+
+Setiap shell melaporkan posisi kursor dengan satuan berbeda, dan ini bukan
+detail yang bisa diabaikan:
+
+| Shell | Variabel | Satuan |
+|---|---|---|
+| zsh | `$CURSOR` | karakter |
+| fish | `commandline -C` | karakter |
+| bash | `$READLINE_POINT` | **byte** |
+
+Karena itu `uf widget` menerima `--cursor-unit rune\|byte`, dan hanya skrip bash
+yang memintanya dalam byte. Salah satuan tidak terlihat sama sekali pada baris
+ASCII, dan baru muncul sebagai sisipan di posisi yang salah begitu ada huruf
+beraksen atau CJK di baris itu.
 
 ## SSH
 

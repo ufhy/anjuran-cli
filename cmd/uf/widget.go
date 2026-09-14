@@ -29,18 +29,14 @@ import (
 func runWidget(args []string) int {
 	fs := flag.NewFlagSet("widget", flag.ExitOnError)
 	line := fs.String("line", "", "isi buffer shell")
-	cursor := fs.Int("cursor", -1, "posisi kursor dalam jumlah rune")
+	cursor := fs.Int("cursor", -1, "posisi kursor")
+	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune atau byte")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
-	// Shell melaporkan posisi kursor dalam rune; engine bekerja dalam byte.
-	runes := []rune(*line)
-	if *cursor < 0 || *cursor > len(runes) {
-		*cursor = len(runes)
-	}
-	byteCursor := len(string(runes[:*cursor]))
+	byteCursor := toByteCursor(*line, *cursor, *unit)
 
 	dirs, err := resolveSpecsDirs(*specsDir)
 	if err != nil {
@@ -57,11 +53,11 @@ func runWidget(args []string) int {
 
 	switch outcome {
 	case ui.Accepted:
-		emit("ok", st.Line, st.Cursor)
+		emit("ok", st.Line, st.Cursor, *unit)
 	case ui.NoCandidates:
-		emit("none", *line, byteCursor)
+		emit("none", *line, byteCursor, *unit)
 	default:
-		emit("cancel", *line, byteCursor)
+		emit("cancel", *line, byteCursor, *unit)
 	}
 	return 0
 }
@@ -104,11 +100,42 @@ func simpleMode() bool {
 	return false
 }
 
-// emit menulis hasil dengan posisi kursor dikembalikan ke satuan rune.
-func emit(status, line string, byteCursor int) {
+// toByteCursor menerjemahkan posisi kursor yang dilaporkan shell menjadi
+// offset byte yang dipakai engine.
+//
+// Satuannya berbeda antar shell dan itu bukan detail yang bisa diabaikan:
+// zsh, fish, dan PowerShell menghitung dalam karakter, sedangkan READLINE_POINT
+// milik bash menghitung dalam byte. Pada baris berisi huruf non-ASCII, salah
+// satuan berarti completion terjadi di tempat yang salah.
+func toByteCursor(line string, cursor int, unit string) int {
+	if unit == unitByte {
+		if cursor < 0 || cursor > len(line) {
+			return len(line)
+		}
+		return cursor
+	}
+
+	runes := []rune(line)
+	if cursor < 0 || cursor > len(runes) {
+		return len(line)
+	}
+	return len(string(runes[:cursor]))
+}
+
+// Satuan posisi kursor yang dipahami mode widget.
+const (
+	unitRune = "rune"
+	unitByte = "byte"
+)
+
+// emit menulis hasil dengan posisi kursor dikembalikan ke satuan yang diminta.
+func emit(status, line string, byteCursor int, unit string) {
 	if byteCursor > len(line) {
 		byteCursor = len(line)
 	}
-	runeCursor := len([]rune(line[:byteCursor]))
-	fmt.Printf("%s %d\n%s", status, runeCursor, line)
+	pos := byteCursor
+	if unit != unitByte {
+		pos = len([]rune(line[:byteCursor]))
+	}
+	fmt.Printf("%s %d\n%s", status, pos, line)
 }
