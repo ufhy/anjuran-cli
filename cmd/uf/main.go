@@ -20,12 +20,20 @@ const usage = `uf - autocomplete lintas platform untuk shell
 
 Penggunaan:
   uf complete --line <baris> [--cursor N] [--json]
+  uf widget   --line <baris> --cursor <N>
 
 Opsi:
   --line    baris perintah yang sedang diketik
   --cursor  posisi kursor dalam byte (default: akhir baris)
   --json    keluarkan hasil mentah sebagai JSON
   --specs   direktori spec (default: $UF_SPECS, lalu ./specs, lalu ~/.config/uf/specs)
+
+widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
+ke /dev/tty dan hasilnya dikembalikan lewat stdout.
+
+Lingkungan:
+  UF_SPECS  direktori spec
+  UF_SIMPLE bila diisi, matikan warna dan sorotan
 `
 
 func main() {
@@ -37,6 +45,8 @@ func main() {
 	switch os.Args[1] {
 	case "complete":
 		os.Exit(runComplete(os.Args[2:]))
+	case "widget":
+		os.Exit(runWidget(os.Args[2:]))
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:
