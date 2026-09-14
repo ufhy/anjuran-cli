@@ -1,0 +1,156 @@
+# Konfigurasi rilis uf.
+#
+# Paket rilis WAJIB memuat direktori specs/. Tanpa itu binary-nya berjalan
+# tetapi tidak menawarkan apa pun, karena specs/ dihasilkan mesin dan tidak
+# ikut masuk git.
+
+version: 2
+
+project_name: uf
+
+before:
+  hooks:
+    # Bangun spec bila belum ada. Pemeriksaan ini membuat rilis percobaan di
+    # mesin pengembangan tidak mengunduh ulang paket Fig setiap kali.
+    - sh -c 'test -d specs || make specs'
+    - go mod tidy
+
+builds:
+  - id: uf
+    main: ./cmd/uf
+    binary: uf
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+      - -X main.date={{ .CommitDate }}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: uf
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE
+      - NOTICE
+      # specs/ diletakkan bersebelahan dengan binary; uf mencari di sana
+      # tanpa konfigurasi tambahan.
+      #
+      # Polanya "specs/**" dan BUKAN "specs/**/*": bentuk kedua mensyaratkan
+      # minimal satu tingkat direktori, sehingga seluruh spec tingkat atas —
+      # git, docker, kubectl — diam-diam tidak ikut terbawa.
+      - src: specs/**
+        dst: specs
+
+nfpms:
+  - id: uf
+    package_name: uf
+    vendor: ufhy
+    homepage: https://github.com/uf-cli/uf
+    maintainer: ufhy <metallica.one@live.com>
+    description: Autocomplete gaya Fig untuk shell, lintas platform.
+    license: MIT
+    formats: [deb, rpm, apk]
+    bindir: /usr/bin
+    contents:
+      # /usr/bin/uf mencari ../share/uf/specs, jadi jalur ini sudah dikenali
+      # tanpa variabel lingkungan apa pun.
+      - src: specs
+        dst: /usr/share/uf/specs
+      - src: NOTICE
+        dst: /usr/share/doc/uf/NOTICE
+
+homebrew_casks:
+  - name: uf
+    repository:
+      owner: uf-cli
+      name: homebrew-tap
+      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+    # Manifest hanya didorong bila token tap tersedia; tanpa itu rilis
+    # tetap berhasil, hanya tanpa pembaruan tap.
+    skip_upload: '{{ if envOrDefault "TAP_GITHUB_TOKEN" "" }}false{{ else }}true{{ end }}'
+    homepage: https://github.com/uf-cli/uf
+    description: Autocomplete gaya Fig untuk shell, lintas platform
+    license: MIT
+    # Seluruh isi arsip dipentaskan di Caskroom; hanya binary-nya yang
+    # di-symlink ke bin. Spec tetap bersebelahan dengan berkas aslinya, dan
+    # uf menemukannya karena symlink diselesaikan lebih dulu saat mencari.
+    binaries:
+      - uf
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            # Binary tanpa tanda tangan yang diunduh akan dikarantina Gatekeeper
+            # dan menolak dijalankan. Atribut itu dilepas di sini.
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/uf"]
+          end
+    caveats: |
+      Tambahkan satu baris ke berkas konfigurasi shell:
+
+        zsh         eval "$(uf init zsh)"
+        bash        eval "$(uf init bash)"
+        fish        uf init fish | source
+        PowerShell  uf init powershell | Out-String | Invoke-Expression
+
+scoops:
+  - repository:
+      owner: uf-cli
+      name: scoop-bucket
+    homepage: https://github.com/uf-cli/uf
+    description: Autocomplete gaya Fig untuk shell, lintas platform
+    license: MIT
+
+winget:
+  - name: uf
+    publisher: ufhy
+    short_description: Autocomplete gaya Fig untuk shell, lintas platform
+    license: MIT
+    homepage: https://github.com/uf-cli/uf
+    repository:
+      owner: uf-cli
+      name: winget-pkgs
+      branch: "uf-{{ .Version }}"
+      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+    # Manifest hanya didorong bila token tap tersedia; tanpa itu rilis
+    # tetap berhasil, hanya tanpa pembaruan tap.
+    skip_upload: '{{ if envOrDefault "TAP_GITHUB_TOKEN" "" }}false{{ else }}true{{ end }}'
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - Merge pull request
+
+release:
+  footer: |
+    ## Pemasangan
+
+    Unduh arsip untuk platform kamu, letakkan `uf` di dalam PATH, dan biarkan
+    `specs/` bersebelahan dengannya. Lalu satu baris di berkas konfigurasi shell:
+
+    | Shell | Baris |
+    |---|---|
+    | zsh | `eval "$(uf init zsh)"` |
+    | bash | `eval "$(uf init bash)"` |
+    | fish | `uf init fish \| source` |
+    | PowerShell | `uf init powershell \| Out-String \| Invoke-Expression` |

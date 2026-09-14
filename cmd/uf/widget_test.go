@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 // Satuan posisi kursor berbeda antar shell: bash memakai byte, sisanya rune.
 // Kesalahan di sini tidak terlihat pada baris ASCII, dan baru muncul sebagai
@@ -150,6 +153,83 @@ func TestUTF16Len(t *testing.T) {
 	for _, tt := range tests {
 		if got := utf16Len(tt.r); got != tt.want {
 			t.Errorf("utf16Len(%q) = %d, mau %d", tt.r, got, tt.want)
+		}
+	}
+}
+
+// Letak spec bawaan berbeda-beda menurut cara pemasangannya, dan symlink
+// membuatnya tidak sesederhana "sebelah binary". Homebrew memasang binary
+// sebagai symlink di dalam bin sementara spec tetap di direktori aslinya;
+// pernah membuat spec tidak pernah ditemukan sama sekali.
+func TestBundledSpecsDirs(t *testing.T) {
+	noSymlink := func(p string) (string, error) { return p, nil }
+
+	t.Run("arsip rilis", func(t *testing.T) {
+		got := bundledSpecsDirsFor("/opt/uf/uf", noSymlink)
+		want := []string{"/opt/uf/specs", "/opt/share/uf/specs"}
+		assertDirs(t, got, want)
+	})
+
+	t.Run("deb dan rpm", func(t *testing.T) {
+		got := bundledSpecsDirsFor("/usr/bin/uf", noSymlink)
+		if !contains(got, "/usr/share/uf/specs") {
+			t.Errorf("mau /usr/share/uf/specs, dapat %v", got)
+		}
+	})
+
+	t.Run("symlink homebrew", func(t *testing.T) {
+		// /opt/homebrew/bin/uf -> /opt/homebrew/Caskroom/uf/1.0.0/uf
+		eval := func(p string) (string, error) {
+			if p == "/opt/homebrew/bin/uf" {
+				return "/opt/homebrew/Caskroom/uf/1.0.0/uf", nil
+			}
+			return p, nil
+		}
+		got := bundledSpecsDirsFor("/opt/homebrew/bin/uf", eval)
+		if !contains(got, "/opt/homebrew/Caskroom/uf/1.0.0/specs") {
+			t.Errorf("lokasi sebenarnya di balik symlink harus ikut dicari, dapat %v", got)
+		}
+		// Lokasi sebelum symlink diselesaikan tetap dicoba, karena formula
+		// meletakkan spec di share/ relatif terhadap bin.
+		if !contains(got, "/opt/homebrew/share/uf/specs") {
+			t.Errorf("lokasi share relatif bin harus tetap dicari, dapat %v", got)
+		}
+	})
+
+	t.Run("tanpa duplikat", func(t *testing.T) {
+		got := bundledSpecsDirsFor("/usr/bin/uf", noSymlink)
+		seen := map[string]bool{}
+		for _, d := range got {
+			if seen[d] {
+				t.Errorf("jalur ganda %q dalam %v", d, got)
+			}
+			seen[d] = true
+		}
+	})
+
+	t.Run("symlink gagal diselesaikan", func(t *testing.T) {
+		eval := func(string) (string, error) { return "", os.ErrNotExist }
+		got := bundledSpecsDirsFor("/opt/uf/uf", eval)
+		if len(got) == 0 {
+			t.Error("kegagalan resolusi symlink tidak boleh mengosongkan hasil")
+		}
+	})
+}
+
+func contains(hay []string, needle string) bool {
+	for _, h := range hay {
+		if h == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func assertDirs(t *testing.T, got, want []string) {
+	t.Helper()
+	for _, w := range want {
+		if !contains(got, w) {
+			t.Errorf("mau memuat %q, dapat %v", w, got)
 		}
 	}
 }

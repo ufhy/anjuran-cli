@@ -2,6 +2,10 @@
 /dist/
 *.test
 
+# Binary hasil `go build -o uf` di akar, seperti yang dipakai uji asap CI.
+/uf
+/uf.exe
+
 # specs/ DIHASILKAN oleh `make specs` dari paket npm Fig. Isinya 1472 berkas
 # gzip yang tidak bisa di-delta oleh git, sehingga setiap kali versi Fig
 # dinaikkan repo akan bertambah beberapa megabyte secara permanen. Direktori

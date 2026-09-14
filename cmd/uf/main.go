@@ -16,10 +16,19 @@ import (
 	"github.com/uf-cli/uf/internal/spec"
 )
 
+// version diisi saat build lewat -ldflags. Nilai "dev" berarti binary ini
+// dibangun dari pohon kerja, bukan dari sebuah rilis.
+var (
+	version = "dev"
+	commit  = ""
+	date    = ""
+)
+
 const usage = `uf - autocomplete lintas platform untuk shell
 
 Penggunaan:
-  uf init     <zsh|bash|fish>
+  uf init     <zsh|bash|fish|powershell>
+  uf version
   uf complete --line <baris> [--cursor N] [--json]
   uf widget   --line <baris> --cursor <N>
 
@@ -59,6 +68,8 @@ func main() {
 		os.Exit(runComplete(os.Args[2:]))
 	case "widget":
 		os.Exit(runWidget(os.Args[2:]))
+	case "version", "-v", "--version":
+		fmt.Println(versionString())
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:
@@ -138,15 +149,65 @@ func resolveSpecsDirs(flagValue string) ([]string, error) {
 		add(filepath.Join(home, ".config", "uf", "specs"))
 	}
 	add("specs")
-	// Spec bawaan yang diletakkan bersebelahan dengan binary, sebagaimana
-	// hasil pemasangan dari paket rilis.
-	if exe, err := os.Executable(); err == nil {
-		add(filepath.Join(filepath.Dir(exe), "specs"),
-			filepath.Join(filepath.Dir(exe), "..", "share", "uf", "specs"))
-	}
+	add(bundledSpecsDirs()...)
 
 	if len(dirs) == 0 {
 		return nil, fmt.Errorf("direktori spec tidak ditemukan; set UF_SPECS atau pakai --specs")
 	}
 	return dirs, nil
+}
+
+// versionString merangkai keterangan versi. Commit dan tanggal hanya muncul
+// bila binary ini memang dibangun oleh proses rilis.
+func versionString() string {
+	s := "uf " + version
+	if commit != "" {
+		s += " (" + commit
+		if date != "" {
+			s += ", " + date
+		}
+		s += ")"
+	}
+	return s
+}
+
+// bundledSpecsDirs menyusun lokasi spec bawaan relatif terhadap binary.
+func bundledSpecsDirs() []string {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	return bundledSpecsDirsFor(exe, filepath.EvalSymlinks)
+}
+
+// bundledSpecsDirsFor adalah isi bundledSpecsDirs yang bisa diuji.
+//
+// Symlink harus diselesaikan lebih dulu. Homebrew — baik formula maupun cask —
+// memasang binary sebagai symlink di dalam bin, sementara spec tetap berada di
+// direktori aslinya; tanpa langkah ini spec tidak akan pernah ditemukan.
+// Kedua lokasi tetap dicoba, karena arsip biasa tidak memakai symlink sama
+// sekali dan di sana exe sudah merupakan jalur sebenarnya.
+func bundledSpecsDirsFor(exe string, eval func(string) (string, error)) []string {
+	dirs := []string{}
+	seen := map[string]bool{}
+
+	addFor := func(path string) {
+		base := filepath.Dir(path)
+		for _, d := range []string{
+			filepath.Join(base, "specs"),                      // arsip rilis, cask, scoop
+			filepath.Join(base, "..", "share", "uf", "specs"), // deb, rpm, formula
+		} {
+			c := filepath.Clean(d)
+			if !seen[c] {
+				seen[c] = true
+				dirs = append(dirs, c)
+			}
+		}
+	}
+
+	addFor(exe)
+	if real, err := eval(exe); err == nil && real != exe {
+		addFor(real)
+	}
+	return dirs
 }

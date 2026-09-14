@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # goreleaser butuh riwayat penuh untuk changelog
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      # Node dibutuhkan karena paket rilis WAJIB memuat specs/, dan direktori
+      # itu dihasilkan dari paket npm Fig — tidak ikut masuk git.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: bangun spec
+        run: make specs
+
+      - name: pastikan spec benar-benar ada
+        run: |
+          n=$(find specs -name '*.json.gz' | wc -l)
+          echo "spec terbangun: $n"
+          # Rilis tanpa spec menghasilkan binary yang berjalan tetapi tidak
+          # menawarkan apa pun. Lebih baik gagal di sini.
+          if [ "$n" -lt 1000 ]; then
+            echo "terlalu sedikit spec; rilis dibatalkan" >&2
+            exit 1
+          fi
+
+      - name: test
+        run: go test ./...
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Token terpisah untuk mendorong manifest ke repo tap, bucket, dan
+          # winget. Bila belum diisi, goreleaser melewati langkah itu.
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

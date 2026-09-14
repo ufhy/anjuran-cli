@@ -17,6 +17,23 @@ UI-nya berupa byte, dropdown-nya melewati pipa SSH sama seperti output perintah 
 
 Spec CLI diambil ulang dari withfig/autocomplete yang berlisensi MIT.
 
+## Rilis
+
+`make snapshot` membangun rilis percobaan lengkap ke `dist/` tanpa
+mempublikasikan apa pun; `git tag vX.Y.Z && git push --tags` menjalankan
+rilis sungguhan lewat CI.
+
+| Artefak | Tata letak spec |
+|---|---|
+| tar.gz, zip | `specs/` di samping binary |
+| deb, rpm, apk | `/usr/share/uf/specs` |
+| Homebrew cask | di dalam Caskroom, ditemukan lewat resolusi symlink |
+| Scoop, winget | `specs/` di samping binary |
+
+Paket rilis WAJIB memuat `specs/`. Tanpa itu binary-nya berjalan tetapi tidak
+menawarkan apa pun, jadi alur rilis menggagalkan dirinya sendiri bila jumlah
+spec yang terbangun kurang dari seribu.
+
 ## Spec
 
 `make specs` mengunduh paket npm `@withfig/autocomplete` — yang sudah berisi spec
@@ -64,7 +81,7 @@ dihasilkan mesin.
 
 ## Status
 
-Tahap 5 dari 6: sudah bisa dipakai di **zsh, bash, fish, dan PowerShell**, dengan
+Selesai enam tahap: jalan di **zsh, bash, fish, dan PowerShell**, dengan
 **716 CLI** hasil impor dari paket spec Fig — git, docker, kubectl, terraform, aws, az, gcloud, npm, systemctl,
 dan seterusnya.
 
@@ -75,14 +92,29 @@ dan seterusnya.
 | 3 | Transpiler spec Fig → JSON, impor massal | selesai |
 | 4 | Integrasi bash + fish | selesai |
 | 5 | PowerShell / Windows Terminal | selesai |
-| 6 | Rilis: brew, deb/rpm, scoop/winget | belum |
+| 6 | Rilis: brew, deb/rpm, scoop/winget | selesai |
 
 ## Pasang
 
 ```sh
+brew install uf-cli/tap/uf              # macOS, Linux
+scoop bucket add uf-cli https://github.com/uf-cli/scoop-bucket
+scoop install uf                        # Windows
+sudo dpkg -i uf_*_linux_amd64.deb       # Debian, Ubuntu
+sudo rpm -i uf_*_linux_amd64.rpm        # Fedora, RHEL
+```
+
+Atau unduh arsip dari halaman rilis, letakkan `uf` di dalam PATH, dan biarkan
+`specs/` bersebelahan dengannya. Tidak ada variabel lingkungan yang perlu
+disetel: `uf` mencari spec relatif terhadap dirinya sendiri, termasuk saat
+dipasang sebagai symlink oleh Homebrew.
+
+### Dari sumber
+
+```sh
 make specs                              # unduh + transpile spec Fig (butuh node)
 make build
-sudo cp bin/uf /usr/local/bin/          # atau taruh di mana pun dalam PATH
+sudo cp bin/uf /usr/local/bin/
 mkdir -p ~/.config/uf && cp -r specs ~/.config/uf/
 ```
 

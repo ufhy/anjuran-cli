@@ -4,7 +4,7 @@ BIN_DIR := bin
 # Versi paket spec Fig yang dipakai. Naikkan angka ini untuk menyegarkan spec.
 FIG_VERSION := 2.692.3
 
-.PHONY: build test bench fmt vet check clean cross specs
+.PHONY: build test bench fmt vet check clean cross specs snapshot release-check
 
 build:
 	go build -o $(BIN_DIR)/$(BINARY) ./cmd/uf
@@ -36,5 +36,14 @@ cross:
 specs:
 	@tools/transpile/build-specs.sh $(FIG_VERSION) specs
 
+# snapshot membangun rilis percobaan lengkap ke dist/ tanpa mempublikasikan
+# apa pun. Ini satu-satunya cara memastikan paketnya benar-benar berisi spec:
+# kesalahan pola berkas tidak pernah terlihat dari konfigurasinya saja.
+snapshot:
+	goreleaser release --snapshot --clean --skip=publish
+
+release-check:
+	goreleaser check
+
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) dist
