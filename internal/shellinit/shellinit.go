@@ -21,10 +21,17 @@ var bashScript string
 //go:embed uf.fish
 var fishScript string
 
+//go:embed uf.ps1
+var powershellScript string
+
 var scripts = map[string]string{
-	"zsh":  zshScript,
-	"bash": bashScript,
-	"fish": fishScript,
+	"zsh":        zshScript,
+	"bash":       bashScript,
+	"fish":       fishScript,
+	"powershell": powershellScript,
+	// pwsh adalah nama biner PowerShell 6 ke atas; deteksi dari $SHELL
+	// akan menemukan nama itu, bukan "powershell".
+	"pwsh": powershellScript,
 }
 
 // Script mengembalikan skrip integrasi untuk sebuah shell.
@@ -36,10 +43,14 @@ func Script(shell string) (string, error) {
 	return s, nil
 }
 
-// Shells mengembalikan daftar shell yang didukung, terurut.
+// Shells mengembalikan daftar shell yang didukung, terurut. Alias "pwsh"
+// tidak ikut ditampilkan agar daftarnya tidak memuat dua nama untuk hal sama.
 func Shells() []string {
 	out := make([]string, 0, len(scripts))
 	for k := range scripts {
+		if k == "pwsh" {
+			continue
+		}
 		out = append(out, k)
 	}
 	sort.Strings(out)

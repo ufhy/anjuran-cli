@@ -46,19 +46,47 @@ func TestSetiapSkripMematuhiProtokol(t *testing.T) {
 	}
 }
 
-// READLINE_POINT milik bash dihitung dalam byte, tidak seperti shell lain.
-func TestSkripBashMemintaSatuanByte(t *testing.T) {
-	s, _ := Script("bash")
-	if !strings.Contains(s, "--cursor-unit byte") {
-		t.Error("skrip bash harus meminta satuan byte untuk READLINE_POINT")
+// Setiap keluarga shell melaporkan posisi kursor dengan satuan berbeda, dan
+// skrip yang salah meminta satuan akan menyisipkan di posisi keliru begitu
+// baris memuat huruf non-ASCII.
+func TestSatuanKursorPerShell(t *testing.T) {
+	want := map[string]string{
+		"bash":       "--cursor-unit byte",  // READLINE_POINT menghitung byte
+		"powershell": "--cursor-unit utf16", // indeks string .NET
+		"zsh":        "",                    // rune, yaitu nilai bawaan
+		"fish":       "",
+	}
+	for sh, flag := range want {
+		s, err := Script(sh)
+		if err != nil {
+			t.Fatalf("Script(%q): %v", sh, err)
+		}
+		if flag == "" {
+			if strings.Contains(s, "--cursor-unit") {
+				t.Errorf("skrip %s memakai satuan rune, seharusnya tidak menyebut --cursor-unit", sh)
+			}
+			continue
+		}
+		if !strings.Contains(s, flag) {
+			t.Errorf("skrip %s harus memuat %q", sh, flag)
+		}
 	}
 }
 
-func TestSkripSelainBashMemakaiSatuanRune(t *testing.T) {
-	for _, sh := range []string{"zsh", "fish"} {
-		s, _ := Script(sh)
-		if strings.Contains(s, "--cursor-unit byte") {
-			t.Errorf("skrip %s tidak boleh meminta satuan byte", sh)
+// pwsh adalah nama biner PowerShell 6 ke atas dan harus mengarah ke skrip yang
+// sama, karena deteksi dari $SHELL akan menemukan nama itu.
+func TestPwshAliasKePowershell(t *testing.T) {
+	a, err := Script("pwsh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := Script("powershell")
+	if a != b {
+		t.Error("pwsh dan powershell harus memakai skrip yang sama")
+	}
+	for _, sh := range Shells() {
+		if sh == "pwsh" {
+			t.Error("pwsh tidak boleh muncul dua kali di daftar shell")
 		}
 	}
 }

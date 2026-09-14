@@ -1,0 +1,83 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    # Windows ikut di sini bukan sekadar kelengkapan: jalur konsolnya
+    # (CONIN$/CONOUT$, ENABLE_VIRTUAL_TERMINAL_PROCESSING) tidak bisa diuji
+    # dari mesin pengembangan berbasis Unix, jadi runner inilah satu-satunya
+    # tempat kode itu benar-benar dijalankan.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./...
+
+      # Uji asap memastikan binary-nya benar-benar bisa dijalankan di OS ini,
+      # bukan hanya bisa dikompilasi.
+      - name: uji asap
+        shell: bash
+        run: |
+          go build -o uf ./cmd/uf
+          ./uf init powershell > /dev/null
+          ./uf init bash > /dev/null
+          ./uf complete --line "git comm" --specs internal/testdata/specs | grep -q commit
+          ./uf widget --line "git stat" --cursor 8 --specs internal/testdata/specs < /dev/null | grep -q '^ok '
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "berkas berikut belum diformat:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+  cross:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: cross-compile
+        run: make cross
+
+  specs:
+    # Transpiler diuji terpisah karena butuh node dan jaringan; kegagalannya
+    # tidak boleh menutupi hasil uji Go.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+      - name: bangun spec
+        run: make specs
+      - name: uji terhadap spec asli
+        run: go test ./internal/engine/ -run 'TestSpecAsli|TestLoadSpec' -v

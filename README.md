@@ -64,8 +64,8 @@ dihasilkan mesin.
 
 ## Status
 
-Tahap 4 dari 6: sudah bisa dipakai di **zsh, bash, dan fish**, dengan **716 CLI**
-hasil impor dari paket spec Fig — git, docker, kubectl, terraform, aws, az, gcloud, npm, systemctl,
+Tahap 5 dari 6: sudah bisa dipakai di **zsh, bash, fish, dan PowerShell**, dengan
+**716 CLI** hasil impor dari paket spec Fig — git, docker, kubectl, terraform, aws, az, gcloud, npm, systemctl,
 dan seterusnya.
 
 | Tahap | Isi | Status |
@@ -74,7 +74,7 @@ dan seterusnya.
 | 2 | Renderer ANSI + integrasi zsh | selesai |
 | 3 | Transpiler spec Fig → JSON, impor massal | selesai |
 | 4 | Integrasi bash + fish | selesai |
-| 5 | PowerShell / Windows Terminal | belum |
+| 5 | PowerShell / Windows Terminal | selesai |
 | 6 | Rilis: brew, deb/rpm, scoop/winget | belum |
 
 ## Pasang
@@ -93,6 +93,7 @@ Lalu satu baris di berkas konfigurasi shell:
 | zsh | `~/.zshrc` | `eval "$(uf init zsh)"` |
 | bash | `~/.bashrc` | `eval "$(uf init bash)"` |
 | fish | `~/.config/fish/config.fish` | `uf init fish \| source` |
+| PowerShell | `$PROFILE` | `uf init powershell \| Out-String \| Invoke-Expression` |
 
 Skrip integrasinya disematkan di dalam binary, jadi tidak ada path repo yang
 perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas.
@@ -114,6 +115,7 @@ Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik shell:
 UF_KEY='^ '   eval "$(uf init zsh)"     # zsh:  Ctrl-Spasi
 UF_KEY='\C-@' eval "$(uf init bash)"    # bash: Ctrl-Spasi
 set -gx UF_KEY \cspace                  # fish: Ctrl-Spasi
+$env:UF_KEY = 'Ctrl+Spacebar'           # PowerShell
 ```
 
 ### Saat sebuah perintah tidak punya spec
@@ -124,6 +126,7 @@ set -gx UF_KEY \cspace                  # fish: Ctrl-Spasi
 |---|---|
 | zsh | `expand-or-complete` bawaan, utuh |
 | fish | `commandline -f complete` bawaan, utuh |
+| PowerShell | `MenuComplete` bawaan, utuh |
 | bash | melengkapi nama berkas saja |
 
 Bash memang lebih terbatas, dan itu batasan readline, bukan pilihan desain:
@@ -214,14 +217,36 @@ detail yang bisa diabaikan:
 
 | Shell | Variabel | Satuan |
 |---|---|---|
-| zsh | `$CURSOR` | karakter |
-| fish | `commandline -C` | karakter |
+| zsh | `$CURSOR` | rune |
+| fish | `commandline -C` | rune |
 | bash | `$READLINE_POINT` | **byte** |
+| PowerShell | `GetBufferState` | **UTF-16 code unit** |
 
-Karena itu `uf widget` menerima `--cursor-unit rune\|byte`, dan hanya skrip bash
-yang memintanya dalam byte. Salah satuan tidak terlihat sama sekali pada baris
-ASCII, dan baru muncul sebagai sisipan di posisi yang salah begitu ada huruf
-beraksen atau CJK di baris itu.
+Tiga satuan berbeda, jadi `uf widget` menerima `--cursor-unit rune\|byte\|utf16`.
+Salah satuan tidak terlihat sama sekali pada baris ASCII. Ia baru muncul saat
+baris memuat karakter non-ASCII, dan tiap satuan berpisah pada titik berbeda:
+
+| Karakter | byte | rune | utf16 |
+|---|---|---|---|
+| `a` | 1 | 1 | 1 |
+| `é` | 2 | 1 | 1 |
+| `日` | 3 | 1 | 1 |
+| `🚀` | 4 | 1 | **2** |
+
+Diuji di keempat shell dengan `café`, `日本語`, dan emoji.
+
+## Windows
+
+PowerShell 5.1 ke atas, dengan PSReadLine yang sudah menjadi bawaannya. Windows
+Terminal mendukung VT penuh sejak 2019, jadi renderer yang sama langsung
+berlaku; pada conhost lama `uf` menyalakan `ENABLE_VIRTUAL_TERMINAL_PROCESSING`
+sendiri, dan bila gagal hanya warnanya yang hilang. `cmd.exe` tidak didukung.
+
+Yang bergantung pada Windows hanyalah `internal/tty/open_windows.go`, sebatas
+membuka `CONIN$` dan `CONOUT$`. Berkas itu **belum pernah dijalankan di Windows
+sungguhan** dari sini — pengembangannya di macOS. Karena itu CI menjalankan
+seluruh uji di runner `windows-latest`, dan skrip PowerShell-nya diverifikasi di
+PowerShell 7.6 dengan PSReadLine 2.4 lewat PTY.
 
 ## SSH
 

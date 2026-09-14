@@ -30,7 +30,7 @@ func runWidget(args []string) int {
 	fs := flag.NewFlagSet("widget", flag.ExitOnError)
 	line := fs.String("line", "", "isi buffer shell")
 	cursor := fs.Int("cursor", -1, "posisi kursor")
-	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune atau byte")
+	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -100,42 +100,91 @@ func simpleMode() bool {
 	return false
 }
 
+// Satuan posisi kursor yang dipahami mode widget.
+//
+// Tiga satuan, bukan karena kelebihan pilihan melainkan karena setiap keluarga
+// shell memang melaporkannya berbeda:
+//
+//	rune   zsh ($CURSOR) dan fish (commandline -C) menghitung karakter
+//	byte   READLINE_POINT milik bash menghitung byte
+//	utf16  PSReadLine memakai indeks string .NET, yaitu UTF-16 code unit
+//
+// Perbedaannya tidak terlihat sama sekali pada baris ASCII. Pada huruf beraksen
+// dan CJK, rune dan byte berpisah; pada emoji dan karakter di luar BMP, rune
+// dan utf16 juga berpisah karena satu rune di sana memakan dua code unit.
+const (
+	unitRune  = "rune"
+	unitByte  = "byte"
+	unitUTF16 = "utf16"
+)
+
 // toByteCursor menerjemahkan posisi kursor yang dilaporkan shell menjadi
 // offset byte yang dipakai engine.
-//
-// Satuannya berbeda antar shell dan itu bukan detail yang bisa diabaikan:
-// zsh, fish, dan PowerShell menghitung dalam karakter, sedangkan READLINE_POINT
-// milik bash menghitung dalam byte. Pada baris berisi huruf non-ASCII, salah
-// satuan berarti completion terjadi di tempat yang salah.
 func toByteCursor(line string, cursor int, unit string) int {
-	if unit == unitByte {
+	switch unit {
+	case unitByte:
 		if cursor < 0 || cursor > len(line) {
 			return len(line)
 		}
 		return cursor
-	}
 
-	runes := []rune(line)
-	if cursor < 0 || cursor > len(runes) {
+	case unitUTF16:
+		if cursor < 0 {
+			return len(line)
+		}
+		units := 0
+		for i, r := range line {
+			if units >= cursor {
+				return i
+			}
+			// Kursor yang jatuh di TENGAH pasangan surrogate bukan posisi yang
+			// sah. Dibulatkan ke bawah, karena kursor berarti "sebelum karakter
+			// ini": membulatkan ke atas akan melewati karakter yang belum
+			// dilewati pengguna.
+			if units+utf16Len(r) > cursor {
+				return i
+			}
+			units += utf16Len(r)
+		}
 		return len(line)
+
+	default:
+		runes := []rune(line)
+		if cursor < 0 || cursor > len(runes) {
+			return len(line)
+		}
+		return len(string(runes[:cursor]))
 	}
-	return len(string(runes[:cursor]))
 }
 
-// Satuan posisi kursor yang dipahami mode widget.
-const (
-	unitRune = "rune"
-	unitByte = "byte"
-)
-
-// emit menulis hasil dengan posisi kursor dikembalikan ke satuan yang diminta.
-func emit(status, line string, byteCursor int, unit string) {
+// fromByteCursor mengembalikan posisi kursor ke satuan yang diminta pemanggil.
+func fromByteCursor(line string, byteCursor int, unit string) int {
 	if byteCursor > len(line) {
 		byteCursor = len(line)
 	}
-	pos := byteCursor
-	if unit != unitByte {
-		pos = len([]rune(line[:byteCursor]))
+	switch unit {
+	case unitByte:
+		return byteCursor
+	case unitUTF16:
+		units := 0
+		for _, r := range line[:byteCursor] {
+			units += utf16Len(r)
+		}
+		return units
+	default:
+		return len([]rune(line[:byteCursor]))
 	}
-	fmt.Printf("%s %d\n%s", status, pos, line)
+}
+
+// utf16Len adalah jumlah code unit UTF-16 yang dipakai sebuah rune.
+func utf16Len(r rune) int {
+	if r > 0xFFFF {
+		return 2 // pasangan surrogate
+	}
+	return 1
+}
+
+// emit menulis hasil dengan posisi kursor dikembalikan ke satuan yang diminta.
+func emit(status, line string, byteCursor int, unit string) {
+	fmt.Printf("%s %d\n%s", status, fromByteCursor(line, byteCursor, unit), line)
 }
