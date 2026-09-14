@@ -5,10 +5,15 @@
 package spec
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -50,10 +55,16 @@ func (n Names) Has(s string) bool {
 // Suggestion adalah satu entri statis yang bisa ditawarkan untuk sebuah argumen.
 type Suggestion struct {
 	Name        Names  `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`
-	Icon        string `json:"icon,omitempty"`
+	// InsertValue menggantikan teks yang disisipkan bila berbeda dari nama.
+	// Boleh memuat penanda {cursor} untuk menentukan posisi kursor akhir.
+	InsertValue string `json:"insertValue,omitempty"`
+	// Priority mengikuti konvensi Fig: default 50, makin besar makin diutamakan.
+	Priority int `json:"priority,omitempty"`
 	// Hidden menandai entri yang hanya cocok saat diketik persis.
-	Hidden bool `json:"hidden,omitempty"`
+	Hidden     bool `json:"hidden,omitempty"`
+	Deprecated bool `json:"deprecated,omitempty"`
 }
 
 // Generator mendeskripsikan sumber kandidat dinamis secara DEKLARATIF.
@@ -66,6 +77,8 @@ type Generator struct {
 	Script []string `json:"script,omitempty"`
 	// SplitOn memecah stdout menjadi baris kandidat, default "\n".
 	SplitOn string `json:"splitOn,omitempty"`
+	// Template merujuk sumber bawaan seperti "filepaths" atau "folders".
+	Template []string `json:"template,omitempty"`
 	// Trim membuang spasi di tiap kandidat.
 	Trim bool `json:"trim,omitempty"`
 	// CacheTTL dalam detik; 0 berarti tidak di-cache.
@@ -78,6 +91,7 @@ type Arg struct {
 	Description string       `json:"description,omitempty"`
 	IsOptional  bool         `json:"isOptional,omitempty"`
 	IsVariadic  bool         `json:"isVariadic,omitempty"`
+	Default     string       `json:"default,omitempty"`
 	Suggestions []Suggestion `json:"suggestions,omitempty"`
 	Generators  []Generator  `json:"generators,omitempty"`
 	// Template merujuk sumber bawaan seperti "filepaths" atau "folders".
@@ -87,24 +101,46 @@ type Arg struct {
 // Option adalah flag seperti -v atau --verbose.
 type Option struct {
 	Name        Names  `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`
+	InsertValue string `json:"insertValue,omitempty"`
+	Priority    int    `json:"priority,omitempty"`
 	Args        []Arg  `json:"args,omitempty"`
 	// IsPersistent membuat opsi ini juga berlaku di seluruh subcommand turunan.
 	IsPersistent bool `json:"isPersistent,omitempty"`
 	IsRepeatable bool `json:"isRepeatable,omitempty"`
+	// RequiresSeparator menandai opsi yang nilainya WAJIB ditulis menempel,
+	// misalnya --jobs=4 dan bukan --jobs 4. Tanpa ini, penelusuran akan salah
+	// menelan token berikutnya sebagai argumen opsi.
+	RequiresSeparator bool `json:"requiresSeparator,omitempty"`
 	// ExclusiveOn menyembunyikan opsi ini bila salah satu nama di sini sudah dipakai.
 	ExclusiveOn []string `json:"exclusiveOn,omitempty"`
+	// DependsOn menyembunyikan opsi ini sampai opsi yang disebut sudah dipakai.
+	DependsOn   []string `json:"dependsOn,omitempty"`
+	IsDangerous bool     `json:"isDangerous,omitempty"`
 	Hidden      bool     `json:"hidden,omitempty"`
+	Deprecated  bool     `json:"deprecated,omitempty"`
 }
 
 // Subcommand adalah simpul rekursif: sebuah spec akar juga berbentuk ini.
 type Subcommand struct {
 	Name        Names        `json:"name"`
+	DisplayName string       `json:"displayName,omitempty"`
 	Description string       `json:"description,omitempty"`
+	InsertValue string       `json:"insertValue,omitempty"`
+	Priority    int          `json:"priority,omitempty"`
 	Subcommands []Subcommand `json:"subcommands,omitempty"`
 	Options     []Option     `json:"options,omitempty"`
 	Args        []Arg        `json:"args,omitempty"`
-	Hidden      bool         `json:"hidden,omitempty"`
+	// LoadSpec merujuk berkas spec lain yang memuat isi subcommand ini,
+	// misalnya "aws/s3". Isinya baru dibaca saat penelusuran benar-benar
+	// sampai ke simpul ini; tanpa itu, satu spec aws berarti membaca puluhan
+	// megabyte untuk melengkapi satu kata.
+	LoadSpec           string `json:"loadSpec,omitempty"`
+	RequiresSubcommand bool   `json:"requiresSubcommand,omitempty"`
+	IsDangerous        bool   `json:"isDangerous,omitempty"`
+	Hidden             bool   `json:"hidden,omitempty"`
+	Deprecated         bool   `json:"deprecated,omitempty"`
 }
 
 // FindSubcommand mencari subcommand berdasarkan nama atau alias.
@@ -130,15 +166,43 @@ func (s *Subcommand) FindOption(name string) *Option {
 	return nil
 }
 
-// Registry memuat spec dari direktori berisi <command>.json.
+// Registry memuat spec dari sebuah direktori, dengan cache per proses.
+//
+// Berkas boleh berupa <nama>.json maupun <nama>.json.gz. Bentuk terkompresi
+// dipakai untuk distribusi: seluruh spec Fig berukuran 45 MB sebagai JSON
+// polos tetapi hanya sekitar 5 MB ter-gzip, dan itu berarti jauh lebih ringan
+// saat ikut dikirim ke host remote lewat SSH.
+// Registry mencari di beberapa direktori secara berurutan. Direktori pertama
+// yang memuat berkasnya menang.
+//
+// Jalur ganda ini bukan kemewahan: direktori specs/ bawaan DIHASILKAN dari
+// paket Fig dan ditimpa setiap kali dibangun ulang, jadi spec buatan sendiri —
+// untuk CLI internal yang tidak akan pernah ada di repo Fig — membutuhkan
+// tempat yang tidak ikut terhapus, sekaligus cara menimpa spec bawaan yang
+// dianggap kurang tepat.
 type Registry struct {
-	dir   string
+	dirs  []string
 	cache map[string]*Subcommand
 }
 
+// NewRegistry membuat registry dengan satu direktori.
 func NewRegistry(dir string) *Registry {
-	return &Registry{dir: dir, cache: map[string]*Subcommand{}}
+	return NewRegistryDirs(dir)
 }
+
+// NewRegistryDirs membuat registry dengan urutan pencarian.
+func NewRegistryDirs(dirs ...string) *Registry {
+	clean := make([]string, 0, len(dirs))
+	for _, d := range dirs {
+		if d != "" {
+			clean = append(clean, d)
+		}
+	}
+	return &Registry{dirs: clean, cache: map[string]*Subcommand{}}
+}
+
+// Dirs mengembalikan urutan direktori yang dicari.
+func (r *Registry) Dirs() []string { return r.dirs }
 
 // Load mengembalikan spec untuk sebuah nama perintah. Perintah yang tidak
 // punya spec mengembalikan (nil, nil) — bukan error, karena mayoritas
@@ -147,22 +211,150 @@ func (r *Registry) Load(command string) (*Subcommand, error) {
 	if command == "" || strings.ContainsAny(command, `/\`) {
 		return nil, nil
 	}
-	if sc, ok := r.cache[command]; ok {
+	return r.loadPath(command)
+}
+
+// Resolve mengembalikan isi sebenarnya sebuah subcommand. Untuk simpul biasa
+// nilainya adalah sc itu sendiri; untuk simpul ber-loadSpec, berkas rujukannya
+// dibaca lebih dulu.
+//
+// Pemuatan ditunda sampai titik ini secara sengaja. Spec aws terdiri atas
+// ratusan berkas; membacanya sekaligus hanya untuk melengkapi satu kata akan
+// menghabiskan anggaran waktu yang kita jaga ketat.
+func (r *Registry) Resolve(sc *Subcommand) (*Subcommand, error) {
+	if sc == nil || sc.LoadSpec == "" {
 		return sc, nil
 	}
-	path := filepath.Join(r.dir, command+".json")
-	b, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		r.cache[command] = nil
-		return nil, nil
+
+	loaded, err := r.loadPath(sc.LoadSpec)
+	if err != nil || loaded == nil {
+		// Rujukan yang tidak ada tidak boleh mematikan completion; simpul
+		// dipakai apa adanya.
+		return sc, nil
 	}
+
+	// Nama dan deskripsi milik simpul pemanggil tetap dipertahankan, karena
+	// itulah yang dikenal pengguna di baris perintah.
+	merged := *loaded
+	merged.Name = sc.Name
+	if sc.Description != "" {
+		merged.Description = sc.Description
+	}
+	merged.LoadSpec = ""
+	return &merged, nil
+}
+
+// loadPath membaca satu berkas spec berdasarkan path relatif tanpa ekstensi.
+func (r *Registry) loadPath(rel string) (*Subcommand, error) {
+	if sc, ok := r.cache[rel]; ok {
+		return sc, nil
+	}
+
+	b, err := r.readSpecFile(rel)
 	if err != nil {
 		return nil, err
 	}
+	if b == nil {
+		// Sebagian perintah hanya disimpan Fig sebagai spec berversi, misalnya
+		// az yang ada sebagai az/2.53.0 tanpa az di akar sama sekali.
+		if v := r.resolveVersioned(rel); v != "" {
+			b, err = r.readSpecFile(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if b == nil {
+		r.cache[rel] = nil
+		return nil, nil
+	}
+
 	var sc Subcommand
 	if err := json.Unmarshal(b, &sc); err != nil {
-		return nil, fmt.Errorf("spec %s: %w", path, err)
+		return nil, fmt.Errorf("spec %s: %w", rel, err)
 	}
-	r.cache[command] = &sc
+	r.cache[rel] = &sc
 	return &sc, nil
+}
+
+// semverName mencocokkan nama berkas spec berversi seperti "2.53.0".
+var semverName = regexp.MustCompile(`^(\d+)\.(\d+)(?:\.(\d+))?$`)
+
+// resolveVersioned mencari spec berversi tertinggi untuk sebuah perintah.
+//
+// Fig menentukan versi yang tepat dengan menjalankan perintahnya lebih dulu.
+// Di sini versi tertinggi yang dipilih: tanpa mengeksekusi apa pun, itu
+// tebakan terbaik yang tersedia, dan selisih antar versi minor pada spec
+// hampir selalu berupa penambahan subcommand.
+func (r *Registry) resolveVersioned(command string) string {
+	if strings.Contains(command, "/") {
+		return ""
+	}
+
+	best := ""
+	var bestNum [3]int
+	for _, dir := range r.dirs {
+		entries, err := os.ReadDir(filepath.Join(dir, command))
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			name := strings.TrimSuffix(strings.TrimSuffix(e.Name(), ".gz"), ".json")
+			m := semverName.FindStringSubmatch(name)
+			if m == nil {
+				continue
+			}
+			var num [3]int
+			for i := 0; i < 3; i++ {
+				n, _ := strconv.Atoi(m[i+1])
+				num[i] = n
+			}
+			if best == "" || num[0] > bestNum[0] ||
+				(num[0] == bestNum[0] && num[1] > bestNum[1]) ||
+				(num[0] == bestNum[0] && num[1] == bestNum[1] && num[2] > bestNum[2]) {
+				best, bestNum = command+"/"+name, num
+			}
+		}
+		if best != "" {
+			// Direktori yang lebih diutamakan sudah menjawab; jangan dicampur
+			// dengan versi dari direktori berikutnya.
+			return best
+		}
+	}
+	return best
+}
+
+// readSpecFile menelusuri direktori sesuai urutan, mencari bentuk terkompresi
+// lebih dulu lalu JSON polos. Mengembalikan (nil, nil) bila spec memang tidak
+// ada di mana pun.
+func (r *Registry) readSpecFile(rel string) ([]byte, error) {
+	// Tolak path yang mencoba keluar dari direktori spec. Berkas spec berasal
+	// dari pihak ketiga, jadi rujukan loadSpec diperlakukan sebagai masukan
+	// yang tidak dipercaya.
+	clean := filepath.Clean("/" + filepath.FromSlash(rel))[1:]
+	if clean == "" || strings.HasPrefix(clean, "..") {
+		return nil, nil
+	}
+
+	for _, dir := range r.dirs {
+		base := filepath.Join(dir, clean)
+
+		if b, err := os.ReadFile(base + ".json.gz"); err == nil {
+			zr, err := gzip.NewReader(bytes.NewReader(b))
+			if err != nil {
+				return nil, fmt.Errorf("spec %s: %w", rel, err)
+			}
+			defer zr.Close()
+			return io.ReadAll(zr)
+		}
+
+		b, err := os.ReadFile(base + ".json")
+		if err == nil {
+			return b, nil
+		}
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+	return nil, nil
 }

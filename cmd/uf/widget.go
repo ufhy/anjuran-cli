@@ -42,12 +42,12 @@ func runWidget(args []string) int {
 	}
 	byteCursor := len(string(runes[:*cursor]))
 
-	dir, err := resolveSpecsDir(*specsDir)
+	dirs, err := resolveSpecsDirs(*specsDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
 	}
-	eng := engine.New(spec.NewRegistry(dir))
+	eng := engine.New(spec.NewRegistryDirs(dirs...))
 
 	st, outcome, err := interact(eng, ui.State{Line: *line, Cursor: byteCursor})
 	if err != nil {

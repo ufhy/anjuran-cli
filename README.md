@@ -17,16 +17,62 @@ UI-nya berupa byte, dropdown-nya melewati pipa SSH sama seperti output perintah 
 
 Spec CLI diambil ulang dari withfig/autocomplete yang berlisensi MIT.
 
+## Spec
+
+`make specs` mengunduh paket npm `@withfig/autocomplete` — yang sudah berisi spec
+terkompilasi sebagai modul JS, jadi TypeScript tidak dibutuhkan sama sekali — lalu
+menyaringnya menjadi skema uf.
+
+| | |
+|---|---|
+| spec | 1.472 berkas, 716 perintah tingkat atas |
+| subcommand | 52.255 |
+| opsi | 282.836 |
+| saran statis | 27.192 |
+| ukuran | 42 MB sebagai JSON, 7,7 MB ter-gzip |
+
+Yang dibuang saat transpile adalah segala sesuatu yang membutuhkan mesin
+JavaScript saat runtime: generator berbentuk fungsi dan `custom`, `postProcess`,
+`generateSpec`, dan `parserDirectives`. Dari 5.073 generator, **3.438 terbawa dan
+1.635 dibuang** — jadi sebagian argumen dinamis akan kosong sampai layer generator
+dibangun. Contohnya `kubectl get <TAB>` belum menawarkan tipe resource, karena
+spec Fig memasoknya lewat closure JS.
+
+Tidak ada satu pun generator yang berbentuk string shell, sehingga tidak ada
+perintah yang perlu dilewatkan ke `sh -c`.
+
+Spec disimpan ter-gzip dan dibaca langsung dari bentuk itu. Ini bukan penghematan
+disk semata: rencana SSH mengharuskan spec ikut dikirim ke host remote, dan 7,7 MB
+jauh berbeda dari 42 MB di sana.
+
+### Spec sendiri
+
+`uf` mencari spec secara berurutan, dan direktori pertama yang memuat berkasnya
+menang:
+
+```
+--specs <dir>            (boleh beberapa, dipisah titik dua)
+$UF_SPECS
+~/.config/uf/specs
+./specs
+<dir binary>/specs
+```
+
+Jadi CLI internal cukup ditaruh di `~/.config/uf/specs/nama.json`, dan spec bawaan
+yang dianggap kurang tepat bisa ditimpa tanpa menyunting direktori yang
+dihasilkan mesin.
+
 ## Status
 
-Tahap 2 dari 6: sudah bisa dipakai di zsh. Tekan Tab, dropdown muncul, ketik untuk
-menyaring, panah untuk memilih, Enter untuk menyisipkan.
+Tahap 3 dari 6: sudah bisa dipakai di zsh, dengan **716 CLI** hasil impor dari
+paket spec Fig — git, docker, kubectl, terraform, aws, az, gcloud, npm, systemctl,
+dan seterusnya.
 
 | Tahap | Isi | Status |
 |---|---|---|
 | 1 | Parser + engine + spec buatan tangan | selesai |
 | 2 | Renderer ANSI + integrasi zsh | selesai |
-| 3 | Transpiler spec Fig TS → JSON | belum |
+| 3 | Transpiler spec Fig → JSON, impor massal | selesai |
 | 4 | Integrasi bash + fish | belum |
 | 5 | PowerShell / Windows Terminal | belum |
 | 6 | Rilis: brew, deb/rpm, scoop/winget | belum |
@@ -34,6 +80,7 @@ menyaring, panah untuk memilih, Enter untuk menyisipkan.
 ## Pasang di zsh
 
 ```sh
+make specs                              # unduh + transpile spec Fig (butuh node)
 make build
 sudo cp bin/uf /usr/local/bin/          # atau taruh di mana pun dalam PATH
 mkdir -p ~/.config/uf && cp -r specs ~/.config/uf/
@@ -84,7 +131,9 @@ internal/engine/   penelusuran pohon spec → daftar kandidat
 internal/ui/       pencocokan fuzzy, renderer diff, loop interaktif
 internal/tty/      mode raw, ukuran layar, penguraian tombol
 shell/             integrasi per-shell
-specs/             spec CLI dalam JSON
+tools/transpile/   pengubah spec Fig menjadi skema uf
+specs/             DIHASILKAN oleh `make specs`, tidak masuk git
+internal/testdata/ spec buatan tangan sebagai fixture pengujian
 ```
 
 Hanya `internal/tty/open_*.go` yang bergantung pada sistem operasi, dan isinya
@@ -111,6 +160,14 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
 
    Mode degradasi `UF_SIMPLE=1` mematikan warna dan sorotan, dan menyala
    otomatis untuk `TERM` bernilai `dumb`, `vt100`, `vt102`, atau `ansi`.
+
+   Waktu hitung per ketikan, jauh di bawah anggaran 16 ms:
+
+   | | |
+   |---|---|
+   | spec sudah di cache | 1,9 µs |
+   | lewat `loadSpec` (aws s3) | 2,3 µs |
+   | muat dingin, buka gzip + urai | 1,2 ms |
 2. **Generator butuh policy layer.** Generator mengeksekusi perintah sebagai efek
    samping mengetik. Karena itu `internal/engine` sengaja hanya *melaporkan*
    generator yang relevan tanpa menjalankannya — eksekusinya ditaruh di satu

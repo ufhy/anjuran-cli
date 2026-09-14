@@ -24,13 +24,58 @@ const (
 
 // Candidate adalah satu entri yang ditawarkan ke pengguna.
 type Candidate struct {
-	// Name adalah teks yang ditampilkan.
+	// Name adalah nama kanonik kandidat.
 	Name string `json:"name"`
+	// Display adalah teks yang ditampilkan bila berbeda dari Name.
+	Display string `json:"display,omitempty"`
 	// Insert adalah teks yang benar-benar disisipkan; biasanya sama dengan
 	// Name, berbeda pada kasus seperti --opt=value.
-	Insert      string `json:"insert"`
-	Description string `json:"description,omitempty"`
-	Kind        Kind   `json:"kind"`
+	Insert string `json:"insert"`
+	// CursorOffset adalah posisi kursor akhir, dihitung dari awal Insert.
+	// Spec Fig memakai penanda {cursor} untuk ini, misalnya pada opsi yang
+	// nilainya harus menempel: menyisipkan "--jobs=" sebaiknya meletakkan
+	// kursor sesudah tanda sama dengan, bukan di ujung kata berikutnya.
+	CursorOffset int    `json:"cursorOffset,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Kind         Kind   `json:"kind"`
+	// Priority mengikuti konvensi Fig: 50 adalah nilai bawaan.
+	Priority int `json:"priority,omitempty"`
+	// Dangerous menandai kandidat yang merusak bila salah pilih, misalnya
+	// --force pada git push.
+	Dangerous bool `json:"dangerous,omitempty"`
+}
+
+// DefaultPriority adalah nilai yang dipakai Fig bila sebuah entri tidak
+// menyebut prioritasnya sendiri.
+const DefaultPriority = 50
+
+// Label mengembalikan teks yang seharusnya ditampilkan.
+func (c Candidate) Label() string {
+	if c.Display != "" {
+		return c.Display
+	}
+	return c.Name
+}
+
+// cursorMarker adalah penanda posisi kursor di dalam insertValue milik Fig.
+const cursorMarker = "{cursor}"
+
+// makeInsert menerjemahkan insertValue menjadi teks sisipan dan posisi kursor.
+func makeInsert(name, insertValue, prefix string) (string, int) {
+	text := name
+	if insertValue != "" {
+		text = insertValue
+	}
+	offset := -1
+	if i := strings.Index(text, cursorMarker); i >= 0 {
+		text = text[:i] + text[i+len(cursorMarker):]
+		offset = i
+	}
+	text = prefix + text
+	if offset < 0 {
+		return text, len(text)
+	}
+	return text, len(prefix) + offset
 }
 
 // Result adalah jawaban lengkap engine untuk satu posisi kursor.
@@ -78,7 +123,15 @@ func (e *Engine) Complete(line string, cursor int) (*Result, error) {
 		return res, nil // perintah tanpa spec: bukan error
 	}
 
-	st := walk(root, words[1:])
+	root, err = e.registry.Resolve(root)
+	if err != nil {
+		return nil, err
+	}
+
+	st, err := e.walk(root, words[1:])
+	if err != nil {
+		return nil, err
+	}
 	e.suggest(res, st, l.Prefix)
 	return res, nil
 }
@@ -103,7 +156,7 @@ type state struct {
 
 // walk mengeksekusi token-token yang sudah selesai diketik, menghasilkan
 // state di posisi kursor.
-func walk(root *spec.Subcommand, words []parser.Token) *state {
+func (e *Engine) walk(root *spec.Subcommand, words []parser.Token) (*state, error) {
 	st := &state{current: root, usedOptions: map[string]bool{}}
 
 	i := 0
@@ -118,8 +171,9 @@ func walk(root *spec.Subcommand, words []parser.Token) *state {
 				}
 			}
 
-			// Bentuk --opt=value sudah membawa argumennya sendiri.
-			if opt != nil && !strings.Contains(tok, "=") {
+			// Bentuk --opt=value sudah membawa argumennya sendiri, begitu
+			// pula opsi yang memang mewajibkan nilainya menempel.
+			if opt != nil && !strings.Contains(tok, "=") && !opt.RequiresSeparator {
 				for ai := range opt.Args {
 					if opt.Args[ai].IsOptional {
 						break
@@ -137,13 +191,17 @@ func walk(root *spec.Subcommand, words []parser.Token) *state {
 		}
 
 		if sub := st.current.FindSubcommand(tok); sub != nil {
+			resolved, err := e.registry.Resolve(sub)
+			if err != nil {
+				return nil, err
+			}
 			// Bawa turun opsi persisten milik induk sebelum berpindah.
 			for _, o := range st.current.Options {
 				if o.IsPersistent {
 					st.persistent = append(st.persistent, o)
 				}
 			}
-			st.current = sub
+			st.current = resolved
 			st.argIndex = 0
 			i++
 			continue
@@ -154,7 +212,7 @@ func walk(root *spec.Subcommand, words []parser.Token) *state {
 		i++
 	}
 
-	return st
+	return st, nil
 }
 
 // lookupOption mencari opsi di subcommand aktif, lalu di opsi persisten.
@@ -199,16 +257,21 @@ func (e *Engine) suggest(res *Result, st *state, prefix string) {
 	// Konteks umum: subcommand, lalu argumen posisional, lalu opsi.
 	for i := range st.current.Subcommands {
 		sub := &st.current.Subcommands[i]
-		if sub.Hidden {
+		if sub.Hidden || sub.Deprecated {
 			continue
 		}
 		for _, name := range sub.Name {
 			if matches(name, prefix) {
+				insert, offset := makeInsert(name, sub.InsertValue, "")
 				res.Candidates = append(res.Candidates, Candidate{
-					Name:        name,
-					Insert:      name,
-					Description: sub.Description,
-					Kind:        KindSubcommand,
+					Name:         name,
+					Display:      sub.DisplayName,
+					Insert:       insert,
+					CursorOffset: offset,
+					Description:  sub.Description,
+					Kind:         KindSubcommand,
+					Priority:     priorityOr(sub.Priority),
+					Dangerous:    sub.IsDangerous,
 				})
 				break // satu entri per subcommand, pakai alias yang cocok
 			}
@@ -231,18 +294,31 @@ func (e *Engine) addOptions(res *Result, st *state, prefix string) {
 	add := func(opts []spec.Option) {
 		for i := range opts {
 			o := &opts[i]
-			if o.Hidden || st.isExcluded(o) {
+			if o.Hidden || o.Deprecated || st.isExcluded(o) {
 				continue
 			}
 			for _, name := range o.Name {
-				if matches(name, prefix) {
-					res.Candidates = append(res.Candidates, Candidate{
-						Name:        name,
-						Insert:      name,
-						Description: o.Description,
-						Kind:        KindOption,
-					})
+				if !matches(name, prefix) {
+					continue
 				}
+				// Opsi yang nilainya wajib menempel disisipkan sekalian dengan
+				// tanda sama dengan, supaya pengguna tidak menulis bentuk yang
+				// justru ditolak perintahnya.
+				insertValue := o.InsertValue
+				if insertValue == "" && o.RequiresSeparator && len(o.Args) > 0 {
+					insertValue = name + "=" + cursorMarker
+				}
+				insert, offset := makeInsert(name, insertValue, "")
+				res.Candidates = append(res.Candidates, Candidate{
+					Name:         name,
+					Display:      o.DisplayName,
+					Insert:       insert,
+					CursorOffset: offset,
+					Description:  o.Description,
+					Kind:         KindOption,
+					Priority:     priorityOr(o.Priority),
+					Dangerous:    o.IsDangerous,
+				})
 			}
 		}
 	}
@@ -251,8 +327,8 @@ func (e *Engine) addOptions(res *Result, st *state, prefix string) {
 	sortCandidates(res.Candidates)
 }
 
-// isExcluded menyembunyikan opsi yang sudah dipakai (dan tidak repeatable)
-// atau yang bentrok dengan opsi lain yang sudah ada di baris.
+// isExcluded menyembunyikan opsi yang sudah dipakai (dan tidak repeatable),
+// yang bentrok dengan opsi lain di baris, atau yang syaratnya belum terpenuhi.
 func (st *state) isExcluded(o *spec.Option) bool {
 	if !o.IsRepeatable {
 		for _, n := range o.Name {
@@ -266,7 +342,22 @@ func (st *state) isExcluded(o *spec.Option) bool {
 			return true
 		}
 	}
+	// dependsOn: opsi baru masuk akal setelah opsi lain hadir, misalnya
+	// --set-upstream yang hanya berguna bersama nama remote.
+	for _, d := range o.DependsOn {
+		if !st.usedOptions[d] {
+			return true
+		}
+	}
 	return false
+}
+
+// priorityOr menerapkan nilai bawaan Fig untuk entri tanpa prioritas.
+func priorityOr(p int) int {
+	if p == 0 {
+		return DefaultPriority
+	}
+	return p
 }
 
 // addArg menawarkan suggestion statis milik sebuah argumen, dan mencatat
@@ -274,16 +365,23 @@ func (st *state) isExcluded(o *spec.Option) bool {
 func (e *Engine) addArg(res *Result, a *spec.Arg, prefix, insertPrefix string) {
 	for i := range a.Suggestions {
 		s := &a.Suggestions[i]
+		if s.Deprecated {
+			continue
+		}
 		for _, name := range s.Name {
 			if s.Hidden && name != prefix {
 				continue
 			}
 			if matches(name, prefix) {
+				insert, offset := makeInsert(name, s.InsertValue, insertPrefix)
 				res.Candidates = append(res.Candidates, Candidate{
-					Name:        name,
-					Insert:      insertPrefix + name,
-					Description: s.Description,
-					Kind:        KindArg,
+					Name:         name,
+					Display:      s.DisplayName,
+					Insert:       insert,
+					CursorOffset: offset,
+					Description:  s.Description,
+					Kind:         KindArg,
+					Priority:     priorityOr(s.Priority),
 				})
 				break
 			}

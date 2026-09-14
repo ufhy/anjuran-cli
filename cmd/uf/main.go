@@ -26,7 +26,8 @@ Opsi:
   --line    baris perintah yang sedang diketik
   --cursor  posisi kursor dalam byte (default: akhir baris)
   --json    keluarkan hasil mentah sebagai JSON
-  --specs   direktori spec (default: $UF_SPECS, lalu ./specs, lalu ~/.config/uf/specs)
+  --specs   direktori spec, boleh beberapa dipisah titik dua
+            (default: $UF_SPECS, ~/.config/uf/specs, ./specs, lalu bawaan)
 
 widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
@@ -69,13 +70,13 @@ func runComplete(args []string) int {
 		*cursor = len(*line)
 	}
 
-	dir, err := resolveSpecsDir(*specsDir)
+	dirs, err := resolveSpecsDirs(*specsDir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
 	}
 
-	eng := engine.New(spec.NewRegistry(dir))
+	eng := engine.New(spec.NewRegistryDirs(dirs...))
 	res, err := eng.Complete(*line, *cursor)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
@@ -102,21 +103,39 @@ func runComplete(args []string) int {
 	return 0
 }
 
-// resolveSpecsDir mencari direktori spec dengan urutan: flag eksplisit,
-// variabel lingkungan, direktori kerja, lalu konfigurasi user.
-func resolveSpecsDir(flagValue string) (string, error) {
-	candidates := []string{flagValue, os.Getenv("UF_SPECS"), "specs"}
-	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".config", "uf", "specs"))
+// resolveSpecsDirs menyusun urutan pencarian spec.
+//
+// Urutannya: yang disebut pengguna lebih dulu, lalu spec bawaan. Dengan begitu
+// sebuah spec buatan sendiri bisa menimpa spec bawaan tanpa menyunting
+// direktori yang dihasilkan mesin.
+func resolveSpecsDirs(flagValue string) ([]string, error) {
+	var dirs []string
+	add := func(paths ...string) {
+		for _, p := range paths {
+			if p == "" {
+				continue
+			}
+			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+				dirs = append(dirs, p)
+			}
+		}
 	}
 
-	for _, c := range candidates {
-		if c == "" {
-			continue
-		}
-		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
-			return c, nil
-		}
+	add(filepath.SplitList(flagValue)...)
+	add(filepath.SplitList(os.Getenv("UF_SPECS"))...)
+	if home, err := os.UserHomeDir(); err == nil {
+		add(filepath.Join(home, ".config", "uf", "specs"))
 	}
-	return "", fmt.Errorf("direktori spec tidak ditemukan; set UF_SPECS atau pakai --specs")
+	add("specs")
+	// Spec bawaan yang diletakkan bersebelahan dengan binary, sebagaimana
+	// hasil pemasangan dari paket rilis.
+	if exe, err := os.Executable(); err == nil {
+		add(filepath.Join(filepath.Dir(exe), "specs"),
+			filepath.Join(filepath.Dir(exe), "..", "share", "uf", "specs"))
+	}
+
+	if len(dirs) == 0 {
+		return nil, fmt.Errorf("direktori spec tidak ditemukan; set UF_SPECS atau pakai --specs")
+	}
+	return dirs, nil
 }

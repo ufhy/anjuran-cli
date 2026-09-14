@@ -30,7 +30,7 @@ func (f *fakeTerm) Size() (int, int) { return 80, 24 }
 
 func k(t tty.KeyType) tty.Key   { return tty.Key{Type: t} }
 func r(c rune) tty.Key          { return tty.Key{Type: tty.KeyRune, Rune: c} }
-func newEngine() *engine.Engine { return engine.New(spec.NewRegistry("../../specs")) }
+func newEngine() *engine.Engine { return engine.New(spec.NewRegistry("../testdata/specs")) }
 func discard() *Renderer        { return NewRenderer(io.Discard, 80, 24, true) }
 
 func run(t *testing.T, line string, keys ...tty.Key) (State, Outcome) {
@@ -177,4 +177,54 @@ func TestWindowMenjagaPilihanTerlihat(t *testing.T) {
 				tt.total, tt.selected, tt.rows, start, rel, tt.wantStart, tt.wantRel)
 		}
 	}
+}
+
+// Urutan daftar adalah bagian dari kegunaannya: kandidat yang paling mungkin
+// dimaksud harus sudah terpilih sebelum pengguna menekan apa pun.
+func TestUrutanPrioritasSaatBelumMengetik(t *testing.T) {
+	cands := []engine.Candidate{
+		{Name: "zebra", Kind: engine.KindSubcommand, Priority: 90},
+		{Name: "alpha", Kind: engine.KindSubcommand, Priority: 10},
+		{Name: "beta", Kind: engine.KindSubcommand, Priority: engine.DefaultPriority},
+	}
+	got := filter(cands, "")
+	want := []string{"zebra", "beta", "alpha"}
+	for i := range want {
+		if got[i].cand.Name != want[i] {
+			t.Fatalf("urutan = %v, mau %v", candNames(got), want)
+		}
+	}
+}
+
+func TestRelevansiMengalahkanPrioritasSaatMengetik(t *testing.T) {
+	cands := []engine.Candidate{
+		{Name: "zebra", Kind: engine.KindSubcommand, Priority: 99},
+		{Name: "alpha", Kind: engine.KindSubcommand, Priority: 1},
+	}
+	// "al" adalah awalan alpha, jadi alpha harus menang meski prioritasnya
+	// jauh lebih rendah.
+	got := filter(cands, "al")
+	if len(got) == 0 || got[0].cand.Name != "alpha" {
+		t.Fatalf("urutan = %v, mau alpha di depan", candNames(got))
+	}
+}
+
+func TestPrioritasMemutusSeriSkorYangSama(t *testing.T) {
+	cands := []engine.Candidate{
+		{Name: "commit", Kind: engine.KindSubcommand, Priority: 10},
+		{Name: "config", Kind: engine.KindSubcommand, Priority: 90},
+	}
+	// Keduanya cocok "co" dengan skor identik; prioritas yang menentukan.
+	got := filter(cands, "co")
+	if got[0].cand.Name != "config" {
+		t.Fatalf("urutan = %v, mau config di depan", candNames(got))
+	}
+}
+
+func candNames(rs []ranked) []string {
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.cand.Name
+	}
+	return out
 }

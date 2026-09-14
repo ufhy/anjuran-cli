@@ -34,9 +34,17 @@ type ranked struct {
 
 // filter mencocokkan seluruh kandidat terhadap prefix lalu mengurutkannya.
 //
-// Urutannya: skor fuzzy menurun, lalu jenis (subcommand sebelum opsi), lalu
-// alfabetis. Pengurutan terakhir penting agar daftar tidak bergoyang saat
-// dua kandidat punya skor sama.
+// Kunci urutannya sengaja dipisah, bukan digabung jadi satu skor berbobot:
+//
+//   - Saat pengguna belum mengetik apa pun, seluruh skor fuzzy bernilai sama,
+//     sehingga prioritas dari spec yang menentukan. Itulah yang membuat
+//     "git " menaruh commit dan status di atas, bukan urutan alfabet.
+//   - Begitu ada huruf yang diketik, relevansi yang memimpin, dan prioritas
+//     turun menjadi pemutus seri.
+//
+// Bobot gabungan sempat dicoba tetapi menghasilkan urutan yang sulit dinalar:
+// sebuah entri berprioritas tinggi bisa mengalahkan kecocokan awalan yang
+// jelas lebih tepat.
 func filter(cands []engine.Candidate, query string) []ranked {
 	out := make([]ranked, 0, len(cands))
 	for _, c := range cands {
@@ -52,22 +60,30 @@ func filter(cands []engine.Candidate, query string) []ranked {
 		engine.KindArg:        1,
 		engine.KindOption:     2,
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].match.Score != out[j].match.Score {
-			return out[i].match.Score > out[j].match.Score
+	less := func(i, j int) bool {
+		a, b := out[i], out[j]
+		if query != "" && a.match.Score != b.match.Score {
+			return a.match.Score > b.match.Score
 		}
-		if ri, rj := rank[out[i].cand.Kind], rank[out[j].cand.Kind]; ri != rj {
-			return ri < rj
+		if a.cand.Priority != b.cand.Priority {
+			return a.cand.Priority > b.cand.Priority
 		}
-		return out[i].cand.Name < out[j].cand.Name
-	})
+		if ra, rb := rank[a.cand.Kind], rank[b.cand.Kind]; ra != rb {
+			return ra < rb
+		}
+		return a.cand.Name < b.cand.Name
+	}
+	sort.SliceStable(out, less)
 	return out
 }
 
 // apply menyisipkan kandidat terpilih ke dalam baris.
+//
+// Kursor akhir mengikuti CursorOffset, bukan selalu ujung sisipan, sehingga
+// bentuk seperti "--jobs=" meninggalkan kursor tepat sesudah tanda sama dengan.
 func apply(st State, res *engine.Result, c engine.Candidate) State {
 	line := st.Line[:res.ReplaceStart] + c.Insert + st.Line[res.ReplaceEnd:]
-	return State{Line: line, Cursor: res.ReplaceStart + len(c.Insert)}
+	return State{Line: line, Cursor: res.ReplaceStart + c.CursorOffset}
 }
 
 // items mengubah kandidat berperingkat menjadi baris yang bisa digambar.
@@ -75,9 +91,10 @@ func items(rs []ranked) []Item {
 	out := make([]Item, len(rs))
 	for i, r := range rs {
 		out[i] = Item{
-			Name:        r.cand.Name,
+			Name:        r.cand.Label(),
 			Description: r.cand.Description,
 			Kind:        string(r.cand.Kind),
+			Dangerous:   r.cand.Dangerous,
 			Highlight:   r.match.Positions,
 		}
 	}

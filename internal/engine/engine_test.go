@@ -9,7 +9,7 @@ import (
 
 func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
-	return New(spec.NewRegistry("../../specs"))
+	return New(spec.NewRegistry("../testdata/specs"))
 }
 
 // names mengambil nama kandidat agar assertion mudah dibaca.
@@ -220,7 +220,7 @@ func TestCompletionSetelahPipe(t *testing.T) {
 }
 
 func BenchmarkComplete(b *testing.B) {
-	e := New(spec.NewRegistry("../../specs"))
+	e := New(spec.NewRegistry("../testdata/specs"))
 	line := "kubectl get pods --namespace kube-system -o wi"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

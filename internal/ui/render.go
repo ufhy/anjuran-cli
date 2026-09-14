@@ -12,6 +12,9 @@ type Item struct {
 	Name        string
 	Description string
 	Kind        string
+	// Dangerous menandai kandidat yang merusak bila salah pilih, misalnya
+	// --force pada git push. Ditandai warna agar terlihat sebelum dipilih.
+	Dangerous bool
 	// Highlight adalah indeks rune pada Name yang cocok dengan kueri.
 	Highlight []int
 }
@@ -28,6 +31,7 @@ const (
 	escReverse       = "\x1b[7m"
 	escCyan          = "\x1b[36m"
 	escYellow        = "\x1b[33m"
+	escRed           = "\x1b[31m"
 )
 
 // Renderer menggambar dropdown tepat di bawah baris prompt.
@@ -221,7 +225,11 @@ func (r *Renderer) composeRow(it Item, nameW int, selected bool) string {
 
 	// Satu escReset di ujung sudah membatalkan escDim maupun escCyan;
 	// menutup keduanya secara terpisah hanya menambah byte yang dikirim.
-	row := escCyan + marker + highlight(name, it.Highlight) + pad
+	color := escCyan
+	if it.Dangerous {
+		color = escRed
+	}
+	row := color + marker + highlight(name, it.Highlight) + pad
 	if desc != "" {
 		row += escDim + desc
 	}

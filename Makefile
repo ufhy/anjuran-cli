@@ -1,7 +1,10 @@
 BINARY := uf
 BIN_DIR := bin
 
-.PHONY: build test bench fmt vet check clean cross
+# Versi paket spec Fig yang dipakai. Naikkan angka ini untuk menyegarkan spec.
+FIG_VERSION := 2.692.3
+
+.PHONY: build test bench fmt vet check clean cross specs
 
 build:
 	go build -o $(BIN_DIR)/$(BINARY) ./cmd/uf
@@ -28,6 +31,10 @@ cross:
 		GOOS=$$os GOARCH=$$arch go build -o $(BIN_DIR)/$(BINARY)-$$os-$$arch$$ext ./cmd/uf || exit 1; \
 		echo "  ok $$os/$$arch"; \
 	done
+
+# specs membangun ulang direktori spec dari paket npm Fig. Butuh node dan curl.
+specs:
+	@tools/transpile/build-specs.sh $(FIG_VERSION) specs
 
 clean:
 	rm -rf $(BIN_DIR)
