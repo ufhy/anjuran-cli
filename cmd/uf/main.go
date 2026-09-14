@@ -29,7 +29,8 @@ var (
 const usage = `uf - autocomplete lintas platform untuk shell
 
 Penggunaan:
-  uf init     <zsh|bash|fish|powershell>
+  uf init      <zsh|bash|fish|powershell>
+  uf bootstrap [user@]host [--from <dir>] [--dry-run]
   uf version
   uf complete --line <baris> [--cursor N] [--json]
   uf widget   --line <baris> --cursor <N>
@@ -49,6 +50,11 @@ berkas konfigurasi shell:
   zsh   ~/.zshrc                     eval "$(uf init zsh)"
   bash  ~/.bashrc                    eval "$(uf init bash)"
   fish  ~/.config/fish/config.fish   uf init fish | source
+
+bootstrap memasang uf di host lain lewat SSH. Engine harus berjalan di sisi
+remote, karena generator seperti "kubectl get pods" hanya menjawab benar di
+tempat datanya berada. Perintah ini bukan pembungkus ssh: ia dijalankan sekali,
+dengan sadar, lalu selesai.
 
 widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
@@ -79,6 +85,8 @@ func main() {
 	switch os.Args[1] {
 	case "init":
 		os.Exit(runInit(os.Args[2:]))
+	case "bootstrap":
+		os.Exit(runBootstrap(os.Args[2:]))
 	case "complete":
 		os.Exit(runComplete(os.Args[2:]))
 	case "widget":

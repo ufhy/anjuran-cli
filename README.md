@@ -197,6 +197,7 @@ internal/parser/   tokenizer sadar-kutip + resolusi posisi kursor
 internal/engine/   penelusuran pohon spec → daftar kandidat
 internal/ui/       pencocokan fuzzy, renderer diff, loop interaktif
 internal/generator/ eksekusi generator, kebijakannya, cache, template berkas
+internal/remote/   pemasangan ke host lain lewat SSH
 internal/tty/      mode raw, ukuran layar, penguraian tombol
 internal/shellinit/ skrip integrasi shell, disematkan ke binary
 tools/transpile/   pengubah spec Fig menjadi skema uf
@@ -370,3 +371,72 @@ mengembalikan pod di cluster server itu, bukan konteks kubectl laptopmu.
 
 Syaratnya sama dengan syarat Tab supaya pintar di sana: satu binary statis di host,
 satu baris di rc file.
+
+```sh
+uf bootstrap deploy@web-01
+```
+
+Perintah itu mendeteksi platform host, mengalirkan binary dan spec lewat koneksi
+SSH yang sama, lalu memeriksa hasilnya dengan benar-benar menjalankan berkas yang
+dikirim. Menyalin bukan berarti bisa menjalankan: home yang dipasang `noexec`
+baru ketahuan di langkah itu.
+
+```
+  host      : deploy@web-01 (linux/amd64)
+  sumber    : uf_1.0.0_linux_amd64.tar.gz
+  binary    : ~/.local/bin/uf
+  spec      : ~/.local/share/uf/specs
+  terkirim  : 6.6 MB
+  terpasang : uf 1.0.0
+```
+
+Tata letaknya mengikuti XDG, sehingga penemuan spec berjalan tanpa variabel
+lingkungan: `~/.local/bin/uf` mencari `../share/uf/specs` dan menemukannya.
+
+### Yang TIDAK dilakukan perintah ini
+
+**Bukan pembungkus `ssh`.** uf tidak pernah menyisip di antara kamu dan
+koneksimu, tidak mengubah `~/.ssh/config`, dan tidak pernah berjalan otomatis
+saat kamu menyambung ke suatu host. Perintah ini dijalankan sekali, dengan
+sadar, lalu selesai.
+
+Sebelum mengirim apa pun, rencananya ditampilkan dan persetujuan diminta.
+Di luar terminal interaktif jawabannya selalu tidak — sebuah skrip tidak boleh
+mendapat izin hanya karena tidak ada yang menjawab. Untuk pemakaian terskrip
+ada dua jalan yang meninggalkan jejak: `--yes`, atau mendaftarkan host di
+`~/.config/uf/hosts` — persetujuan yang bisa ditinjau dan disimpan di kendali
+versi, bukan jawaban di layar yang menguap.
+
+```
+# ~/.config/uf/hosts
+web-01
+web-*.internal
+deploy@bastion
+```
+
+### Platform berbeda
+
+Tanpa `--from`, satu-satunya sumber yang tersedia adalah binary yang sedang
+berjalan, jadi platformnya harus sama. Untuk host yang berbeda, sebutkan
+sumbernya:
+
+```sh
+make snapshot                                  # atau unduh arsip rilis
+uf bootstrap --from dist web-01
+```
+
+Mesin lokal yang mengunduh, bukan host — jadi ini tetap bekerja untuk server
+produksi yang tidak punya akses internet keluar.
+
+Argumen setelah nama host diteruskan apa adanya ke `ssh`, sehingga `ProxyJump`,
+bastion, dan opsi lain berlaku seperti biasa:
+
+```sh
+uf bootstrap web-01 -J bastion -i ~/.ssh/deploy
+```
+
+Perintah `ssh` sistem yang dipakai, bukan pustaka SSH — supaya seluruh isi
+`~/.ssh/config` berlaku apa adanya, termasuk Match block dan kunci perangkat
+keras. Koneksinya dibagi lewat `ControlMaster`: bootstrap memanggil host
+beberapa kali, dan tanpa itu host ber-MFA akan meminta sentuhan kunci keamanan
+berkali-kali untuk satu perintah.
