@@ -1,0 +1,43 @@
+{
+  "name": "systemctl",
+  "description": "Kendalikan systemd",
+  "options": [
+    { "name": ["--user"], "description": "Kelola service milik user", "isPersistent": true, "exclusiveOn": ["--system"] },
+    { "name": ["--system"], "description": "Kelola service sistem", "isPersistent": true, "exclusiveOn": ["--user"] },
+    { "name": ["-H", "--host"], "description": "Jalankan di host remote", "isPersistent": true, "args": [{ "name": "host" }] },
+    { "name": ["--no-pager"], "description": "Jangan pipe keluaran ke pager", "isPersistent": true }
+  ],
+  "subcommands": [
+    { "name": "status", "description": "Tampilkan status unit",
+      "args": [{ "name": "unit", "isVariadic": true,
+        "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain", "--full"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "start", "description": "Jalankan unit",
+      "args": [{ "name": "unit", "isVariadic": true,
+        "generators": [{ "script": ["systemctl", "list-unit-files", "--no-legend", "--no-pager", "--plain"], "trim": true, "cacheTtl": 30 }] }] },
+    { "name": "stop", "description": "Hentikan unit",
+      "args": [{ "name": "unit", "isVariadic": true,
+        "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain", "--state=running"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "restart", "description": "Restart unit",
+      "args": [{ "name": "unit", "isVariadic": true,
+        "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "reload", "description": "Muat ulang konfigurasi unit",
+      "args": [{ "name": "unit", "isVariadic": true }] },
+    { "name": "enable", "description": "Aktifkan unit saat boot",
+      "options": [{ "name": ["--now"], "description": "Sekaligus jalankan sekarang" }],
+      "args": [{ "name": "unit", "isVariadic": true }] },
+    { "name": "disable", "description": "Nonaktifkan unit saat boot",
+      "options": [{ "name": ["--now"], "description": "Sekaligus hentikan sekarang" }],
+      "args": [{ "name": "unit", "isVariadic": true }] },
+    { "name": "list-units", "description": "Daftar unit yang dimuat",
+      "options": [
+        { "name": ["--type"], "description": "Saring berdasarkan tipe",
+          "args": [{ "name": "type", "suggestions": [
+            { "name": "service" }, { "name": "socket" }, { "name": "timer" },
+            { "name": "target" }, { "name": "mount" }, { "name": "path" } ] }] },
+        { "name": ["--state"], "description": "Saring berdasarkan state",
+          "args": [{ "name": "state", "suggestions": [
+            { "name": "running" }, { "name": "failed" }, { "name": "active" }, { "name": "inactive" } ] }] }
+      ] },
+    { "name": "daemon-reload", "description": "Muat ulang konfigurasi systemd" }
+  ]
+}

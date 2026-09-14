@@ -1,0 +1,86 @@
+{
+  "name": "kubectl",
+  "description": "Kendalikan cluster Kubernetes",
+  "options": [
+    { "name": ["-n", "--namespace"], "description": "Namespace untuk request ini", "isPersistent": true,
+      "args": [{ "name": "namespace",
+        "generators": [{ "script": ["kubectl", "get", "namespaces", "-o", "name"], "trim": true, "cacheTtl": 30 }] }] },
+    { "name": ["--context"], "description": "Context kubeconfig yang dipakai", "isPersistent": true,
+      "args": [{ "name": "context",
+        "generators": [{ "script": ["kubectl", "config", "get-contexts", "-o", "name"], "trim": true, "cacheTtl": 60 }] }] },
+    { "name": ["-A", "--all-namespaces"], "description": "Lintas semua namespace", "isPersistent": true },
+    { "name": ["-o", "--output"], "description": "Format keluaran", "isPersistent": true,
+      "args": [{ "name": "format", "suggestions": [
+        { "name": "json" }, { "name": "yaml" }, { "name": "wide" },
+        { "name": "name" }, { "name": "jsonpath" }, { "name": "custom-columns" } ] }] }
+  ],
+  "subcommands": [
+    { "name": "get", "description": "Tampilkan satu atau banyak resource",
+      "args": [
+        { "name": "resource", "suggestions": [
+          { "name": ["pods", "po"], "description": "Pod" },
+          { "name": ["services", "svc"], "description": "Service" },
+          { "name": ["deployments", "deploy"], "description": "Deployment" },
+          { "name": ["nodes", "no"], "description": "Node" },
+          { "name": ["namespaces", "ns"], "description": "Namespace" },
+          { "name": ["configmaps", "cm"], "description": "ConfigMap" },
+          { "name": ["secrets"], "description": "Secret" },
+          { "name": ["ingress", "ing"], "description": "Ingress" },
+          { "name": ["statefulsets", "sts"], "description": "StatefulSet" },
+          { "name": ["daemonsets", "ds"], "description": "DaemonSet" } ] },
+        { "name": "name", "isOptional": true }
+      ],
+      "options": [
+        { "name": ["-w", "--watch"], "description": "Pantau perubahan" },
+        { "name": ["-l", "--selector"], "description": "Filter label", "args": [{ "name": "selector" }] }
+      ] },
+    { "name": "describe", "description": "Tampilkan detail resource",
+      "args": [
+        { "name": "resource", "suggestions": [
+          { "name": ["pods", "po"] }, { "name": ["services", "svc"] },
+          { "name": ["deployments", "deploy"] }, { "name": ["nodes", "no"] } ] },
+        { "name": "name", "isOptional": true }
+      ] },
+    { "name": "logs", "description": "Tampilkan log sebuah pod",
+      "options": [
+        { "name": ["-f", "--follow"], "description": "Ikuti aliran log" },
+        { "name": ["-p", "--previous"], "description": "Log container sebelumnya" },
+        { "name": ["-c", "--container"], "description": "Nama container", "args": [{ "name": "container" }] },
+        { "name": ["--tail"], "description": "Jumlah baris dari akhir", "args": [{ "name": "n" }] }
+      ],
+      "args": [{ "name": "pod",
+        "generators": [{ "script": ["kubectl", "get", "pods", "-o", "name"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "exec", "description": "Jalankan perintah di dalam container",
+      "options": [
+        { "name": ["-i", "--stdin"], "description": "Teruskan STDIN" },
+        { "name": ["-t", "--tty"], "description": "Alokasikan TTY" },
+        { "name": ["-c", "--container"], "description": "Nama container", "args": [{ "name": "container" }] }
+      ],
+      "args": [{ "name": "pod",
+        "generators": [{ "script": ["kubectl", "get", "pods", "-o", "name"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "apply", "description": "Terapkan konfigurasi ke resource",
+      "options": [
+        { "name": ["-f", "--filename"], "description": "Berkas atau direktori manifest",
+          "args": [{ "name": "file", "template": ["filepaths"] }] },
+        { "name": ["-k", "--kustomize"], "description": "Direktori kustomization",
+          "args": [{ "name": "dir", "template": ["folders"] }] },
+        { "name": ["--dry-run"], "description": "Mode simulasi",
+          "args": [{ "name": "strategy", "suggestions": [{ "name": "none" }, { "name": "client" }, { "name": "server" }] }] }
+      ] },
+    { "name": "rollout", "description": "Kelola rollout resource",
+      "subcommands": [
+        { "name": "status", "description": "Pantau status rollout" },
+        { "name": "undo", "description": "Kembalikan ke revisi sebelumnya" },
+        { "name": "restart", "description": "Restart resource" },
+        { "name": "history", "description": "Tampilkan riwayat revisi" }
+      ] },
+    { "name": "config", "description": "Ubah berkas kubeconfig",
+      "subcommands": [
+        { "name": "use-context", "description": "Pindah context aktif",
+          "args": [{ "name": "context",
+            "generators": [{ "script": ["kubectl", "config", "get-contexts", "-o", "name"], "trim": true, "cacheTtl": 60 }] }] },
+        { "name": "get-contexts", "description": "Daftar context yang tersedia" },
+        { "name": "current-context", "description": "Tampilkan context aktif" }
+      ] }
+  ]
+}

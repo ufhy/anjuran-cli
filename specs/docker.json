@@ -1,0 +1,54 @@
+{
+  "name": "docker",
+  "description": "Kelola container",
+  "options": [
+    { "name": ["-H", "--host"], "description": "Daemon socket yang dihubungi", "isPersistent": true,
+      "args": [{ "name": "host" }] },
+    { "name": ["--context"], "description": "Context yang dipakai", "isPersistent": true,
+      "args": [{ "name": "name", "generators": [{ "script": ["docker", "context", "ls", "--format", "{{.Name}}"], "trim": true, "cacheTtl": 60 }] }] }
+  ],
+  "subcommands": [
+    { "name": "ps", "description": "Daftar container",
+      "options": [
+        { "name": ["-a", "--all"], "description": "Termasuk yang berhenti" },
+        { "name": ["-q", "--quiet"], "description": "Hanya tampilkan ID" },
+        { "name": ["--format"], "description": "Format keluaran Go template", "args": [{ "name": "template" }] }
+      ] },
+    { "name": "exec", "description": "Jalankan perintah di container berjalan",
+      "options": [
+        { "name": ["-i", "--interactive"], "description": "Biarkan STDIN terbuka" },
+        { "name": ["-t", "--tty"], "description": "Alokasikan pseudo-TTY" },
+        { "name": ["-u", "--user"], "description": "Jalankan sebagai user", "args": [{ "name": "user" }] },
+        { "name": ["-w", "--workdir"], "description": "Direktori kerja", "args": [{ "name": "path" }] }
+      ],
+      "args": [
+        { "name": "container", "generators": [{ "script": ["docker", "ps", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] },
+        { "name": "command", "isVariadic": true }
+      ] },
+    { "name": "logs", "description": "Ambil log container",
+      "options": [
+        { "name": ["-f", "--follow"], "description": "Ikuti keluaran log" },
+        { "name": ["--tail"], "description": "Jumlah baris dari akhir", "args": [{ "name": "n" }] },
+        { "name": ["--since"], "description": "Tampilkan log sejak", "args": [{ "name": "timestamp" }] }
+      ],
+      "args": [{ "name": "container", "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": ["rm"], "description": "Hapus container",
+      "options": [{ "name": ["-f", "--force"], "description": "Paksa hapus container berjalan" }],
+      "args": [{ "name": "container", "isVariadic": true,
+        "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "compose", "description": "Jalankan aplikasi multi-container",
+      "options": [{ "name": ["-f", "--file"], "description": "Berkas compose", "isPersistent": true,
+        "args": [{ "name": "file", "template": ["filepaths"] }] }],
+      "subcommands": [
+        { "name": "up", "description": "Buat dan jalankan container",
+          "options": [
+            { "name": ["-d", "--detach"], "description": "Jalankan di latar belakang" },
+            { "name": ["--build"], "description": "Bangun image sebelum start" }
+          ] },
+        { "name": "down", "description": "Hentikan dan hapus container",
+          "options": [{ "name": ["-v", "--volumes"], "description": "Hapus volume bernama" }] },
+        { "name": "logs", "description": "Tampilkan log service",
+          "options": [{ "name": ["-f", "--follow"], "description": "Ikuti keluaran log" }] }
+      ] }
+  ]
+}

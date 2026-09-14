@@ -1,0 +1,33 @@
+{
+  "name": "ssh",
+  "description": "Klien login remote OpenSSH",
+  "options": [
+    { "name": ["-p"], "description": "Port tujuan", "args": [{ "name": "port" }] },
+    { "name": ["-i"], "description": "Berkas identitas (private key)",
+      "args": [{ "name": "identity_file", "template": ["filepaths"] }] },
+    { "name": ["-l"], "description": "Nama user untuk login", "args": [{ "name": "user" }] },
+    { "name": ["-J"], "description": "Lompat lewat jump host", "args": [{ "name": "destination" }] },
+    { "name": ["-L"], "description": "Port forwarding lokal", "args": [{ "name": "spec" }] },
+    { "name": ["-R"], "description": "Port forwarding remote", "args": [{ "name": "spec" }] },
+    { "name": ["-D"], "description": "SOCKS proxy dinamis", "args": [{ "name": "port" }] },
+    { "name": ["-o"], "description": "Opsi konfigurasi", "isRepeatable": true,
+      "args": [{ "name": "option", "suggestions": [
+        { "name": "StrictHostKeyChecking=no" },
+        { "name": "UserKnownHostsFile=/dev/null" },
+        { "name": "ServerAliveInterval=60" },
+        { "name": "ControlMaster=auto" },
+        { "name": "ControlPersist=10m" },
+        { "name": "ForwardAgent=yes" } ] }] },
+    { "name": ["-A"], "description": "Teruskan ssh-agent", "exclusiveOn": ["-a"] },
+    { "name": ["-a"], "description": "Jangan teruskan ssh-agent", "exclusiveOn": ["-A"] },
+    { "name": ["-N"], "description": "Jangan jalankan perintah remote" },
+    { "name": ["-f"], "description": "Masuk ke latar belakang" },
+    { "name": ["-t"], "description": "Paksa alokasi TTY" },
+    { "name": ["-v"], "description": "Mode verbose", "isRepeatable": true }
+  ],
+  "args": [
+    { "name": "destination",
+      "generators": [{ "script": ["uf", "internal", "ssh-hosts"], "trim": true, "cacheTtl": 60 }] },
+    { "name": "command", "isOptional": true, "isVariadic": true }
+  ]
+}

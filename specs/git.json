@@ -1,0 +1,83 @@
+{
+  "name": "git",
+  "description": "Sistem kontrol versi terdistribusi",
+  "options": [
+    { "name": ["-v", "--version"], "description": "Tampilkan versi git" },
+    { "name": ["-h", "--help"], "description": "Tampilkan bantuan" },
+    { "name": ["-C"], "description": "Jalankan seolah git dimulai di direktori ini", "isPersistent": true,
+      "args": [{ "name": "path", "template": ["folders"] }] },
+    { "name": ["--git-dir"], "description": "Lokasi direktori .git", "isPersistent": true,
+      "args": [{ "name": "path", "template": ["folders"] }] }
+  ],
+  "subcommands": [
+    { "name": "add", "description": "Tambahkan isi file ke index",
+      "options": [
+        { "name": ["-A", "--all"], "description": "Tambahkan semua perubahan" },
+        { "name": ["-p", "--patch"], "description": "Pilih hunk secara interaktif" },
+        { "name": ["-n", "--dry-run"], "description": "Jangan benar-benar menambahkan" }
+      ],
+      "args": [{ "name": "pathspec", "isVariadic": true, "template": ["filepaths"] }] },
+
+    { "name": ["checkout", "co"], "description": "Ganti branch atau pulihkan file",
+      "options": [
+        { "name": ["-b"], "description": "Buat branch baru lalu pindah ke sana",
+          "args": [{ "name": "branch" }] },
+        { "name": ["-B"], "description": "Buat atau reset branch lalu pindah",
+          "args": [{ "name": "branch" }] },
+        { "name": ["-f", "--force"], "description": "Buang perubahan lokal" },
+        { "name": ["--track"], "description": "Set upstream saat membuat branch" }
+      ],
+      "args": [{ "name": "branch",
+        "generators": [{ "script": ["git", "branch", "--format=%(refname:short)"], "trim": true, "cacheTtl": 5 }] }] },
+
+    { "name": "commit", "description": "Rekam perubahan ke repository",
+      "options": [
+        { "name": ["-m", "--message"], "description": "Pesan commit",
+          "args": [{ "name": "message" }] },
+        { "name": ["-a", "--all"], "description": "Stage otomatis file yang dimodifikasi" },
+        { "name": ["--amend"], "description": "Ubah commit terakhir" },
+        { "name": ["-S", "--gpg-sign"], "description": "Tandatangani commit dengan GPG" },
+        { "name": ["--no-verify"], "description": "Lewati hook pre-commit", "exclusiveOn": ["--verify"] },
+        { "name": ["--verify"], "description": "Jalankan hook pre-commit", "exclusiveOn": ["--no-verify"] }
+      ] },
+
+    { "name": "push", "description": "Kirim objek ke repository remote",
+      "options": [
+        { "name": ["-u", "--set-upstream"], "description": "Set upstream untuk branch" },
+        { "name": ["-f", "--force"], "description": "Timpa remote", "exclusiveOn": ["--force-with-lease"] },
+        { "name": ["--force-with-lease"], "description": "Timpa hanya bila remote belum berubah", "exclusiveOn": ["-f", "--force"] },
+        { "name": ["--tags"], "description": "Kirim semua tag" },
+        { "name": ["-n", "--dry-run"], "description": "Simulasi tanpa mengirim" }
+      ],
+      "args": [
+        { "name": "remote", "isOptional": true,
+          "generators": [{ "script": ["git", "remote"], "trim": true, "cacheTtl": 30 }] },
+        { "name": "branch", "isOptional": true,
+          "generators": [{ "script": ["git", "branch", "--format=%(refname:short)"], "trim": true, "cacheTtl": 5 }] }
+      ] },
+
+    { "name": "remote", "description": "Kelola repository yang dilacak",
+      "subcommands": [
+        { "name": "add", "description": "Tambah remote baru",
+          "args": [{ "name": "name" }, { "name": "url" }] },
+        { "name": "remove", "description": "Hapus remote",
+          "args": [{ "name": "name", "generators": [{ "script": ["git", "remote"], "trim": true }] }] },
+        { "name": ["show"], "description": "Tampilkan detail remote",
+          "args": [{ "name": "name", "generators": [{ "script": ["git", "remote"], "trim": true }] }] }
+      ],
+      "options": [{ "name": ["-v", "--verbose"], "description": "Tampilkan URL remote" }] },
+
+    { "name": "status", "description": "Tampilkan status working tree",
+      "options": [
+        { "name": ["-s", "--short"], "description": "Keluaran format ringkas" },
+        { "name": ["-b", "--branch"], "description": "Tampilkan informasi branch" }
+      ] },
+
+    { "name": "log", "description": "Tampilkan riwayat commit",
+      "options": [
+        { "name": ["--oneline"], "description": "Satu commit per baris" },
+        { "name": ["--graph"], "description": "Gambar grafik ASCII" },
+        { "name": ["-n"], "description": "Batasi jumlah commit", "args": [{ "name": "jumlah" }] }
+      ] }
+  ]
+}
