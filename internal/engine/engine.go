@@ -6,6 +6,8 @@
 package engine
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -102,10 +104,40 @@ type Result struct {
 // Engine memegang registry spec.
 type Engine struct {
 	registry *spec.Registry
+	// Dir adalah direktori kerja, dipakai menilai syarat whenFile.
+	Dir string
+	// Exists bisa diganti saat pengujian; nil berarti memeriksa berkas
+	// sungguhan.
+	Exists func(path string) bool
 }
 
 func New(r *spec.Registry) *Engine {
 	return &Engine{registry: r}
+}
+
+// InDir menyetel direktori kerja yang dipakai menilai syarat whenFile.
+func (e *Engine) InDir(dir string) *Engine {
+	e.Dir = dir
+	return e
+}
+
+// available menilai syarat whenFile sebuah entri.
+//
+// Syarat kosong berarti selalu tersedia. Berkasnya dicari relatif terhadap
+// direktori kerja, karena itulah tempat perintahnya akan dijalankan.
+func (e *Engine) available(whenFile string) bool {
+	if whenFile == "" {
+		return true
+	}
+	path := whenFile
+	if !filepath.IsAbs(path) && e.Dir != "" {
+		path = filepath.Join(e.Dir, whenFile)
+	}
+	if e.Exists != nil {
+		return e.Exists(path)
+	}
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Complete adalah satu-satunya entry point paket ini.
@@ -129,7 +161,15 @@ func (e *Engine) Complete(line string, cursor int) (*Result, error) {
 		return nil, err
 	}
 	if root == nil {
-		return res, nil // perintah tanpa spec: bukan error
+		// Perintah tanpa spec tetap melengkapi nama berkas.
+		//
+		// Korpus Fig memuat 716 perintah; sisanya — gzip, awk, openssl,
+		// perintah internal perusahaan, skrip apa pun di PATH — tidak ada di
+		// sana. Diam total di situ salah: shell mana pun melengkapi path untuk
+		// perintah yang tidak dikenalnya, dan itulah yang paling sering
+		// dibutuhkan.
+		res.Templates = append(res.Templates, "filepaths")
+		return res, nil
 	}
 
 	root, err = e.registry.Resolve(root)
@@ -266,7 +306,7 @@ func (e *Engine) suggest(res *Result, st *state, prefix string) {
 	// Konteks umum: subcommand, lalu argumen posisional, lalu opsi.
 	for i := range st.current.Subcommands {
 		sub := &st.current.Subcommands[i]
-		if sub.Hidden || sub.Deprecated {
+		if sub.Hidden || sub.Deprecated || !e.available(sub.WhenFile) {
 			continue
 		}
 		for _, name := range sub.Name {
@@ -287,11 +327,17 @@ func (e *Engine) suggest(res *Result, st *state, prefix string) {
 		}
 	}
 
-	if st.argIndex < len(st.current.Args) {
+	switch n := len(st.current.Args); {
+	case st.argIndex < n:
 		e.addArg(res, &st.current.Args[st.argIndex], prefix, "")
-	} else if n := len(st.current.Args); n > 0 && st.current.Args[n-1].IsVariadic {
+	case n > 0 && st.current.Args[n-1].IsVariadic:
 		// Argumen variadic menerima token tak terbatas.
 		e.addArg(res, &st.current.Args[n-1], prefix, "")
+	case n == 0 && len(st.current.Subcommands) == 0:
+		// Perintah yang spec-nya tidak menyebutkan argumen apa pun, dan tidak
+		// punya subcommand untuk ditawarkan. Ratusan spec berhenti di daftar
+		// opsi saja; melengkapi berkas adalah tebakan terbaik yang tersedia.
+		res.Templates = append(res.Templates, "filepaths")
 	}
 
 	e.addOptions(res, st, prefix)
@@ -374,7 +420,7 @@ func priorityOr(p int) int {
 func (e *Engine) addArg(res *Result, a *spec.Arg, prefix, insertPrefix string) {
 	for i := range a.Suggestions {
 		s := &a.Suggestions[i]
-		if s.Deprecated {
+		if s.Deprecated || !e.available(s.WhenFile) {
 			continue
 		}
 		for _, name := range s.Name {
@@ -401,7 +447,32 @@ func (e *Engine) addArg(res *Result, a *spec.Arg, prefix, insertPrefix string) {
 	for _, g := range a.Generators {
 		res.Templates = append(res.Templates, g.Template...)
 	}
+
+	// Argumen tanpa sumber kandidat apa pun dilengkapi sebagai nama berkas.
+	//
+	// Ratusan spec hanya menyebut nama argumennya — "python script", "node
+	// script" — tanpa menyebut isinya dari mana. Tanpa aturan ini, Tab di situ
+	// diam sama sekali. Melengkapi berkas adalah tebakan terbaik yang
+	// tersedia, dan itu pula yang dilakukan shell tanpa completion khusus.
+	if !hasSource(a) {
+		res.Templates = append(res.Templates, "filepaths")
+	}
+
 	sortCandidates(res.Candidates)
+}
+
+// hasSource menjawab apakah sebuah argumen menyebutkan dari mana kandidatnya
+// berasal.
+func hasSource(a *spec.Arg) bool {
+	if len(a.Suggestions) > 0 || len(a.Template) > 0 {
+		return true
+	}
+	for _, g := range a.Generators {
+		if len(g.Script) > 0 || len(g.Template) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // isOptionToken membedakan flag dari argumen biasa. Token yang dikutip

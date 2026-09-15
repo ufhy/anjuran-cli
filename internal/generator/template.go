@@ -28,9 +28,18 @@ const maxEntries = 2000
 // seperti "internal/ge". Nilai kembaliannya sudah berisi bagian direktori itu,
 // sehingga bisa langsung menggantikan kata tersebut.
 func Files(prefix, workdir string, onlyDirs bool) []string {
+	// "~" tanpa garis miring adalah rujukan ke direktori rumah, bukan nama
+	// berkas yang diawali tilde.
+	if prefix == "~" {
+		return []string{"~/"}
+	}
+
 	dirPart, basePart := splitPrefix(prefix)
 
-	lookup := dirPart
+	// Tilde dipekarkan LEBIH DULU. Menggabungkannya dengan direktori kerja
+	// sebelum itu menghasilkan "<cwd>/~", yang tidak pernah ada — dan "~/"
+	// karena itu tidak menawarkan apa pun sama sekali.
+	lookup := expandHome(dirPart)
 	switch {
 	case lookup == "":
 		lookup = workdir
@@ -41,7 +50,7 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 		lookup = "."
 	}
 
-	entries, err := os.ReadDir(expandHome(lookup))
+	entries, err := os.ReadDir(lookup)
 	if err != nil {
 		return nil
 	}
@@ -57,7 +66,7 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 		if !isDir && e.Type()&os.ModeSymlink != 0 {
 			// Symlink ke direktori tetap layak diperlakukan sebagai direktori,
 			// karena begitulah pengguna menelusurinya.
-			if fi, err := os.Stat(filepath.Join(expandHome(lookup), name)); err == nil {
+			if fi, err := os.Stat(filepath.Join(lookup, name)); err == nil {
 				isDir = fi.IsDir()
 			}
 		}
@@ -76,6 +85,9 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 		if isDir {
 			name += "/"
 		}
+		// Bagian direktori dikembalikan APA ADANYA, termasuk tilde-nya:
+		// yang disisipkan harus tetap "~/berkas", bukan path rumah yang
+		// sudah dipekarkan.
 		out = append(out, dirPart+name)
 	}
 

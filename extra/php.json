@@ -9,6 +9,7 @@
     {
       "name": "artisan",
       "description": "Perintah konsol Laravel",
+      "whenFile": "artisan",
       "args": [
         {
           "name": "command",

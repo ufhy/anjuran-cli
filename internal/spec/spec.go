@@ -65,6 +65,9 @@ type Suggestion struct {
 	// Hidden menandai entri yang hanya cocok saat diketik persis.
 	Hidden     bool `json:"hidden,omitempty"`
 	Deprecated bool `json:"deprecated,omitempty"`
+	// WhenFile membuat entri ini hanya ditawarkan bila berkas bernama itu ada
+	// di direktori kerja.
+	WhenFile string `json:"whenFile,omitempty"`
 }
 
 // Generator mendeskripsikan sumber kandidat dinamis secara DEKLARATIF.
@@ -145,7 +148,15 @@ type Subcommand struct {
 	// misalnya "aws/s3". Isinya baru dibaca saat penelusuran benar-benar
 	// sampai ke simpul ini; tanpa itu, satu spec aws berarti membaca puluhan
 	// megabyte untuk melengkapi satu kata.
-	LoadSpec           string `json:"loadSpec,omitempty"`
+	LoadSpec string `json:"loadSpec,omitempty"`
+	// WhenFile membuat entri ini hanya ditawarkan bila berkas atau direktori
+	// bernama itu ada di direktori kerja.
+	//
+	// Banyak perintah punya subcommand yang hanya bermakna di dalam proyek
+	// tertentu: "php artisan" hanya ada di proyek Laravel, "npm run" hanya
+	// berguna bila ada package.json. Menawarkannya di mana-mana membuat
+	// daftarnya berbohong tentang apa yang sebenarnya bisa dijalankan.
+	WhenFile           string `json:"whenFile,omitempty"`
 	RequiresSubcommand bool   `json:"requiresSubcommand,omitempty"`
 	IsDangerous        bool   `json:"isDangerous,omitempty"`
 	Hidden             bool   `json:"hidden,omitempty"`

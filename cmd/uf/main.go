@@ -133,7 +133,7 @@ func runComplete(args []string) int {
 	// Jalur yang dipakai sama persis dengan mode widget — engine, generator,
 	// penyaringan, dan pemeringkatan yang sama — supaya hasil pemeriksaan di
 	// sini tidak pernah berbeda dari yang muncul saat Tab ditekan.
-	eng := engine.New(newRegistry(dirs, *specsDir))
+	eng := engine.New(newRegistry(dirs, *specsDir)).InDir(generator.CurrentDir())
 
 	var src *generator.Source
 	var dyn ui.Dynamic

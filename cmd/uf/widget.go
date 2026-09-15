@@ -48,7 +48,7 @@ func runWidget(args []string) int {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
 	}
-	eng := engine.New(newRegistry(dirs, *specsDir))
+	eng := engine.New(newRegistry(dirs, *specsDir)).InDir(generator.CurrentDir())
 
 	start := 0
 	if *sel == "last" {

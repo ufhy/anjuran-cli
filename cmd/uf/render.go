@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/uf-cli/uf/internal/engine"
+	"github.com/uf-cli/uf/internal/generator"
 	"github.com/uf-cli/uf/internal/ui"
 	"golang.org/x/term"
 )
@@ -62,7 +63,7 @@ func runRender(args []string) int {
 		return 0
 	}
 
-	eng := engine.New(newRegistry(dirs, *specsDir))
+	eng := engine.New(newRegistry(dirs, *specsDir)).InDir(generator.CurrentDir())
 	byteCursor := toByteCursor(*line, *cursor, *unit)
 	ax := newAliasExpansion(*line, byteCursor, *alias)
 	st := ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}

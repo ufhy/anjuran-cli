@@ -46,6 +46,9 @@ func merge(base, overlay *Subcommand) *Subcommand {
 	if overlay.LoadSpec != "" {
 		out.LoadSpec = overlay.LoadSpec
 	}
+	if overlay.WhenFile != "" {
+		out.WhenFile = overlay.WhenFile
+	}
 	out.Hidden = out.Hidden || overlay.Hidden
 	out.Deprecated = out.Deprecated || overlay.Deprecated
 	out.IsDangerous = out.IsDangerous || overlay.IsDangerous
