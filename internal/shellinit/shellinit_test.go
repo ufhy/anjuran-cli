@@ -90,3 +90,32 @@ func TestPwshAliasKePowershell(t *testing.T) {
 		}
 	}
 }
+
+// Dropdown otomatis dipicu SPASI, bukan setiap huruf. Setelah sebuah kata
+// selesai barulah ada yang bisa ditawarkan, dan biayanya hanya dibayar di
+// tempat yang jarang ditekan.
+func TestZshOtomatisDipicuSpasi(t *testing.T) {
+	s, _ := Script("zsh")
+	for _, want := range []string{
+		"UF_AUTO",      // harus opt-in
+		"uf render",    // memakai mode gambar-saja
+		"--prev-lines", // zsh yang menyimpan jumlah barisnya
+		"zle .self-insert",
+		"TRAPINT", // Ctrl-C tidak pernah sampai ke widget
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("skrip zsh tidak memuat %q", want)
+		}
+	}
+}
+
+// Shell lain tidak punya hook per-ketikan yang layak, jadi tidak boleh
+// berpura-pura punya mode otomatis.
+func TestShellLainTanpaModeOtomatis(t *testing.T) {
+	for _, sh := range []string{"bash", "fish", "powershell"} {
+		s, _ := Script(sh)
+		if strings.Contains(s, "uf render") {
+			t.Errorf("skrip %s seharusnya belum memakai mode gambar-saja", sh)
+		}
+	}
+}

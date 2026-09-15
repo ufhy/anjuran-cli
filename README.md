@@ -132,6 +132,26 @@ Lalu satu baris di berkas konfigurasi shell:
 Skrip integrasinya disematkan di dalam binary, jadi tidak ada path repo yang
 perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas.
 
+### Dropdown yang muncul sendiri
+
+```sh
+UF_AUTO=1 eval "$(uf init zsh)"
+```
+
+Ketik `git` lalu **spasi** — dropdown muncul tanpa menekan apa pun. Huruf
+berikutnya menyaringnya, Tab masuk ke mode memilih, Enter menjalankan perintah
+seperti biasa.
+
+Pemicunya spasi, bukan setiap huruf. Sebelum sebuah kata selesai, isi dropdown
+hanya akan berganti-ganti mengikuti huruf yang belum tentu selesai — dan
+biayanya akan dibayar pada tombol yang paling sering ditekan. Satu penggambaran
+memakan 3,1 ms; di spasi itu tidak terasa, di setiap huruf akan terasa.
+
+Bawaannya mati. Hanya zsh yang punya hook per-ketikan yang layak: bash
+memerlukan `bind -x` pada setiap karakter, yang merusak bracketed paste dan
+penanganan masukan readline; fish tidak punya hook itu; PSReadLine hanya
+menyediakan pendaftaran per-tombol satu per satu.
+
 Tab kini membuka dropdown. Tombol di dalamnya:
 
 | Tombol | Aksi |
@@ -233,6 +253,14 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
    Mode degradasi `UF_SIMPLE=1` mematikan warna dan sorotan, dan menyala
    otomatis untuk `TERM` bernilai `dumb`, `vt100`, `vt102`, atau `ansi`.
 
+   Waktu yang dirasakan saat dropdown muncul sendiri:
+
+   | | |
+   |---|---|
+   | spasi → gambar kotak | 3,1 ms |
+   | huruf berikutnya → menyaring | 3,1 ms |
+   | hapus kotak | 3,1 ms |
+
    Waktu hitung engine per ketikan:
 
    | | |
@@ -246,14 +274,18 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
 
    | | |
    |---|---|
-   | menyalakan proses saja | 8 ms |
-   | completion statis | 11 ms |
-   | dengan generator, cache panas | 18 ms |
-   | dengan generator, cache dingin | 44 ms |
+   | menyalakan proses saja | 3,2 ms |
+   | completion statis | 6,6 ms |
+   | dengan generator, cache panas | 6,8 ms |
 
    Jadi biaya terbesarnya adalah menyalakan proses, bukan menghitung. Daemon
-   yang tetap hidup akan memangkas 8 ms itu; belum dibangun karena 18 ms sudah
-   jauh di bawah ambang yang terasa.
+   yang tetap hidup akan memangkas 3,2 ms itu; tidak dibangun karena
+   pengukurannya menunjukkan tidak perlu.
+
+   Generator yang GAGAL ikut di-cache sebentar. Tanpa itu, mengetik di
+   direktori yang bukan repo git menjalankan `git branch` yang gagal
+   berulang-ulang — 32 ms, bukan 7 ms. Generator yang gagal justru yang paling
+   mahal, karena biayanya dibayar penuh tanpa pernah menghasilkan apa pun.
 2. **Generator butuh policy layer.** Generator mengeksekusi perintah sebagai efek
    samping mengetik. Karena itu `internal/engine` sengaja hanya *melaporkan*
    generator yang relevan tanpa menjalankannya — eksekusinya ditaruh di satu

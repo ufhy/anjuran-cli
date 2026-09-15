@@ -162,3 +162,42 @@ func TestScriptKosongDiabaikan(t *testing.T) {
 		t.Errorf("mau nil, dapat %v", namaDari(got))
 	}
 }
+
+// Generator yang gagal adalah yang PALING mahal: biayanya dibayar penuh setiap
+// kali, tanpa pernah menghasilkan apa pun. Saat dropdown digambar ulang tiap
+// ketikan, itu berarti proses gagal yang ditumbuhkan terus-menerus.
+func TestKegagalanIkutDiCache(t *testing.T) {
+	skipTanpaShellUnix(t)
+
+	c := &Cache{Dir: t.TempDir(), Now: time.Now}
+	r := runnerUntuk("program-yang-pasti-tidak-ada")
+	r.Cache = c
+
+	spec := Spec{Script: []string{"program-yang-pasti-tidak-ada"}, CacheTTL: time.Minute}
+	if got := r.Run(context.Background(), spec); len(got) != 0 {
+		t.Fatalf("mau kosong, dapat %v", namaDari(got))
+	}
+
+	if _, ok := c.Get(spec.Script, ""); !ok {
+		t.Error("kegagalan harus ikut tercatat di cache")
+	}
+}
+
+// Masa berlaku cache kegagalan harus pendek: keadaan yang membuatnya gagal
+// bisa berubah kapan saja, misalnya setelah `git init`.
+func TestCacheKegagalanBerumurPendek(t *testing.T) {
+	skipTanpaShellUnix(t)
+
+	now := time.Now()
+	c := &Cache{Dir: t.TempDir(), Now: func() time.Time { return now }}
+	r := runnerUntuk("program-yang-pasti-tidak-ada")
+	r.Cache = c
+
+	spec := Spec{Script: []string{"program-yang-pasti-tidak-ada"}, CacheTTL: time.Hour}
+	r.Run(context.Background(), spec)
+
+	now = now.Add(failureTTL + time.Second)
+	if _, ok := c.Get(spec.Script, ""); ok {
+		t.Error("cache kegagalan seharusnya sudah kedaluwarsa")
+	}
+}

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/uf-cli/uf/internal/engine"
 )
 
 func sample() []Item {
@@ -91,12 +93,17 @@ func TestRuangDipesanSebelumMenggambar(t *testing.T) {
 	}
 	out := buf.String()
 
-	// Newline pemesan ruang harus mendahului penyimpanan kursor, supaya
-	// posisi tersimpan tidak basi bila terminal ikut menggulung.
-	nl := strings.Index(out, "\n\n\n")
+	// Pemesan ruang harus mendahului penyimpanan kursor, supaya posisi
+	// tersimpan tidak basi bila terminal ikut menggulung.
+	nl := strings.Index(out, escIndex+escIndex+escIndex)
 	save := strings.Index(out, escSaveCursor)
 	if nl < 0 || save < 0 {
 		t.Fatalf("mau pemesanan ruang dan simpan kursor, dapat %q", out)
+	}
+	// "\n" tidak boleh dipakai: di luar mode raw ia menjadi CR+LF dan
+	// memindahkan kursor ke kolom 0.
+	if strings.Contains(out, "\n") {
+		t.Errorf("pemesanan ruang tidak boleh memakai newline mentah: %q", out)
 	}
 	if nl > save {
 		t.Error("ruang harus dipesan SEBELUM posisi kursor disimpan")
@@ -296,5 +303,95 @@ func TestMaxRowsMengikutiTinggiTerminal(t *testing.T) {
 	}
 	if got := NewRenderer(nil, 80, 1, true).MaxRows(); got < 1 {
 		t.Errorf("terminal sangat pendek tetap harus menyisakan 1 baris, dapat %d", got)
+	}
+}
+
+// Adopt memungkinkan proses baru melanjutkan gambar proses sebelumnya. Tanpa
+// itu, dropdown yang muncul sambil mengetik tidak mungkin: setiap ketikan
+// menjalankan uf yang baru dan tidak mewarisi apa pun.
+func TestAdoptMenggambarUlangSemuanya(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, 24, true)
+	r.Adopt(5)
+
+	if err := r.Render(sample(), 0, 3); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+
+	// Tidak boleh ada pemesanan ruang: lima baris sudah diamankan proses lain.
+	if strings.Contains(out, escIndex) {
+		t.Errorf("baris yang sudah diamankan tidak boleh dipesan ulang: %q", out)
+	}
+	// Seluruh baris digambar ulang, karena isi lama tidak diketahui.
+	for _, want := range []string{"add", "commit", "push"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("mau %q digambar ulang", want)
+		}
+	}
+	// Dua baris sisa dari gambar sebelumnya harus dibersihkan.
+	if n := strings.Count(out, escClearLine); n < 5 {
+		t.Errorf("mau minimal 5 pembersihan baris, dapat %d", n)
+	}
+}
+
+func TestAdoptNolTidakBerpengaruh(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, 24, true)
+	r.Adopt(0)
+	if err := r.Render(sample(), 0, 3); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), escIndex) {
+		t.Error("tanpa baris yang diadopsi, ruang tetap harus dipesan")
+	}
+}
+
+// Show dipakai mode gambar-saja: belum ada pilihan aktif, karena pengguna
+// masih mengetik dan Enter di situ menjalankan perintah.
+func TestShowTanpaBarisTerpilih(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, 24, false)
+
+	cands := []engine.Candidate{
+		{Name: "add", Kind: engine.KindSubcommand},
+		{Name: "commit", Kind: engine.KindSubcommand},
+		{Name: "push", Kind: engine.KindSubcommand},
+	}
+	n := r.Show(cands, 2)
+	if n != len(cands)+2 {
+		t.Errorf("baris terpakai = %d, mau %d isi ditambah dua bingkai", n, len(cands))
+	}
+	if strings.Contains(buf.String(), escReverse) {
+		t.Error("tidak boleh ada baris tersorot saat pengguna masih mengetik")
+	}
+	if !strings.Contains(stripStyles(buf.String()), " 3 ") {
+		t.Errorf("garis bawah harus memuat jumlah kandidat: %q", stripStyles(buf.String()))
+	}
+}
+
+// Kotak berisi satu baris tidak memberi apa pun untuk dipilih; ia hanya
+// menutupi layar.
+func TestShowMelewatiKandidatTerlaluSedikit(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, 24, false)
+	n := r.Show([]engine.Candidate{{Name: "commit"}}, 2)
+	if n != 0 {
+		t.Errorf("baris terpakai = %d, mau 0", n)
+	}
+	if strings.Contains(buf.String(), "commit") {
+		t.Error("kandidat tunggal tidak boleh digambar")
+	}
+}
+
+func TestShowMembersihkanSaatKosong(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, 24, false)
+	r.Adopt(6)
+	if n := r.Show(nil, 2); n != 0 {
+		t.Errorf("baris terpakai = %d, mau 0", n)
+	}
+	if !strings.Contains(buf.String(), escClearLine) {
+		t.Error("kotak lama harus dibersihkan saat tidak ada kandidat")
 	}
 }

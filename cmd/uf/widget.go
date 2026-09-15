@@ -12,6 +12,7 @@ import (
 	"github.com/uf-cli/uf/internal/spec"
 	"github.com/uf-cli/uf/internal/tty"
 	"github.com/uf-cli/uf/internal/ui"
+	"golang.org/x/term"
 )
 
 // runWidget adalah mode interaktif yang dipanggil oleh integrasi shell.
@@ -33,6 +34,7 @@ func runWidget(args []string) int {
 	line := fs.String("line", "", "isi buffer shell")
 	cursor := fs.Int("cursor", -1, "posisi kursor")
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
+	prev := fs.Int("prev-lines", 0, "baris yang sudah digambar mode render")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -47,7 +49,7 @@ func runWidget(args []string) int {
 	}
 	eng := engine.New(spec.NewRegistryDirs(dirs...))
 
-	st, outcome, err := interact(eng, ui.State{Line: *line, Cursor: byteCursor})
+	st, outcome, err := interact(eng, ui.State{Line: *line, Cursor: byteCursor}, *prev)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
@@ -65,7 +67,7 @@ func runWidget(args []string) int {
 }
 
 // interact membuka terminal, menjalankan sesi, lalu memulihkan mode terminal.
-func interact(eng *engine.Engine, st ui.State) (ui.State, ui.Outcome, error) {
+func interact(eng *engine.Engine, st ui.State, prevLines int) (ui.State, ui.Outcome, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	pre, err := ui.Prepare(eng, st, newDynamic())
@@ -73,11 +75,15 @@ func interact(eng *engine.Engine, st ui.State) (ui.State, ui.Outcome, error) {
 		return st, ui.Cancelled, err
 	}
 	if out, outcome, done := pre.Immediate(); done {
+		// Dropdown yang sedang tergambar oleh mode otomatis harus tetap
+		// dibersihkan, meski sesi interaktif tidak jadi dibuka.
+		clearLeftover(prevLines)
 		return out, outcome, nil
 	}
 
 	term, err := tty.Open()
 	if err != nil {
+		clearLeftover(prevLines)
 		// Tanpa terminal interaktif tidak ada yang bisa digambar. Diperlakukan
 		// sebagai "tidak ada kandidat" supaya shell jatuh ke completion bawaan.
 		return st, ui.NoCandidates, nil
@@ -86,8 +92,30 @@ func interact(eng *engine.Engine, st ui.State) (ui.State, ui.Outcome, error) {
 
 	w, h := term.Size()
 	rend := ui.NewRenderer(term.Out(), w, h, simpleMode())
+	// Baris yang sudah digambar mode otomatis diambil alih, bukan ditumpuk.
+	rend.Adopt(prevLines)
 
 	return pre.Session(term, rend).Run()
+}
+
+// clearLeftover menghapus dropdown yang tertinggal dari mode otomatis.
+func clearLeftover(lines int) {
+	if lines <= 0 {
+		return
+	}
+	f, err := os.OpenFile(ttyDevice, os.O_WRONLY, 0)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	w, h := 80, 24
+	if tw, th, err := term.GetSize(int(f.Fd())); err == nil && tw > 0 && th > 0 {
+		w, h = tw, th
+	}
+	r := ui.NewRenderer(f, w, h, simpleMode())
+	r.Adopt(lines)
+	r.Clear()
 }
 
 // newDynamic menyiapkan sumber kandidat dinamis.
@@ -116,6 +144,9 @@ func generatorTimeout() time.Duration {
 	}
 	return d
 }
+
+// ttyDevice adalah terminal pengendali pada sistem mirip Unix.
+const ttyDevice = "/dev/tty"
 
 // simpleMode mematikan warna dan sorotan pada terminal yang terbatas.
 func simpleMode() bool {

@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/uf-cli/uf/internal/engine"
 )
 
 // Item adalah satu baris yang digambar di dropdown.
@@ -22,6 +24,9 @@ type Item struct {
 // Escape sequence yang dipakai. Sengaja dikumpulkan di satu tempat agar
 // mode sederhana bisa mengosongkan yang bersifat dekoratif.
 const (
+	// escIndex menurunkan kursor satu baris tanpa mengubah kolomnya, dan
+	// menggulung layar bila sudah di baris terakhir.
+	escIndex         = "\x1bD"
 	escSaveCursor    = "\x1b7"
 	escRestoreCursor = "\x1b8"
 	escClearLine     = "\x1b[K"
@@ -159,13 +164,38 @@ func (r *Renderer) reserve(n int) error {
 		return nil
 	}
 	need := n - r.reserved
-	// Newline menggulung layar bila perlu; kursor lalu dikembalikan ke atas.
-	s := strings.Repeat("\n", need) + fmt.Sprintf("\x1b[%dA", need)
+	// escIndex dipakai, BUKAN "\n".
+	//
+	// Di luar mode raw, terminal mengubah "\n" menjadi CR+LF, sehingga kursor
+	// ikut melompat ke kolom 0. Posisi yang disimpan sesudahnya lalu salah,
+	// dan baris prompt tertimpa saat kursor dipulihkan. Mode Tab tidak
+	// terkena karena di sana terminal sedang raw; mode gambar-saja terkena,
+	// karena ia sengaja tidak mengubah keadaan terminal sama sekali.
+	s := strings.Repeat(escIndex, need) + fmt.Sprintf("\x1b[%dA", need)
 	if _, err := io.WriteString(r.w, s); err != nil {
 		return err
 	}
 	r.reserved = n
 	return nil
+}
+
+// Adopt memberi tahu renderer bahwa n baris di bawah kursor SUDAH terpakai dan
+// sudah diamankan oleh proses lain.
+//
+// Ini yang membuat penggambaran ulang antar proses mungkin. Saat dropdown
+// muncul otomatis, setiap ketikan menjalankan proses uf yang baru dan tidak
+// mewarisi apa pun; zsh yang menyimpan jumlah barisnya lalu menyerahkannya
+// kembali ke sini. Isi baris lama sengaja diisi penanda yang tidak mungkin
+// cocok, supaya seluruhnya digambar ulang dan sisanya dibersihkan.
+func (r *Renderer) Adopt(n int) {
+	if n <= 0 {
+		return
+	}
+	r.reserved = n
+	r.prev = make([]string, n)
+	for i := range r.prev {
+		r.prev[i] = "\x00"
+	}
 }
 
 // Clear menghapus dropdown dan melupakan state gambar.
@@ -310,7 +340,12 @@ func (r *Renderer) boxedRow(it Item, nameW, descW, inner int, selected bool) str
 // bottomBorder menyisipkan penghitung posisi ke dalam garis bawah, sehingga
 // tidak memakan satu baris layar sendiri.
 func (r *Renderer) bottomBorder(inner, selected, total int) string {
-	label := fmt.Sprintf(" %d/%d ", selected+1, total)
+	// Saat belum ada yang terpilih — dropdown yang muncul sambil mengetik —
+	// yang bermakna hanyalah berapa banyak kandidatnya.
+	label := fmt.Sprintf(" %d ", total)
+	if selected >= 0 {
+		label = fmt.Sprintf(" %d/%d ", selected+1, total)
+	}
 	if n := utf8.RuneCountInString(label); n+2 > inner {
 		label = ""
 	}
@@ -385,4 +420,41 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// Show menggambar daftar kandidat tanpa ada yang terpilih, lalu mengembalikan
+// jumlah baris yang terpakai.
+//
+// Dipakai oleh mode gambar-saja, di mana belum ada pilihan aktif: pengguna
+// masih mengetik, dan menyorot salah satu baris akan menyarankan bahwa Enter
+// akan memilihnya — padahal Enter di situ menjalankan perintah.
+//
+// min adalah jumlah kandidat terkecil yang layak digambar.
+func (r *Renderer) Show(cands []engine.Candidate, min int) int {
+	if len(cands) < min {
+		r.Clear()
+		return 0
+	}
+
+	rows := r.MaxRows()
+	if len(cands) < rows {
+		rows = len(cands)
+	}
+
+	items := make([]Item, rows)
+	for i := 0; i < rows; i++ {
+		items[i] = Item{
+			Name:        cands[i].Label(),
+			Description: cands[i].Description,
+			Kind:        string(cands[i].Kind),
+			Dangerous:   cands[i].Dangerous,
+		}
+	}
+
+	// selected di luar rentang berarti tidak ada baris yang tersorot.
+	lines := r.compose(items, -1, len(cands))
+	if err := r.Render(items, -1, len(cands)); err != nil {
+		return 0
+	}
+	return len(lines)
 }

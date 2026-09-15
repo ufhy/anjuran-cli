@@ -22,6 +22,8 @@ const (
 	// maxCandidates membatasi jumlah baris yang diolah; dropdown tidak
 	// pernah menampilkan lebih dari belasan.
 	maxCandidates = 2000
+	// failureTTL adalah masa berlaku cache untuk generator yang gagal.
+	failureTTL = 3 * time.Second
 )
 
 // Spec adalah generator yang akan dijalankan, bentuk minimal yang dibutuhkan
@@ -69,6 +71,16 @@ func (r *Runner) Run(ctx context.Context, g Spec) []Candidate {
 
 	out, err := r.exec(ctx, g.Script)
 	if err != nil {
+		// Kegagalan ikut di-cache, dengan masa berlaku pendek.
+		//
+		// Tanpa ini, mengetik di direktori yang bukan repo git akan menjalankan
+		// `git branch` yang gagal berulang-ulang — dan generator yang gagal
+		// justru yang paling mahal, karena biayanya dibayar penuh setiap kali.
+		// Masa berlakunya sengaja pendek: keadaan yang membuatnya gagal bisa
+		// berubah kapan saja, misalnya setelah `git init`.
+		if r.Cache != nil {
+			r.Cache.Put(g.Script, r.Dir, "", failureTTL)
+		}
 		return nil
 	}
 
