@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/uf-cli/uf/internal/engine"
 )
@@ -307,7 +306,7 @@ func (c layout) bottomBorder(position, total int) string {
 	if !c.split {
 		tail = c.left
 	}
-	n := utf8.RuneCountInString(label)
+	n := textWidth(label)
 	if n+2 > tail {
 		label = ""
 		n = 0
@@ -325,10 +324,10 @@ func (c layout) bottomBorder(position, total int) string {
 func (r *Renderer) columns(items []Item) layout {
 	var c layout
 	for _, it := range items {
-		if n := utf8.RuneCountInString(it.Name); n > c.nameW {
+		if n := textWidth(it.Name); n > c.nameW {
 			c.nameW = n
 		}
-		if n := utf8.RuneCountInString(it.Description); n > c.descW {
+		if n := textWidth(it.Description); n > c.descW {
 			c.descW = n
 		}
 	}
@@ -370,14 +369,14 @@ func rowCells(it Item, c layout, selected bool) (left, right string) {
 	if selected {
 		marker = "❯ "
 	}
-	name := truncate(it.Name, c.nameW)
-	left = " " + marker + name + strings.Repeat(" ", max(0, c.nameW-utf8.RuneCountInString(name))) + " "
+	name := truncateWidth(it.Name, c.nameW)
+	left = " " + marker + name + strings.Repeat(" ", max(0, c.nameW-textWidth(name))) + " "
 
 	if !c.split {
 		return left, ""
 	}
-	desc := truncate(it.Description, c.descW)
-	right = " " + desc + strings.Repeat(" ", max(0, c.descW-utf8.RuneCountInString(desc))) + " "
+	desc := truncateWidth(it.Description, c.descW)
+	right = " " + desc + strings.Repeat(" ", max(0, c.descW-textWidth(desc))) + " "
 	return left, right
 }
 
@@ -459,21 +458,6 @@ func stripStyles(s string) string {
 		i++
 	}
 	return b.String()
-}
-
-// truncate memotong berdasarkan rune, bukan byte, lalu menambahkan elipsis.
-func truncate(s string, w int) string {
-	if w <= 0 {
-		return ""
-	}
-	rs := []rune(s)
-	if len(rs) <= w {
-		return s
-	}
-	if w == 1 {
-		return "…"
-	}
-	return string(rs[:w-1]) + "…"
 }
 
 func max(a, b int) int {

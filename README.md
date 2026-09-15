@@ -522,6 +522,22 @@ menghasilkan sesuatu:
 | `TestSyaratWhenFile` | entri bersyarat muncul di tempat yang tepat |
 | `TestSpecKosongYangDiketahui` | daftar kekosongan yang tersisa, agar terlihat |
 
+Di atasnya ada **penyapuan korpus**: menjalankan SELURUH spec terpasang — 716
+perintah lintas banyak posisi kursor — lalu memeriksa sifat yang harus benar
+untuk semuanya. Contoh yang dipilih tangan hanya menemukan yang sudah
+terpikirkan.
+
+| Sifat yang dijaga | Yang pernah ditemukannya |
+|---|---|
+| kandidat terurai utuh sebagai kata shell | 131 kandidat berspasi, kutip menggantung di `mysql` |
+| tidak ada kandidat kembar | 43 entri ganda |
+| rentang penggantian memuat kursor | — |
+| setiap spec bisa diurai | 5 spec mati total karena `requiresSeparator` |
+| keterangan tanpa karakter kendali | byte NUL di spec `ag` |
+| setiap baris kotak sama lebar DI LAYAR | CJK dan emoji mematahkan bingkai |
+| cabang `loadSpec` menghasilkan sesuatu | — |
+| masukan acak tidak menjatuhkan engine | — |
+
 Uji ini lahir dari kegagalan berulang: bug yang dilaporkan pengguna berkali-kali
 lolos dari pengujian sebelumnya, karena skenarionya dipilih sendiri dan selalu
 yang sudah diketahui bekerja. Daftar perintahnya diambil dari yang dipakai

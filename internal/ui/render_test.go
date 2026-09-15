@@ -489,3 +489,43 @@ func TestPemisahIkutTersorot(t *testing.T) {
 		t.Errorf("pemisah kolom harus berada di dalam sorotan: %q", isi)
 	}
 }
+
+// Setiap baris kotak harus sama lebarnya DI LAYAR, bukan sama jumlah rune-nya.
+//
+// Huruf CJK dan emoji memakan dua kolom. Menghitungnya sebagai satu membuat
+// bingkai patah begitu ada satu nama berkas berbahasa Jepang atau satu emoji
+// di dalam keterangan — dan nama seperti itu bukan hal langka.
+func TestSemuaBarisSamaLebarDiLayar(t *testing.T) {
+	kasus := [][]Item{
+		{{Name: "biasa", Description: "keterangan biasa"}},
+		{
+			{Name: "biasa", Description: "keterangan"},
+			{Name: "日本語コマンド", Description: "perintah bahasa Jepang"},
+			{Name: "emoji", Description: "roket \U0001F680 di tengah"},
+			{Name: "campur\U0001F525an", Description: "api di tengah nama"},
+		},
+		{
+			{Name: "한글", Description: "Hangul"},
+			{Name: "中文", Description: "中文说明"},
+			{Name: "é", Description: "huruf bertanda gabung"},
+		},
+	}
+
+	for i, items := range kasus {
+		for _, width := range []int{50, 60, 80, 120} {
+			r := NewRenderer(nil, width, 24, false)
+			lines := r.compose(items, 0, 1, len(items))
+
+			want := textWidth(stripStyles(lines[0]))
+			for j, l := range lines {
+				if got := textWidth(stripStyles(l)); got != want {
+					t.Errorf("kasus %d lebar %d: baris %d selebar %d kolom, mau %d: %q",
+						i, width, j, got, want, stripStyles(l))
+				}
+			}
+			if want > width {
+				t.Errorf("kasus %d: kotak selebar %d kolom melebihi terminal %d", i, want, width)
+			}
+		}
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/uf-cli/uf/internal/parser"
 	"github.com/uf-cli/uf/internal/spec"
@@ -95,6 +96,29 @@ func seimbang(text string) bool {
 		}
 	}
 	return true
+}
+
+// bersihkan membuang karakter kendali dari teks yang akan digambar.
+//
+// Keterangan berasal dari korpus pihak ketiga dan bisa memuat apa saja: spec
+// "ag" menyimpan byte NUL di dalam keterangannya. Menuliskannya apa adanya ke
+// terminal merusak kotak yang sedang digambar — baris meleset, bingkai patah,
+// dan sisa gambar tertinggal di layar.
+func bersihkan(s string) string {
+	if strings.IndexFunc(s, unicode.IsControl) < 0 {
+		return s
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			// Tab dan baris baru menjadi spasi supaya kata tidak menyatu;
+			// sisanya dibuang.
+			if r == '\t' || r == '\n' || r == '\r' {
+				return ' '
+			}
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // perluDikutip menyebut karakter yang mengubah arti sebuah kata di shell.
@@ -389,7 +413,7 @@ func (e *Engine) suggest(res *Result, st *state, prefix string) {
 					Display:      sub.DisplayName,
 					Insert:       insert,
 					CursorOffset: offset,
-					Description:  sub.Description,
+					Description:  bersihkan(sub.Description),
 					Kind:         KindSubcommand,
 					Priority:     priorityOr(sub.Priority),
 					Dangerous:    sub.IsDangerous,
@@ -460,7 +484,7 @@ func (e *Engine) addOptions(res *Result, st *state, prefix string) {
 					Display:      o.DisplayName,
 					Insert:       insert,
 					CursorOffset: offset,
-					Description:  o.Description,
+					Description:  bersihkan(o.Description),
 					Kind:         KindOption,
 					Priority:     priorityOr(o.Priority),
 					Dangerous:    o.IsDangerous,
@@ -525,7 +549,7 @@ func (e *Engine) addArg(res *Result, a *spec.Arg, prefix, insertPrefix string) {
 					Display:      s.DisplayName,
 					Insert:       insert,
 					CursorOffset: offset,
-					Description:  s.Description,
+					Description:  bersihkan(s.Description),
 					Kind:         KindArg,
 					Priority:     priorityOr(s.Priority),
 				})
