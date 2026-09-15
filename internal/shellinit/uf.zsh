@@ -107,6 +107,49 @@ if [[ -n ${UF_AUTO:-} ]]; then
   }
   zle -N self-insert _uf_insert
 
+  # Spasi belum tentu terpasang ke self-insert.
+  #
+  # oh-my-zsh memetakannya ke magic-space, yang lebih dulu memekarkan rujukan
+  # riwayat seperti !! sebelum menyisipkan spasi. Membungkus self-insert saja
+  # karena itu tidak pernah terpanggil di sana — dan spasi justru pemicu utama
+  # fitur ini. Yang dibungkus harus widget yang SEDANG terpasang, apa pun
+  # namanya, supaya perilaku yang sudah dipasang pengguna tetap utuh.
+  # Keluarannya berbentuk: " " magic-space
+  # Nama widget adalah kata terakhir, jadi segala sesuatu sampai spasi terakhir
+  # dibuang. Memecahnya sebagai kata shell tidak bisa dipakai di sini, karena
+  # tanda kutip pembungkus tombolnya ikut terhitung sebagai kata tersendiri.
+  # Keluarannya berbentuk: " " magic-space
+  # Nama widget adalah kata terakhir. Hasilnya ditampung ke variabel lebih dulu;
+  # bentuk bersarang seperti ${${(f)"$(...)"}[1]##* } tidak menerapkan
+  # pemangkasannya sebagaimana diharapkan.
+  typeset -g _uf_space_orig
+  typeset _uf_bindkey_out
+  _uf_bindkey_out="$(bindkey ' ')"
+  _uf_space_orig=${_uf_bindkey_out##* }
+  unset _uf_bindkey_out
+  if [[ -z $_uf_space_orig || $_uf_space_orig == undefined-key ]]; then
+    _uf_space_orig=self-insert
+  fi
+
+  _uf_space() {
+    if [[ $_uf_space_orig == self-insert ]]; then
+      # Widget bawaan dipanggil langsung, supaya tidak berputar kembali ke
+      # pembungkus self-insert kita dan menggambar dua kali.
+      zle .self-insert
+    else
+      zle "$_uf_space_orig" || zle .self-insert
+    fi
+    _uf_draw
+  }
+  zle -N _uf_space
+
+  bindkey " " _uf_space
+  # Mode vi memakai keymap terpisah; tanpa ini fiturnya mati begitu pengguna
+  # berpindah ke sana.
+  if [[ -n ${keymaps[(r)viins]} ]]; then
+    bindkey -M viins " " _uf_space
+  fi
+
   _uf_delete() {
     zle .backward-delete-char
     (( _uf_lines )) && _uf_draw

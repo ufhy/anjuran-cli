@@ -119,3 +119,20 @@ func TestShellLainTanpaModeOtomatis(t *testing.T) {
 		}
 	}
 }
+
+// Spasi belum tentu terpasang ke self-insert: oh-my-zsh memetakannya ke
+// magic-space. Membungkus self-insert saja berarti fitur ini mati diam-diam
+// di konfigurasi yang justru paling banyak dipakai.
+func TestZshMembungkusWidgetSpasiYangAda(t *testing.T) {
+	s, _ := Script("zsh")
+	for _, want := range []string{
+		`bindkey ' '`,           // menanyakan widget yang sedang terpasang
+		`bindkey " " _uf_space`, // memasang pembungkusnya
+		"magic-space",           // alasannya ditulis, bukan sekadar dikerjakan
+		"viins",                 // mode vi memakai keymap terpisah
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("skrip zsh tidak memuat %q", want)
+		}
+	}
+}
