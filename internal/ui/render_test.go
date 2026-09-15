@@ -358,7 +358,7 @@ func TestShowTanpaBarisTerpilih(t *testing.T) {
 		{Name: "commit", Kind: engine.KindSubcommand},
 		{Name: "push", Kind: engine.KindSubcommand},
 	}
-	n := r.Show(cands, 2)
+	n := r.Show(cands, "")
 	if n != len(cands)+2 {
 		t.Errorf("baris terpakai = %d, mau %d isi ditambah dua bingkai", n, len(cands))
 	}
@@ -370,17 +370,30 @@ func TestShowTanpaBarisTerpilih(t *testing.T) {
 	}
 }
 
-// Kotak berisi satu baris tidak memberi apa pun untuk dipilih; ia hanya
-// menutupi layar.
-func TestShowMelewatiKandidatTerlaluSedikit(t *testing.T) {
+// Kandidat tunggal justru saat pengguna paling dekat dengan jawabannya.
+// Menghilangkan kotaknya di situ terasa seperti fiturnya mati.
+func TestShowMenggambarKandidatTunggal(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, false)
-	n := r.Show([]engine.Candidate{{Name: "commit"}}, 2)
-	if n != 0 {
+	n := r.Show([]engine.Candidate{{Name: "add"}}, "ad")
+	if n == 0 {
+		t.Fatal("kandidat tunggal harus tetap digambar")
+	}
+	if !strings.Contains(buf.String(), "add") {
+		t.Error("isinya harus tergambar")
+	}
+}
+
+// Satu-satunya yang disembunyikan: kandidat tunggal yang sudah diketik penuh,
+// karena di situ memang tidak ada lagi yang bisa ditawarkan.
+func TestShowMenyembunyikanYangSudahDiketikPenuh(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRenderer(&buf, 80, 24, false)
+	if n := r.Show([]engine.Candidate{{Name: "add"}}, "add"); n != 0 {
 		t.Errorf("baris terpakai = %d, mau 0", n)
 	}
-	if strings.Contains(buf.String(), "commit") {
-		t.Error("kandidat tunggal tidak boleh digambar")
+	if n := r.Show([]engine.Candidate{{Name: "add"}}, "ADD"); n != 0 {
+		t.Errorf("perbandingan harus mengabaikan besar-kecil huruf, dapat %d baris", n)
 	}
 }
 
@@ -388,7 +401,7 @@ func TestShowMembersihkanSaatKosong(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, false)
 	r.Adopt(6)
-	if n := r.Show(nil, 2); n != 0 {
+	if n := r.Show(nil, ""); n != 0 {
 		t.Errorf("baris terpakai = %d, mau 0", n)
 	}
 	if !strings.Contains(buf.String(), escClearLine) {

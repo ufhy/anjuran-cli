@@ -150,6 +150,11 @@ perintah seperti biasa.
 Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
 sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 
+Kotak menghilang hanya pada dua keadaan: tidak ada yang cocok, atau yang tersisa
+tinggal satu dan teksnya sudah diketik penuh. Kandidat tunggal yang belum
+selesai diketik tetap ditampilkan — justru di situ kamu paling dekat dengan
+jawabannya.
+
 Pemicunya spasi, bukan setiap huruf. Sebelum sebuah kata selesai, isi dropdown
 hanya akan berganti-ganti mengikuti huruf yang belum tentu selesai — dan
 biayanya akan dibayar pada tombol yang paling sering ditekan. Satu penggambaran

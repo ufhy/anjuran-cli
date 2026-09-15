@@ -435,9 +435,14 @@ func max(a, b int) int {
 // masih mengetik, dan menyorot salah satu baris akan menyarankan bahwa Enter
 // akan memilihnya — padahal Enter di situ menjalankan perintah.
 //
-// min adalah jumlah kandidat terkecil yang layak digambar.
-func (r *Renderer) Show(cands []engine.Candidate, min int) int {
-	if len(cands) < min {
+// Kandidat tunggal TETAP digambar. Justru di situlah pengguna paling dekat
+// dengan jawabannya, dan menghilangkan kotaknya terasa seperti fiturnya mati.
+// Yang disembunyikan hanya satu keadaan: kandidat tunggal yang teksnya sudah
+// persis sama dengan yang diketik, karena di situ memang tidak ada lagi yang
+// bisa ditawarkan.
+func (r *Renderer) Show(cands []engine.Candidate, prefix string) int {
+	if len(cands) == 0 ||
+		(len(cands) == 1 && strings.EqualFold(cands[0].Name, prefix)) {
 		r.Clear()
 		return 0
 	}

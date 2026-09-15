@@ -65,6 +65,14 @@ func (p *Preflight) Candidates() []engine.Candidate {
 	return out
 }
 
+// Prefix adalah teks yang sudah diketik pada token kursor.
+func (p *Preflight) Prefix() string {
+	if p.res == nil {
+		return ""
+	}
+	return p.res.Prefix
+}
+
 // Immediate menangani kasus yang tidak memerlukan terminal. Nilai ketiga
 // bernilai false bila dropdown memang harus ditampilkan.
 func (p *Preflight) Immediate() (State, Outcome, bool) {

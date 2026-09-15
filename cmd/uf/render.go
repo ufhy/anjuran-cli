@@ -71,9 +71,7 @@ func runRender(args []string) int {
 		return 0
 	}
 
-	// Satu kandidat tidak perlu digambar: tidak ada yang bisa dipilih, dan
-	// kotak yang berisi satu baris hanya menutupi layar tanpa memberi apa pun.
-	n := rend.Show(pre.Candidates(), 2)
+	n := rend.Show(pre.Candidates(), pre.Prefix())
 	fmt.Println(n)
 	return 0
 }
