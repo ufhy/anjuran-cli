@@ -169,3 +169,28 @@ func indexOptionByName(list []Option, name Names) int {
 	}
 	return -1
 }
+
+// markTrusted menandai seluruh generator di dalam sebuah spec sebagai
+// tepercaya, dipanggil setelah berkasnya dibaca dari direktori tepercaya.
+func markTrusted(sc *Subcommand) {
+	if sc == nil {
+		return
+	}
+	for i := range sc.Args {
+		markArgTrusted(&sc.Args[i])
+	}
+	for i := range sc.Options {
+		for j := range sc.Options[i].Args {
+			markArgTrusted(&sc.Options[i].Args[j])
+		}
+	}
+	for i := range sc.Subcommands {
+		markTrusted(&sc.Subcommands[i])
+	}
+}
+
+func markArgTrusted(a *Arg) {
+	for i := range a.Generators {
+		a.Generators[i].Trusted = true
+	}
+}

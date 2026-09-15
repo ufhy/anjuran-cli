@@ -34,6 +34,8 @@ type Spec struct {
 	SplitOn  string
 	Trim     bool
 	CacheTTL time.Duration
+	// Trusted menandai generator dari spec buatan tangan.
+	Trusted bool
 }
 
 // Runner menjalankan generator sesuai kebijakan.
@@ -58,7 +60,7 @@ func (r *Runner) Run(ctx context.Context, g Spec) []Candidate {
 		return nil
 	}
 
-	if d := r.Policy.Check(g.Script); !d.Allowed {
+	if d := r.Policy.Check(g.Script, g.Trusted); !d.Allowed {
 		r.Denied = append(r.Denied, strings.Join(g.Script, " ")+": "+d.Reason)
 		return nil
 	}

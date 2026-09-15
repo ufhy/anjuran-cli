@@ -72,6 +72,15 @@ type Suggestion struct {
 // yang bisa dieksekusi tanpa mesin JS. Tahap 1 belum menjalankannya —
 // engine hanya membawa metadatanya.
 type Generator struct {
+	// Trusted menandai generator yang berasal dari spec buatan tangan —
+	// tambalan bawaan uf atau milik pengguna sendiri — bukan dari 1.472 berkas
+	// hasil transpile korpus pihak ketiga.
+	//
+	// Sengaja TIDAK bisa diisi dari JSON: kalau bisa, berkas spec mana pun
+	// tinggal menyatakan dirinya tepercaya dan seluruh kebijakannya runtuh.
+	// Nilainya dipasang oleh registry berdasarkan direktori asal berkasnya.
+	Trusted bool `json:"-"`
+
 	// Script adalah perintah yang dijalankan untuk menghasilkan kandidat,
 	// sudah dalam bentuk argv (tanpa shell) supaya tidak bisa di-inject.
 	Script []string `json:"script,omitempty"`
@@ -183,6 +192,26 @@ func (s *Subcommand) FindOption(name string) *Option {
 type Registry struct {
 	dirs  []string
 	cache map[string]*Subcommand
+	// trusted menandai direktori yang isinya ditulis tangan dan ditinjau.
+	trusted map[string]bool
+}
+
+// Trust menandai sebuah direktori sebagai tepercaya.
+//
+// Yang tepercaya bukan binernya, melainkan asal spec-nya. Tambalan bawaan dan
+// spec milik pengguna ditulis dan ditinjau satu per satu; spec hasil transpile
+// berasal dari korpus 1.472 berkas pihak ketiga yang tidak pernah dibaca
+// seorang pun. Perbedaan itulah yang menentukan apakah sebuah generator boleh
+// memanggil interpreter.
+func (r *Registry) Trust(dirs ...string) {
+	if r.trusted == nil {
+		r.trusted = map[string]bool{}
+	}
+	for _, d := range dirs {
+		if d != "" {
+			r.trusted[d] = true
+		}
+	}
 }
 
 // NewRegistry membuat registry dengan satu direktori.
@@ -341,14 +370,18 @@ func (r *Registry) resolveVersioned(command string) string {
 // menggabungkannya, dimulai dari yang paling rendah prioritasnya supaya
 // direktori paling depan menjadi lapisan terakhir yang menimpa.
 func (r *Registry) loadMerged(rel string) (*Subcommand, error) {
-	var found [][]byte
+	type layer struct {
+		body    []byte
+		trusted bool
+	}
+	var found []layer
 	for _, dir := range r.dirs {
 		b, err := r.readSpecIn(dir, rel)
 		if err != nil {
 			return nil, err
 		}
 		if b != nil {
-			found = append(found, b)
+			found = append(found, layer{b, r.trusted[dir]})
 		}
 	}
 	if len(found) == 0 {
@@ -358,8 +391,11 @@ func (r *Registry) loadMerged(rel string) (*Subcommand, error) {
 	var merged *Subcommand
 	for i := len(found) - 1; i >= 0; i-- {
 		var sc Subcommand
-		if err := json.Unmarshal(found[i], &sc); err != nil {
+		if err := json.Unmarshal(found[i].body, &sc); err != nil {
 			return nil, fmt.Errorf("spec %s: %w", rel, err)
+		}
+		if found[i].trusted {
+			markTrusted(&sc)
 		}
 		merged = merge(merged, &sc)
 	}

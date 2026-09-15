@@ -1,0 +1,63 @@
+{
+  "name": "php",
+  "description": "Run the PHP interpreter",
+  "args": [
+    { "name": "file", "isOptional": true, "template": ["filepaths"] },
+    { "name": "args", "isOptional": true, "isVariadic": true }
+  ],
+  "subcommands": [
+    {
+      "name": "artisan",
+      "description": "Perintah konsol Laravel",
+      "args": [
+        {
+          "name": "command",
+          "generators": [
+            { "script": ["php", "artisan", "list", "--raw", "--no-ansi"], "trim": true, "cacheTtl": 30 }
+          ]
+        },
+        { "name": "args", "isOptional": true, "isVariadic": true }
+      ]
+    }
+  ],
+  "options": [
+    { "name": ["-a", "--interactive"], "description": "Jalankan sebagai shell interaktif" },
+    { "name": ["-c"], "description": "Cari php.ini di direktori atau berkas ini",
+      "args": [{ "name": "path", "template": ["filepaths", "folders"] }] },
+    { "name": ["-n"], "description": "Jangan pakai berkas konfigurasi ini sama sekali" },
+    { "name": ["-d"], "description": "Set satu entri ini, misalnya memory_limit=512M",
+      "isRepeatable": true, "args": [{ "name": "foo[=bar]" }] },
+    { "name": ["-e"], "description": "Hasilkan informasi tambahan untuk debugger" },
+    { "name": ["-f"], "description": "Urai dan jalankan berkas",
+      "args": [{ "name": "file", "template": ["filepaths"] }] },
+    { "name": ["-h", "--help"], "description": "Tampilkan bantuan" },
+    { "name": ["-i", "--info"], "description": "Tampilkan phpinfo" },
+    { "name": ["-l", "--syntax-check"], "description": "Periksa sintaks saja, tanpa menjalankan" },
+    { "name": ["-m", "--modules"], "description": "Daftar modul yang terpasang" },
+    { "name": ["-r"], "description": "Jalankan potongan kode PHP tanpa tag pembuka",
+      "args": [{ "name": "code" }] },
+    { "name": ["-B"], "description": "Kode yang dijalankan sebelum membaca masukan",
+      "args": [{ "name": "code" }] },
+    { "name": ["-R"], "description": "Kode yang dijalankan untuk setiap baris masukan",
+      "args": [{ "name": "code" }] },
+    { "name": ["-F"], "description": "Berkas yang dijalankan untuk setiap baris masukan",
+      "args": [{ "name": "file", "template": ["filepaths"] }] },
+    { "name": ["-E"], "description": "Kode yang dijalankan setelah masukan habis",
+      "args": [{ "name": "code" }] },
+    { "name": ["-H"], "description": "Sembunyikan argumen dari daftar proses" },
+    { "name": ["-S"], "description": "Jalankan server web bawaan",
+      "args": [{ "name": "host:port", "suggestions": [
+        { "name": "localhost:8000" },
+        { "name": "127.0.0.1:8000" },
+        { "name": "0.0.0.0:8000", "description": "Terjangkau dari jaringan" }
+      ] }] },
+    { "name": ["-t"], "description": "Document root untuk server bawaan",
+      "args": [{ "name": "docroot", "template": ["folders"] }] },
+    { "name": ["-v", "--version"], "description": "Tampilkan versi" },
+    { "name": ["--ini"], "description": "Tampilkan berkas ini yang dipakai" },
+    { "name": ["--rf"], "description": "Tampilkan informasi sebuah fungsi", "args": [{ "name": "name" }] },
+    { "name": ["--rc"], "description": "Tampilkan informasi sebuah kelas", "args": [{ "name": "name" }] },
+    { "name": ["--re"], "description": "Tampilkan informasi sebuah ekstensi", "args": [{ "name": "name" }] },
+    { "name": ["--ri"], "description": "Tampilkan konfigurasi sebuah ekstensi", "args": [{ "name": "name" }] }
+  ]
+}

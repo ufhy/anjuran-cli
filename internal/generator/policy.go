@@ -82,7 +82,10 @@ func PolicyFromEnv(command string) Policy {
 }
 
 // Check menilai satu baris argv.
-func (p Policy) Check(argv []string) Decision {
+//
+// trusted menandakan argv itu berasal dari spec buatan tangan — tambalan
+// bawaan uf atau milik pengguna — bukan dari korpus hasil transpile.
+func (p Policy) Check(argv []string, trusted bool) Decision {
 	if !p.Enabled {
 		return deny("generator dimatikan lewat %s", EnvDisable)
 	}
@@ -105,7 +108,14 @@ func (p Policy) Check(argv []string) Decision {
 	// Interpreter ditolak lebih dulu, bahkan bila namanya kebetulan sama
 	// dengan perintah yang sedang dilengkapi. Mengizinkan "bash" saat
 	// melengkapi bash akan membuka kembali jalur ["bash","-c","..."].
-	if interpreters[name] {
+	//
+	// Pengecualiannya adalah spec yang ditulis tangan dan ditinjau. Larangan
+	// ini sebetulnya menyasar argumen yang isinya kode, dan nama biner hanyalah
+	// perkiraan kasar untuk itu: "php artisan list" bukan kode, sedangkan
+	// "php -r <apa pun>" jelas kode. Yang membedakan keduanya bukan binernya,
+	// melainkan siapa yang menulis argv-nya. Korpus transpile tidak pernah
+	// mendapat kelonggaran ini.
+	if interpreters[name] && !trusted {
 		return deny("%s adalah interpreter; argumennya adalah kode, bukan data", name)
 	}
 

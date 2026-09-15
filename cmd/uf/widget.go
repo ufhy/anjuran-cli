@@ -9,7 +9,6 @@ import (
 
 	"github.com/uf-cli/uf/internal/engine"
 	"github.com/uf-cli/uf/internal/generator"
-	"github.com/uf-cli/uf/internal/spec"
 	"github.com/uf-cli/uf/internal/tty"
 	"github.com/uf-cli/uf/internal/ui"
 	"golang.org/x/term"
@@ -49,7 +48,7 @@ func runWidget(args []string) int {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
 	}
-	eng := engine.New(spec.NewRegistryDirs(dirs...))
+	eng := engine.New(newRegistry(dirs, *specsDir))
 
 	start := 0
 	if *sel == "last" {

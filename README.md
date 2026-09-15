@@ -82,6 +82,13 @@ opsi, subcommand, dan deskripsi dari Fig tetap utuh:
 | `kubectl` | tipe resource, nama pod, namespace, context |
 | `docker` | nama container dan image |
 | `systemctl` | nama unit |
+| `php` | opsi, `php artisan` beserta perintah proyekmu |
+| `composer` | seluruh subcommand dari `composer list` |
+
+Sebagian spec Fig praktis kosong karena isinya disusun saat runtime oleh
+`generateSpec`, sebuah fungsi JavaScript. `php` misalnya hanya berisi nama dan
+deskripsi. Ada 11 perintah seperti itu: `composer`, `php`, `rails`, `drush`,
+`magento`, `kamal`, `task`, `z`, `mask`, `speedtest`, `create-video`.
 
 Beberapa sumber dikerjakan uf sendiri tanpa menjalankan proses apa pun, dan
 karena itu tidak tunduk pada kebijakan generator:
@@ -410,7 +417,7 @@ kebijakannya ketat secara bawaan:
 | Aturan | Alasan |
 |---|---|
 | Hanya menjalankan perintah yang sedang kamu ketik | `git checkout` boleh memanggil `git`, dan hanya `git` |
-| Interpreter selalu ditolak | `bash`, `sh`, `python`, `node`, `sudo`, `env`, `xargs` — argumennya adalah kode, bukan data |
+| Interpreter ditolak | `bash`, `sh`, `python`, `node`, `sudo`, `env`, `xargs` — argumennya adalah kode, bukan data |
 | Mati saat berjalan sebagai root | Di server, satu Tab yang salah jauh lebih mahal |
 | Batas waktu keras 1,2 detik | Generator lambat tidak boleh menahan tombol |
 | Tidak pernah lewat shell | argv dieksekusi langsung; tidak ada string yang diurai sebagai perintah |
@@ -425,6 +432,25 @@ mengetik.
 Akibatnya sebagian generator memang tidak akan pernah berjalan. Itu pilihan
 sadar: Tab yang tidak menawarkan apa-apa jauh lebih murah daripada Tab yang
 menjalankan sesuatu yang tidak kamu minta.
+
+### Yang tepercaya adalah asal spec-nya, bukan binernya
+
+Larangan interpreter sebetulnya menyasar **argumen yang isinya kode**, dan nama
+biner hanyalah perkiraan kasar untuk itu. `php artisan list` bukan kode;
+`php -r <apa pun>` jelas kode. Yang membedakan keduanya bukan binernya,
+melainkan siapa yang menulis argv-nya.
+
+Karena itu spec yang ditulis tangan dan ditinjau — `extra/` bawaan dan
+`~/.config/uf/specs` milikmu — boleh melewati larangan itu. Korpus hasil
+transpile tidak pernah: 1.472 berkas yang tidak pernah dibaca seorang pun, dan
+194 di antaranya memang berisi `["bash","-c","<skrip>"]`.
+
+Penanda tepercaya itu **tidak bisa diisi dari JSON**. Kalau bisa, berkas spec
+mana pun tinggal menyatakan dirinya tepercaya dan seluruh kebijakannya runtuh;
+nilainya dipasang oleh pemuat spec berdasarkan direktori asal berkasnya.
+Kelonggaran ini juga tidak menembus aturan lain — biner yang berbeda dari
+perintah yang kamu ketik tetap ditolak, dan berjalan sebagai root tetap
+mematikan semuanya.
 
 ```sh
 UF_NO_GENERATORS=1               # matikan seluruhnya

@@ -133,7 +133,7 @@ func runComplete(args []string) int {
 	// Jalur yang dipakai sama persis dengan mode widget — engine, generator,
 	// penyaringan, dan pemeringkatan yang sama — supaya hasil pemeriksaan di
 	// sini tidak pernah berbeda dari yang muncul saat Tab ditekan.
-	eng := engine.New(spec.NewRegistryDirs(dirs...))
+	eng := engine.New(newRegistry(dirs, *specsDir))
 
 	var src *generator.Source
 	var dyn ui.Dynamic
@@ -185,7 +185,16 @@ func runComplete(args []string) int {
 // sebuah spec buatan sendiri bisa menimpa spec bawaan tanpa menyunting
 // direktori yang dihasilkan mesin.
 func resolveSpecsDirs(flagValue string) ([]string, error) {
-	var dirs []string
+	dirs, _ := resolveSpecsDirsTrust(flagValue)
+	if len(dirs) == 0 {
+		return nil, fmt.Errorf("direktori spec tidak ditemukan; setel UF_SPECS atau pakai --specs")
+	}
+	return dirs, nil
+}
+
+// resolveSpecsDirsTrust mengembalikan urutan pencarian beserta direktori mana
+// yang isinya ditulis tangan dan ditinjau.
+func resolveSpecsDirsTrust(flagValue string) (dirs, trusted []string) {
 	add := func(paths ...string) {
 		for _, p := range paths {
 			if p == "" {
@@ -203,21 +212,23 @@ func resolveSpecsDirs(flagValue string) ([]string, error) {
 	// Tambalan harus berada di ATAS spec bawaan. Kalau terbalik, generator
 	// bawaan yang justru ingin diperbaiki akan menimpa perbaikannya — dan
 	// gejalanya diam-diam: fiturnya tampak jalan, isinya saja yang salah.
+	// Spec milik pengguna dan tambalan bawaan ditulis tangan satu per satu,
+	// jadi generatornya boleh memanggil interpreter. Korpus hasil transpile
+	// tidak pernah mendapat kelonggaran itu.
+	mark := len(dirs)
 	if home, err := os.UserHomeDir(); err == nil {
 		add(filepath.Join(home, ".config", "uf", "specs"))
 	}
 	add("extra")
 	add(bundledDirs("extra")...)
+	trusted = append(trusted, dirs[mark:]...)
 
 	add(filepath.SplitList(flagValue)...)
 	add(filepath.SplitList(os.Getenv("UF_SPECS"))...)
 	add("specs")
 	add(bundledDirs("specs")...)
 
-	if len(dirs) == 0 {
-		return nil, fmt.Errorf("direktori spec tidak ditemukan; set UF_SPECS atau pakai --specs")
-	}
-	return dirs, nil
+	return dirs, trusted
 }
 
 // versionString merangkai keterangan versi. Commit dan tanggal hanya muncul
@@ -232,6 +243,14 @@ func versionString() string {
 		s += ")"
 	}
 	return s
+}
+
+// newRegistry menyusun registry lengkap dengan penandaan direktori tepercaya.
+func newRegistry(dirs []string, flagValue string) *spec.Registry {
+	r := spec.NewRegistryDirs(dirs...)
+	_, trusted := resolveSpecsDirsTrust(flagValue)
+	r.Trust(trusted...)
+	return r
 }
 
 // bundledDirs menyusun lokasi sebuah direktori bawaan relatif terhadap binary.

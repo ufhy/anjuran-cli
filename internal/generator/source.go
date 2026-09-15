@@ -89,6 +89,7 @@ func toSpecs(gs []spec.Generator) []Spec {
 			SplitOn:  g.SplitOn,
 			Trim:     g.Trim,
 			CacheTTL: ttl,
+			Trusted:  g.Trusted,
 		})
 	}
 	return out

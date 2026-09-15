@@ -1,0 +1,26 @@
+{
+  "name": "composer",
+  "description": "Manajer dependensi PHP",
+  "args": [
+    {
+      "name": "command",
+      "generators": [
+        { "script": ["composer", "list", "--raw", "--no-ansi"], "trim": true, "cacheTtl": 60 }
+      ]
+    },
+    { "name": "args", "isOptional": true, "isVariadic": true }
+  ],
+  "options": [
+    { "name": ["-h", "--help"], "description": "Tampilkan bantuan" },
+    { "name": ["-q", "--quiet"], "description": "Jangan cetak pesan apa pun" },
+    { "name": ["-V", "--version"], "description": "Tampilkan versi" },
+    { "name": ["-n", "--no-interaction"], "description": "Jangan bertanya apa pun" },
+    { "name": ["-v", "-vv", "-vvv", "--verbose"], "description": "Tingkatkan kelengkapan pesan" },
+    { "name": ["--no-ansi"], "description": "Matikan keluaran berwarna" },
+    { "name": ["--profile"], "description": "Tampilkan waktu dan penggunaan memori" },
+    { "name": ["--no-plugins"], "description": "Matikan seluruh plugin" },
+    { "name": ["--no-scripts"], "description": "Lewati script yang didefinisikan composer.json" },
+    { "name": ["-d", "--working-dir"], "description": "Jalankan di direktori ini",
+      "args": [{ "name": "dir", "template": ["folders"] }] }
+  ]
+}
