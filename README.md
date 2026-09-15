@@ -257,9 +257,10 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 | Tombol | Aksi |
 |---|---|
 | ketik huruf | menyaring daftar secara langsung |
-| Tab, panah bawah, Ctrl-N | turun |
+| Tab | sisipkan awalan terpanjang yang sama; bila tidak ada, turun |
+| panah bawah, Ctrl-N | turun |
 | Shift-Tab, panah atas, Ctrl-P | naik |
-| Enter | sisipkan pilihan |
+| Enter | sisipkan pilihan; pada direktori, lanjut menelusuri ke dalamnya |
 | Spasi | sisipkan lalu tutup, siap mengetik argumen berikutnya |
 | Esc, Ctrl-C | batal, baris dibiarkan apa adanya |
 
@@ -537,6 +538,25 @@ terpikirkan.
 | setiap baris kotak sama lebar DI LAYAR | CJK dan emoji mematahkan bingkai |
 | cabang `loadSpec` menghasilkan sesuatu | — |
 | masukan acak tidak menjatuhkan engine | — |
+
+### Uji UX di shell sungguhan
+
+`make ux` menjalankan skenario yang benar-benar diketik orang di dalam **zsh
+asli dengan konfigurasi shell pengguna**, lalu memeriksa apa yang TERLIHAT di
+layar — bukan jawaban API. Escape sequence yang keluar diputar ulang menjadi
+kisi teks, lengkap dengan penggulungan layar dan pemulihan posisi kursor.
+
+Uji Go memeriksa jawaban engine; ini memeriksa pengalamannya: apakah kotaknya
+muncul, apakah isinya benar, apakah ia hilang saat seharusnya hilang.
+
+Dijalankan dengan konfigurasi asli dan BUKAN zsh kosong — zsh kosong
+menyembunyikan seluruh kelas bug, karena di sana spasi terpasang ke
+`self-insert` sementara oh-my-zsh memetakannya ke `magic-space`.
+
+```
+make ux                 jalankan semuanya
+make ux SKENARIO=alias  jalankan yang namanya memuat "alias"
+```
 
 Uji ini lahir dari kegagalan berulang: bug yang dilaporkan pengguna berkali-kali
 lolos dari pengujian sebelumnya, karena skenarionya dipilih sendiri dan selalu

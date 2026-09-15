@@ -81,6 +81,14 @@ _uf_widget() {
     ok)
       BUFFER=$body
       CURSOR=$new_cursor
+      # Memilih sebuah DIREKTORI berarti pengguna sedang menelusuri, belum
+      # selesai. Dropdown digambar ulang supaya isinya langsung terlihat,
+      # alih-alih memaksa memulai lagi untuk setiap tingkat.
+      if [[ $BUFFER == */ ]] && (( $+functions[_uf_draw] )); then
+        zle redisplay
+        _uf_draw
+        return
+      fi
       ;;
     none)
       # Tidak ada spec untuk perintah ini. Completion bawaan zsh masih jauh

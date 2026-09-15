@@ -55,6 +55,11 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 		return nil
 	}
 
+	// Pencocokan mengabaikan besar-kecil huruf, seperti completion shell pada
+	// umumnya. Mengetik "rea" lalu tidak mendapat README.md adalah kegagalan
+	// yang membuat fiturnya terasa rusak, bukan teliti.
+	lowerBase := strings.ToLower(basePart)
+
 	var out []string
 	for i, e := range entries {
 		if i >= maxEntries {
@@ -78,7 +83,7 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 		if strings.HasPrefix(name, ".") && !strings.HasPrefix(basePart, ".") {
 			continue
 		}
-		if !strings.HasPrefix(name, basePart) {
+		if !strings.HasPrefix(strings.ToLower(name), lowerBase) {
 			continue
 		}
 

@@ -4,7 +4,7 @@ BIN_DIR := bin
 # Versi paket spec Fig yang dipakai. Naikkan angka ini untuk menyegarkan spec.
 FIG_VERSION := 2.692.3
 
-.PHONY: build test bench fmt vet check clean cross specs snapshot release-check
+.PHONY: build test bench fmt vet check clean cross specs snapshot release-check ux
 
 build:
 	go build -o $(BIN_DIR)/$(BINARY) ./cmd/uf
@@ -39,6 +39,12 @@ specs:
 # snapshot membangun rilis percobaan lengkap ke dist/ tanpa mempublikasikan
 # apa pun. Ini satu-satunya cara memastikan paketnya benar-benar berisi spec:
 # kesalahan pola berkas tidak pernah terlihat dari konfigurasinya saja.
+# ux menjalankan skenario yang benar-benar diketik orang di dalam zsh SUNGGUHAN,
+# dengan konfigurasi shell asli, lalu memeriksa apa yang terlihat di layar.
+# Uji Go memeriksa jawaban engine; ini memeriksa pengalamannya.
+ux: build
+	python3 tools/uxtest/uxtest.py
+
 snapshot:
 	goreleaser release --snapshot --clean --skip=publish
 

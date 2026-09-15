@@ -2,6 +2,8 @@ package ui
 
 import (
 	"io"
+	"strings"
+	"unicode"
 
 	"github.com/uf-cli/uf/internal/engine"
 )
@@ -191,9 +193,45 @@ func (s *Session) Run() (State, Outcome, error) {
 			return s.st, Cancelled, nil
 
 		case KeyEnter:
-			return apply(s.st, res, rs[selected].cand), Accepted, nil
+			cand := rs[selected].cand
+			s.st = apply(s.st, res, cand)
 
-		case KeyDown, KeyTab:
+			// Memilih sebuah DIREKTORI berarti pengguna sedang menelusuri,
+			// belum selesai memilih. Menutup kotak di situ memaksa memulai
+			// lagi dari awal untuk setiap tingkat.
+			if menelusuri(cand) {
+				if res, rs, selected, err = s.refresh(); err != nil {
+					return s.st, Cancelled, err
+				}
+				if len(rs) == 0 {
+					return s.st, Accepted, nil
+				}
+				continue
+			}
+			return s.st, Accepted, nil
+
+		case KeyTab:
+			// Tab menyisipkan AWALAN TERPANJANG YANG SAMA lebih dulu.
+			//
+			// Mengetik "git com" lalu Tab seharusnya langsung membawa ke
+			// "git commit" bila seluruh kandidat yang tersisa berawalan sama —
+			// itu perilaku Tab yang sudah dikenal orang dari shell mana pun,
+			// dan tanpanya Tab hanya terasa seperti panah bawah.
+			if ext := awalanBersama(rs, res.Prefix); ext != "" {
+				s.st = apply(s.st, res, engine.Candidate{
+					Name: ext, Insert: ext, CursorOffset: len(ext), Kind: engine.KindArg,
+				})
+				if res, rs, selected, err = s.refresh(); err != nil {
+					return s.st, Cancelled, err
+				}
+				if len(rs) == 0 {
+					return s.st, Accepted, nil
+				}
+				continue
+			}
+			selected = (selected + 1) % len(rs)
+
+		case KeyDown:
 			selected = (selected + 1) % len(rs)
 
 		case KeyUp, KeyShiftTab:
@@ -249,6 +287,52 @@ func (s *Session) Run() (State, Outcome, error) {
 			return s.st, Cancelled, nil
 		}
 	}
+}
+
+// awalanBersama mencari awalan yang dimiliki SELURUH kandidat dan lebih
+// panjang daripada yang sudah diketik.
+//
+// Mengembalikan string kosong bila tidak ada tambahan yang bisa disisipkan —
+// di situ Tab kembali berperan memindahkan pilihan.
+func awalanBersama(rs []ranked, prefix string) string {
+	if len(rs) < 2 {
+		return ""
+	}
+
+	common := rs[0].cand.Name
+	for _, r := range rs[1:] {
+		common = awalanDua(common, r.cand.Name)
+		if len(common) <= len(prefix) {
+			return ""
+		}
+	}
+	// Harus benar-benar memperpanjang apa yang sudah diketik, dan tetap
+	// konsisten dengannya: kandidat dicocokkan secara fuzzy, jadi awalan
+	// bersama belum tentu diawali teks yang diketik.
+	if len(common) <= len(prefix) || !strings.EqualFold(common[:len(prefix)], prefix) {
+		return ""
+	}
+	return common
+}
+
+// awalanDua mengembalikan awalan bersama dua teks, mengabaikan besar-kecil
+// huruf saat membandingkan tetapi mempertahankan bentuk aslinya.
+func awalanDua(a, b string) string {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	i := 0
+	for i < n && unicode.ToLower(rune(a[i])) == unicode.ToLower(rune(b[i])) {
+		i++
+	}
+	return a[:i]
+}
+
+// menelusuri menjawab apakah kandidat ini membawa pengguna lebih dalam alih-alih
+// menyelesaikan pilihannya.
+func menelusuri(c engine.Candidate) bool {
+	return strings.HasSuffix(c.Insert, "/") || strings.HasSuffix(c.Insert, "\\")
 }
 
 // refresh menghitung ulang kandidat setelah baris berubah.

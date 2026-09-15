@@ -323,3 +323,119 @@ func candNamesOf(cs []engine.Candidate) []string {
 	}
 	return out
 }
+
+// Memilih direktori berarti sedang menelusuri, belum selesai memilih. Menutup
+// kotak di situ memaksa memulai lagi dari awal untuk setiap tingkat.
+func TestMemilihDirektoriMelanjutkan(t *testing.T) {
+	// Dua kandidat, supaya dropdown benar-benar terbuka: satu kandidat akan
+	// langsung disisipkan tanpa sesi.
+	dyn := &fakeDynamic{names: []string{"internal/", "integrasi/"}}
+	term := &fakeTerm{keys: []tty.Key{
+		k(tty.KeyEnter), // pilih salah satu direktori
+		k(tty.KeyEscape),
+	}}
+
+	p, err := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, out, err := p.Session(term, discard()).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Enter menyisipkan direktorinya lalu sesi TETAP berjalan, sehingga Esc
+	// setelahnya yang mengakhirinya.
+	if out != Cancelled {
+		t.Errorf("outcome = %v; sesi seharusnya lanjut setelah direktori dipilih", out)
+	}
+	if !strings.HasSuffix(st.Line, "/") {
+		t.Errorf("Line = %q, mau berakhir dengan direktori", st.Line)
+	}
+}
+
+// Memilih berkas biasa menyelesaikan pilihan dan menutup kotak.
+func TestMemilihBerkasMenutup(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"internal.txt"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyEnter)}}
+
+	p, _ := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn)
+	st, out, _ := p.Session(term, discard()).Run()
+
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
+	}
+	if st.Line != "git add internal.txt" {
+		t.Errorf("Line = %q", st.Line)
+	}
+}
+
+// Tab menyisipkan awalan terpanjang yang sama lebih dulu — perilaku Tab yang
+// sudah dikenal orang dari shell mana pun. Tanpa itu Tab hanya terasa seperti
+// panah bawah.
+func TestTabMenyisipkanAwalanBersama(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"fitur-alpha", "fitur-beta", "fitur-gamma"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyTab), k(tty.KeyEscape)}}
+
+	p, err := Prepare(newEngine(), State{Line: "git add fit", Cursor: 11}, dyn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, _, err := p.Session(term, discard()).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Line != "git add fitur-" {
+		t.Errorf("Line = %q, mau %q", st.Line, "git add fitur-")
+	}
+}
+
+// Bila tidak ada awalan yang bisa ditambahkan, Tab kembali berperan
+// memindahkan pilihan.
+func TestTabBerpindahBilaTidakAdaAwalan(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"alpha", "beta"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyTab), k(tty.KeyEnter)}}
+
+	p, _ := Prepare(newEngine(), State{Line: "git add ", Cursor: 8}, dyn)
+	st, out, _ := p.Session(term, discard()).Run()
+
+	if out != Accepted {
+		t.Fatalf("outcome = %v", out)
+	}
+	// Tab memindahkan ke kandidat berikutnya, lalu Enter memilihnya.
+	if strings.HasSuffix(st.Line, "alpha") {
+		t.Errorf("Tab seharusnya berpindah dari kandidat pertama; Line = %q", st.Line)
+	}
+}
+
+func TestAwalanBersama(t *testing.T) {
+	buat := func(names ...string) []ranked {
+		out := make([]ranked, len(names))
+		for i, n := range names {
+			out[i] = ranked{cand: engine.Candidate{Name: n}, match: &Match{}}
+		}
+		return out
+	}
+
+	tests := []struct {
+		names  []string
+		prefix string
+		want   string
+	}{
+		{[]string{"fitur-a", "fitur-b"}, "fit", "fitur-"},
+		{[]string{"commit", "config"}, "co", "co"},        // tidak menambah apa pun
+		{[]string{"alpha", "beta"}, "", ""},               // tidak ada awalan bersama
+		{[]string{"satu"}, "s", ""},                       // satu kandidat bukan urusan Tab
+		{[]string{"Fitur-a", "fitur-b"}, "fit", "Fitur-"}, // beda huruf besar tetap cocok
+	}
+	for _, tt := range tests {
+		got := awalanBersama(buat(tt.names...), tt.prefix)
+		if tt.want == "co" {
+			// "co" sama panjang dengan prefix, jadi tidak ada yang disisipkan.
+			tt.want = ""
+		}
+		if got != tt.want {
+			t.Errorf("awalanBersama(%v, %q) = %q, mau %q", tt.names, tt.prefix, got, tt.want)
+		}
+	}
+}
