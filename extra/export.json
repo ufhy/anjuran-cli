@@ -1,0 +1,4 @@
+{
+  "name": "export",
+  "args": [{ "name": "variable", "isVariadic": true, "template": ["uf:env"] }]
+}

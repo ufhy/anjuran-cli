@@ -51,7 +51,7 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 
 	// Template dikerjakan lebih dulu karena tidak menjalankan proses sama
 	// sekali, sehingga selalu tersedia bahkan saat generator dimatikan.
-	for _, name := range FromTemplates(res.Templates, res.Prefix, s.Dir) {
+	for _, name := range FromTemplates(res.Templates, res.Prefix, s.Dir, res.Command) {
 		add(name, "")
 	}
 

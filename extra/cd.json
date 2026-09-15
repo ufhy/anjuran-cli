@@ -1,0 +1,9 @@
+{
+  "name": "cd",
+  "args": [
+    {
+      "name": "folder",
+      "template": ["folders"]
+    }
+  ]
+}

@@ -197,13 +197,22 @@ func resolveSpecsDirs(flagValue string) ([]string, error) {
 		}
 	}
 
-	add(filepath.SplitList(flagValue)...)
-	add(filepath.SplitList(os.Getenv("UF_SPECS"))...)
+	// Urutannya adalah urutan LAPISAN, dari yang paling menimpa ke yang paling
+	// dasar. Spec dengan nama sama digabung, bukan saling menggantikan.
+	//
+	// Tambalan harus berada di ATAS spec bawaan. Kalau terbalik, generator
+	// bawaan yang justru ingin diperbaiki akan menimpa perbaikannya — dan
+	// gejalanya diam-diam: fiturnya tampak jalan, isinya saja yang salah.
 	if home, err := os.UserHomeDir(); err == nil {
 		add(filepath.Join(home, ".config", "uf", "specs"))
 	}
+	add("extra")
+	add(bundledDirs("extra")...)
+
+	add(filepath.SplitList(flagValue)...)
+	add(filepath.SplitList(os.Getenv("UF_SPECS"))...)
 	add("specs")
-	add(bundledSpecsDirs()...)
+	add(bundledDirs("specs")...)
 
 	if len(dirs) == 0 {
 		return nil, fmt.Errorf("direktori spec tidak ditemukan; set UF_SPECS atau pakai --specs")
@@ -225,13 +234,13 @@ func versionString() string {
 	return s
 }
 
-// bundledSpecsDirs menyusun lokasi spec bawaan relatif terhadap binary.
-func bundledSpecsDirs() []string {
+// bundledDirs menyusun lokasi sebuah direktori bawaan relatif terhadap binary.
+func bundledDirs(name string) []string {
 	exe, err := os.Executable()
 	if err != nil {
 		return nil
 	}
-	return bundledSpecsDirsFor(exe, filepath.EvalSymlinks)
+	return bundledDirsFor(exe, name, filepath.EvalSymlinks)
 }
 
 // bundledSpecsDirsFor adalah isi bundledSpecsDirs yang bisa diuji.
@@ -241,15 +250,15 @@ func bundledSpecsDirs() []string {
 // direktori aslinya; tanpa langkah ini spec tidak akan pernah ditemukan.
 // Kedua lokasi tetap dicoba, karena arsip biasa tidak memakai symlink sama
 // sekali dan di sana exe sudah merupakan jalur sebenarnya.
-func bundledSpecsDirsFor(exe string, eval func(string) (string, error)) []string {
+func bundledDirsFor(exe, name string, eval func(string) (string, error)) []string {
 	dirs := []string{}
 	seen := map[string]bool{}
 
 	addFor := func(path string) {
 		base := filepath.Dir(path)
 		for _, d := range []string{
-			filepath.Join(base, "specs"),                      // arsip rilis, cask, scoop
-			filepath.Join(base, "..", "share", "uf", "specs"), // deb, rpm, formula
+			filepath.Join(base, name),                      // arsip rilis, cask, scoop
+			filepath.Join(base, "..", "share", "uf", name), // deb, rpm, formula
 		} {
 			c := filepath.Clean(d)
 			if !seen[c] {

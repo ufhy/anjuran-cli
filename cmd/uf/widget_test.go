@@ -161,17 +161,17 @@ func TestUTF16Len(t *testing.T) {
 // membuatnya tidak sesederhana "sebelah binary". Homebrew memasang binary
 // sebagai symlink di dalam bin sementara spec tetap di direktori aslinya;
 // pernah membuat spec tidak pernah ditemukan sama sekali.
-func TestBundledSpecsDirs(t *testing.T) {
+func TestBundledDirs(t *testing.T) {
 	noSymlink := func(p string) (string, error) { return p, nil }
 
 	t.Run("arsip rilis", func(t *testing.T) {
-		got := bundledSpecsDirsFor("/opt/uf/uf", noSymlink)
+		got := bundledDirsFor("/opt/uf/uf", "specs", noSymlink)
 		want := []string{"/opt/uf/specs", "/opt/share/uf/specs"}
 		assertDirs(t, got, want)
 	})
 
 	t.Run("deb dan rpm", func(t *testing.T) {
-		got := bundledSpecsDirsFor("/usr/bin/uf", noSymlink)
+		got := bundledDirsFor("/usr/bin/uf", "specs", noSymlink)
 		if !contains(got, "/usr/share/uf/specs") {
 			t.Errorf("mau /usr/share/uf/specs, dapat %v", got)
 		}
@@ -185,7 +185,7 @@ func TestBundledSpecsDirs(t *testing.T) {
 			}
 			return p, nil
 		}
-		got := bundledSpecsDirsFor("/opt/homebrew/bin/uf", eval)
+		got := bundledDirsFor("/opt/homebrew/bin/uf", "specs", eval)
 		if !contains(got, "/opt/homebrew/Caskroom/uf/1.0.0/specs") {
 			t.Errorf("lokasi sebenarnya di balik symlink harus ikut dicari, dapat %v", got)
 		}
@@ -197,7 +197,7 @@ func TestBundledSpecsDirs(t *testing.T) {
 	})
 
 	t.Run("tanpa duplikat", func(t *testing.T) {
-		got := bundledSpecsDirsFor("/usr/bin/uf", noSymlink)
+		got := bundledDirsFor("/usr/bin/uf", "specs", noSymlink)
 		seen := map[string]bool{}
 		for _, d := range got {
 			if seen[d] {
@@ -209,7 +209,7 @@ func TestBundledSpecsDirs(t *testing.T) {
 
 	t.Run("symlink gagal diselesaikan", func(t *testing.T) {
 		eval := func(string) (string, error) { return "", os.ErrNotExist }
-		got := bundledSpecsDirsFor("/opt/uf/uf", eval)
+		got := bundledDirsFor("/opt/uf/uf", "specs", eval)
 		if len(got) == 0 {
 			t.Error("kegagalan resolusi symlink tidak boleh mengosongkan hasil")
 		}

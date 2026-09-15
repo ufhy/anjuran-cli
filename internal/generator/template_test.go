@@ -105,7 +105,7 @@ func TestDirektoriTidakAdaBukanError(t *testing.T) {
 
 func TestFromTemplatesMenggabungkan(t *testing.T) {
 	dir := pohonUji(t)
-	got := FromTemplates([]string{"filepaths", "folders"}, "", dir)
+	got := FromTemplates([]string{"filepaths", "folders"}, "", dir, "")
 	seen := map[string]bool{}
 	for _, c := range got {
 		if seen[c] {
@@ -119,7 +119,7 @@ func TestFromTemplatesMenggabungkan(t *testing.T) {
 }
 
 func TestTemplateTidakDikenalDiabaikan(t *testing.T) {
-	if got := FromTemplates([]string{"history", "help"}, "", pohonUji(t)); got != nil {
+	if got := FromTemplates([]string{"history", "help"}, "", pohonUji(t), ""); got != nil {
 		t.Errorf("template yang belum didukung seharusnya diabaikan diam-diam, dapat %v", got)
 	}
 }

@@ -1,0 +1,7 @@
+{
+  "name": "scp",
+  "args": [
+    { "name": "source", "template": ["filepaths", "uf:hosts"] },
+    { "name": "target", "template": ["filepaths", "uf:hosts"] }
+  ]
+}

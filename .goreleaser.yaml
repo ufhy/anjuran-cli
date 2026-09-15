@@ -50,6 +50,10 @@ archives:
       # git, docker, kubectl — diam-diam tidak ikut terbawa.
       - src: specs/**
         dst: specs
+      # Tambalan buatan tangan. Tanpa ini, ssh, cd, dan kubectl kehilangan
+      # argumennya lagi meski binary dan specs lengkap.
+      - src: extra/*.json
+        dst: extra
 
 nfpms:
   - id: uf
@@ -66,6 +70,8 @@ nfpms:
       # tanpa variabel lingkungan apa pun.
       - src: specs
         dst: /usr/share/uf/specs
+      - src: extra
+        dst: /usr/share/uf/extra
       - src: NOTICE
         dst: /usr/share/doc/uf/NOTICE
 

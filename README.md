@@ -64,22 +64,56 @@ Spec disimpan ter-gzip dan dibaca langsung dari bentuk itu. Ini bukan penghemata
 disk semata: rencana SSH mengharuskan spec ikut dikirim ke host remote, dan 7,7 MB
 jauh berbeda dari 42 MB di sana.
 
+### Tambalan bawaan
+
+Spec bawaan lengkap pada bagian opsinya, tetapi banyak argumennya kosong: Fig
+memasok isinya lewat closure JavaScript, dan 1.635 di antaranya tidak ikut
+ter-transpile. Itulah sebabnya `ssh <TAB>` dan `cd <TAB>` tidak menawarkan apa
+pun meski opsinya lengkap.
+
+Direktori `extra/` menambal itu, dan isinya **digabung di atas** spec bawaan —
+opsi, subcommand, dan deskripsi dari Fig tetap utuh:
+
+| Perintah | Yang ditambal |
+|---|---|
+| `ssh`, `sftp`, `scp` | host dari `~/.ssh/config` dan `known_hosts` |
+| `cd` | daftar direktori |
+| `export`, `unset` | nama variabel lingkungan |
+| `kubectl` | tipe resource, nama pod, namespace, context |
+| `docker` | nama container dan image |
+| `systemctl` | nama unit |
+
+Beberapa sumber dikerjakan uf sendiri tanpa menjalankan proses apa pun, dan
+karena itu tidak tunduk pada kebijakan generator:
+
+| Template | Sumber |
+|---|---|
+| `filepaths`, `folders` | isi direktori |
+| `uf:hosts` | `~/.ssh/config` dan `~/.ssh/known_hosts` |
+| `uf:env` | variabel lingkungan proses |
+| `history` | argumen yang pernah dipakai bersama perintah itu |
+
 ### Spec sendiri
 
-`uf` mencari spec secara berurutan, dan direktori pertama yang memuat berkasnya
-menang:
+Spec dengan nama sama dari beberapa direktori **digabung**, bukan saling
+menggantikan. Urutannya adalah urutan lapisan, dari yang paling menimpa:
 
 ```
---specs <dir>            (boleh beberapa, dipisah titik dua)
-$UF_SPECS
-~/.config/uf/specs
-./specs
-<dir binary>/specs
+~/.config/uf/specs        milikmu sendiri
+./extra, <bin>/extra      tambalan bawaan
+--specs, $UF_SPECS
+./specs, <bin>/specs      spec hasil transpile
 ```
 
-Jadi CLI internal cukup ditaruh di `~/.config/uf/specs/nama.json`, dan spec bawaan
-yang dianggap kurang tepat bisa ditimpa tanpa menyunting direktori yang
-dihasilkan mesin.
+Jadi CLI internal cukup ditaruh di `~/.config/uf/specs/nama.json`. Berkas itu
+tidak perlu lengkap — cukup memuat bagian yang ingin ditambal, karena sisanya
+diambil dari lapisan di bawahnya.
+
+Aturan penggabungannya sedikit dan sengaja bisa ditebak: subcommand dan opsi
+dicocokkan berdasarkan nama lalu digabung ke dalam, argumen dicocokkan
+berdasarkan urutan, dan sumber kandidat (`suggestions`, `generators`,
+`template`) DIGANTI — karena yang di lapisan bawah memang itu yang ingin
+diperbaiki.
 
 ## Status
 

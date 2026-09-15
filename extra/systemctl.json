@@ -1,0 +1,17 @@
+{
+  "name": "systemctl",
+  "subcommands": [
+    { "name": "status", "args": [{ "name": "unit", "isVariadic": true,
+      "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain", "--full"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "start", "args": [{ "name": "unit", "isVariadic": true,
+      "generators": [{ "script": ["systemctl", "list-unit-files", "--no-legend", "--no-pager", "--plain"], "trim": true, "cacheTtl": 30 }] }] },
+    { "name": "stop", "args": [{ "name": "unit", "isVariadic": true,
+      "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain", "--state=running"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "restart", "args": [{ "name": "unit", "isVariadic": true,
+      "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain"], "trim": true, "cacheTtl": 10 }] }] },
+    { "name": "enable", "args": [{ "name": "unit", "isVariadic": true,
+      "generators": [{ "script": ["systemctl", "list-unit-files", "--no-legend", "--no-pager", "--plain"], "trim": true, "cacheTtl": 30 }] }] },
+    { "name": "disable", "args": [{ "name": "unit", "isVariadic": true,
+      "generators": [{ "script": ["systemctl", "list-units", "--no-legend", "--no-pager", "--plain"], "trim": true, "cacheTtl": 10 }] }] }
+  ]
+}

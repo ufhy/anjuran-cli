@@ -1,0 +1,33 @@
+{
+  "name": "docker",
+  "subcommands": [
+    { "name": "exec", "args": [
+      { "name": "container", "generators": [{ "script": ["docker", "ps", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "logs", "args": [
+      { "name": "container", "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "stop", "args": [
+      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "restart", "args": [
+      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "rm", "args": [
+      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "start", "args": [
+      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "inspect", "args": [
+      { "name": "object", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
+    ]},
+    { "name": "rmi", "args": [
+      { "name": "image", "isVariadic": true, "generators": [{ "script": ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"], "trim": true, "cacheTtl": 30 }] }
+    ]},
+    { "name": "run", "args": [
+      { "name": "image", "generators": [{ "script": ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"], "trim": true, "cacheTtl": 30 }] },
+      { "name": "command", "isOptional": true, "isVariadic": true }
+    ]}
+  ]
+}

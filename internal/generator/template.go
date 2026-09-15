@@ -11,8 +11,8 @@ import (
 const (
 	TemplateFilepaths = "filepaths"
 	TemplateFolders   = "folders"
-	TemplateHistory   = "history" // belum didukung
-	TemplateHelp      = "help"    // belum didukung
+	TemplateHistory   = "history"
+	TemplateHelp      = "help" // belum didukung
 )
 
 // maxEntries membatasi jumlah entri yang dibaca dari satu direktori.
@@ -109,9 +109,12 @@ func expandHome(p string) string {
 }
 
 // FromTemplates menjalankan seluruh template yang dikenali untuk sebuah prefix.
+//
+// command dibutuhkan oleh template "history", yang mencari argumen yang pernah
+// dipakai bersama perintah itu — bukan baris perintahnya.
 // Template yang belum didukung diabaikan diam-diam, karena ketiadaan kandidat
 // jauh lebih baik daripada pesan kesalahan di tengah baris perintah.
-func FromTemplates(templates []string, prefix, workdir string) []string {
+func FromTemplates(templates []string, prefix, workdir, command string) []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, t := range templates {
@@ -121,6 +124,12 @@ func FromTemplates(templates []string, prefix, workdir string) []string {
 			got = Files(prefix, workdir, false)
 		case TemplateFolders:
 			got = Files(prefix, workdir, true)
+		case TemplateHistory:
+			got = HistoryArgs(command)
+		case TemplateHosts:
+			got = Hosts()
+		case TemplateEnv:
+			got = Env()
 		}
 		for _, c := range got {
 			if !seen[c] {

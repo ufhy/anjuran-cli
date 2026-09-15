@@ -245,9 +245,22 @@ func (r *Registry) Resolve(sc *Subcommand) (*Subcommand, error) {
 }
 
 // loadPath membaca satu berkas spec berdasarkan path relatif tanpa ekstensi.
+// loadPath membaca spec dari SELURUH direktori pencarian lalu menggabungkannya.
+//
+// Direktori yang lebih diutamakan menambal yang di bawahnya, bukan
+// menggantikannya: spec bawaan lengkap pada bagian opsi, dan tambalan biasanya
+// hanya mengisi argumen yang kosong. Mengambil yang pertama saja akan
+// menghilangkan ribuan opsi hanya karena satu argumen ditambal.
 func (r *Registry) loadPath(rel string) (*Subcommand, error) {
 	if sc, ok := r.cache[rel]; ok {
 		return sc, nil
+	}
+
+	if merged, err := r.loadMerged(rel); err != nil || merged != nil {
+		if merged != nil {
+			r.cache[rel] = merged
+		}
+		return merged, err
 	}
 
 	b, err := r.readSpecFile(rel)
@@ -322,6 +335,63 @@ func (r *Registry) resolveVersioned(command string) string {
 		}
 	}
 	return best
+}
+
+// loadMerged membaca spec bernama sama dari setiap direktori pencarian lalu
+// menggabungkannya, dimulai dari yang paling rendah prioritasnya supaya
+// direktori paling depan menjadi lapisan terakhir yang menimpa.
+func (r *Registry) loadMerged(rel string) (*Subcommand, error) {
+	var found [][]byte
+	for _, dir := range r.dirs {
+		b, err := r.readSpecIn(dir, rel)
+		if err != nil {
+			return nil, err
+		}
+		if b != nil {
+			found = append(found, b)
+		}
+	}
+	if len(found) == 0 {
+		return nil, nil
+	}
+
+	var merged *Subcommand
+	for i := len(found) - 1; i >= 0; i-- {
+		var sc Subcommand
+		if err := json.Unmarshal(found[i], &sc); err != nil {
+			return nil, fmt.Errorf("spec %s: %w", rel, err)
+		}
+		merged = merge(merged, &sc)
+	}
+	return merged, nil
+}
+
+// readSpecIn membaca satu spec dari sebuah direktori, mendahulukan bentuk
+// terkompresi. Mengembalikan (nil, nil) bila tidak ada di direktori itu.
+func (r *Registry) readSpecIn(dir, rel string) ([]byte, error) {
+	clean := filepath.Clean("/" + filepath.FromSlash(rel))[1:]
+	if clean == "" || strings.HasPrefix(clean, "..") {
+		return nil, nil
+	}
+	base := filepath.Join(dir, clean)
+
+	if b, err := os.ReadFile(base + ".json.gz"); err == nil {
+		zr, err := gzip.NewReader(bytes.NewReader(b))
+		if err != nil {
+			return nil, fmt.Errorf("spec %s: %w", rel, err)
+		}
+		defer zr.Close()
+		return io.ReadAll(zr)
+	}
+
+	b, err := os.ReadFile(base + ".json")
+	if err == nil {
+		return b, nil
+	}
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	return nil, err
 }
 
 // readSpecFile menelusuri direktori sesuai urutan, mencari bentuk terkompresi
