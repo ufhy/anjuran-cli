@@ -29,6 +29,7 @@ func runRender(args []string) int {
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
 	prev := fs.Int("prev-lines", 0, "jumlah baris yang sudah digambar sebelumnya")
 	clear := fs.Bool("clear", false, "hapus dropdown lalu selesai")
+	alias := fs.String("alias", "", "pemekaran alias untuk kata pertama")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -63,7 +64,9 @@ func runRender(args []string) int {
 	}
 
 	eng := engine.New(spec.NewRegistryDirs(dirs...))
-	st := ui.State{Line: *line, Cursor: toByteCursor(*line, *cursor, *unit)}
+	byteCursor := toByteCursor(*line, *cursor, *unit)
+	ax := newAliasExpansion(*line, byteCursor, *alias)
+	st := ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}
 
 	pre, err := ui.Prepare(eng, st, newDynamic())
 	if err != nil {

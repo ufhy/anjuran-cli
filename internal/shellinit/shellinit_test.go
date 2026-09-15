@@ -136,3 +136,21 @@ func TestZshMembungkusWidgetSpasiYangAda(t *testing.T) {
 		}
 	}
 }
+
+// Alias harus diteruskan ke uf, kalau tidak "gco" tidak menghasilkan apa pun.
+func TestZshMeneruskanAlias(t *testing.T) {
+	s, _ := Script("zsh")
+	for _, want := range []string{
+		"--alias",       // diteruskan ke uf
+		"${aliases[",    // dibaca dari tabel alias zsh
+		"_uf_alias_exp", // lewat variabel, bukan subshell
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("skrip zsh tidak memuat %q", want)
+		}
+	}
+	// Dipakai oleh kedua jalur: Tab dan dropdown otomatis.
+	if n := strings.Count(s, "--alias"); n < 2 {
+		t.Errorf("--alias dipakai %d kali, mau di jalur widget dan render", n)
+	}
+}

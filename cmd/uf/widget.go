@@ -36,6 +36,7 @@ func runWidget(args []string) int {
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
 	prev := fs.Int("prev-lines", 0, "baris yang sudah digambar mode render")
 	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first atau last")
+	alias := fs.String("alias", "", "pemekaran alias untuk kata pertama")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -54,7 +55,12 @@ func runWidget(args []string) int {
 	if *sel == "last" {
 		start = -1
 	}
-	st, outcome, err := interact(eng, ui.State{Line: *line, Cursor: byteCursor}, *prev, start)
+
+	// Perhitungan memakai bentuk yang sudah dimekarkan; hasilnya dipetakan
+	// kembali ke baris asli sebelum diserahkan ke shell.
+	ax := newAliasExpansion(*line, byteCursor, *alias)
+	st, outcome, err := interact(eng,
+		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, *prev, start)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
@@ -62,7 +68,8 @@ func runWidget(args []string) int {
 
 	switch outcome {
 	case ui.Accepted:
-		emit("ok", st.Line, st.Cursor, *unit)
+		restored, c := ax.Restore(st.Line, st.Cursor)
+		emit("ok", restored, c, *unit)
 	case ui.NoCandidates:
 		emit("none", *line, byteCursor, *unit)
 	default:

@@ -150,6 +150,28 @@ perintah seperti biasa.
 Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
 sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 
+### Alias
+
+Alias dikenali. `gco ` menawarkan nama branch karena zsh memberi tahu uf bahwa
+`gco` berarti `git checkout`:
+
+```
+gco fit
+╭───────────╮
+│   fitur-a │
+│   fitur-b │
+╰─────── 2 ─╯
+```
+
+Perhitungannya memakai bentuk yang sudah dimekarkan, tetapi hasilnya
+dikembalikan ke baris ASLI — yang tersisip adalah `gco fitur-a`, bukan
+`git checkout fitur-a`. Menukar apa yang sudah kamu ketik lebih mengganggu
+daripada tidak ada completion sama sekali.
+
+Alias yang dicari adalah kata pertama dari segmen terakhir, sehingga
+`docker ps | gst` memakai `gst`. Pemekarannya satu tingkat; alias yang menunjuk
+alias lain tidak ditelusuri.
+
 Kotak menghilang hanya pada dua keadaan: tidak ada yang cocok, atau yang tersisa
 tinggal satu dan teksnya sudah diketik penuh. Kandidat tunggal yang belum
 selesai diketik tetap ditampilkan — justru di situ kamu paling dekat dengan

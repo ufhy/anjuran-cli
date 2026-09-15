@@ -12,6 +12,40 @@
 # disalin ke mesin yang belum terpasang uf.
 (( $+commands[uf] )) || return 0
 
+# _uf_alias menaruh pemekaran alias kata pertama ke dalam _uf_alias_exp.
+#
+# Tanpa ini alias sama sekali tidak dikenali: uf mencari spec bernama "gco" dan
+# tidak menemukannya. Padahal alias justru cara sehari-hari orang memakai
+# perintah panjang, dan oh-my-zsh memasang ratusan di antaranya.
+#
+# Nilainya diletakkan di variabel, bukan dicetak, supaya tidak menumbuhkan
+# subshell pada jalur yang dijalankan setiap kali spasi ditekan.
+typeset -g _uf_alias_exp
+
+_uf_alias() {
+  emulate -L zsh
+  setopt local_options no_ksh_arrays
+
+  _uf_alias_exp=""
+
+  local -a words
+  words=(${(z)BUFFER})
+  (( $#words )) || return
+
+  # Alias hanya berlaku di posisi perintah, jadi yang dicari adalah kata
+  # pertama dari segmen TERAKHIR: "docker ps | gst" memakai gst, bukan docker.
+  local w first=""
+  for w in $words; do
+    case $w in
+      '|'|'||'|'&&'|';'|'&') first=""; continue ;;
+    esac
+    [[ -z $first ]] && first=$w
+  done
+
+  [[ -n $first ]] || return
+  _uf_alias_exp=${aliases[$first]-}
+}
+
 _uf_widget() {
   emulate -L zsh
   setopt local_options no_ksh_arrays
@@ -20,8 +54,10 @@ _uf_widget() {
   local select_from=${1:-first}
 
   # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
+  _uf_alias
   out="$(command uf widget --line "$BUFFER" --cursor "$CURSOR" \
-    --prev-lines "${_uf_lines:-0}" --select "$select_from" 2>/dev/null)"
+    --prev-lines "${_uf_lines:-0}" --select "$select_from" \
+    --alias "$_uf_alias_exp" 2>/dev/null)"
   _uf_lines=0
 
   if [[ -z $out ]]; then
@@ -86,7 +122,9 @@ if [[ -n ${UF_AUTO:-} ]]; then
   typeset -g _uf_lines=0
 
   _uf_draw() {
-    _uf_lines=$(command uf render --line "$BUFFER" --cursor "$CURSOR"       --prev-lines "$_uf_lines" 2>/dev/null) || _uf_lines=0
+    _uf_alias
+    _uf_lines=$(command uf render --line "$BUFFER" --cursor "$CURSOR" \
+      --prev-lines "$_uf_lines" --alias "$_uf_alias_exp" 2>/dev/null) || _uf_lines=0
     [[ $_uf_lines == <-> ]] || _uf_lines=0
   }
 
