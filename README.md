@@ -223,9 +223,12 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
 
    | Kejadian | Byte terkirim |
    |---|---|
-   | dropdown pertama kali digambar | 880 |
-   | pindah pilihan satu baris | 167 |
+   | dropdown pertama kali digambar | 1.555 |
+   | pindah pilihan satu baris | 422 |
    | render dengan isi identik | 4 |
+
+   Garis bingkai tidak pernah berubah antar penekanan tombol, jadi ia hanya
+   dikirim sekali untuk seluruh sesi meski dropdown digambar berkali-kali.
 
    Mode degradasi `UF_SIMPLE=1` mematikan warna dan sorotan, dan menyala
    otomatis untuk `TERM` bernilai `dumb`, `vt100`, `vt102`, atau `ansi`.

@@ -32,7 +32,45 @@ const (
 	escCyan          = "\x1b[36m"
 	escYellow        = "\x1b[33m"
 	escRed           = "\x1b[31m"
+	escBlue          = "\x1b[34m"
+	escGreen         = "\x1b[32m"
 )
+
+// Karakter bingkai. Bingkai membuat dropdown terbaca sebagai satu benda,
+// bukan sebagai beberapa baris yang kebetulan tercetak.
+//
+// Biayanya kecil justru pada jalur yang paling kita jaga: garis bingkai tidak
+// pernah berubah antar penekanan tombol, sehingga renderer diff hanya
+// mengirimnya satu kali untuk seluruh sesi.
+const (
+	boxTopLeft     = "╭"
+	boxTopRight    = "╮"
+	boxBottomLeft  = "╰"
+	boxBottomRight = "╯"
+	boxHorizontal  = "─"
+	boxVertical    = "│"
+)
+
+// minBoxWidth adalah lebar terminal terkecil yang masih layak diberi bingkai.
+// Di bawah itu, dua kolom yang dimakan bingkai lebih berharga untuk teks.
+const minBoxWidth = 44
+
+// colorFor memilih warna menurut jenis kandidat, supaya daftar punya struktur
+// yang terbaca sekilas: subcommand, opsi, dan nilai argumen tidak tercampur
+// menjadi satu blok teks yang seragam.
+func colorFor(kind string, dangerous bool) string {
+	if dangerous {
+		return escRed
+	}
+	switch kind {
+	case "subcommand":
+		return escCyan
+	case "option":
+		return escBlue
+	default:
+		return escGreen
+	}
+}
 
 // Renderer menggambar dropdown tepat di bawah baris prompt.
 //
@@ -171,7 +209,32 @@ func (r *Renderer) compose(items []Item, selected, total int) []string {
 		return nil
 	}
 
-	nameW := 0
+	nameW, descW, inner := r.columns(items)
+
+	// Mode sederhana tidak pernah berbingkai: terminal yang memerlukannya
+	// biasanya juga tidak menggambar karakter kotak dengan benar.
+	if r.simple || r.width < minBoxWidth {
+		lines := make([]string, 0, len(items)+1)
+		for i, it := range items {
+			lines = append(lines, r.plainRow(it, nameW, descW, i == selected))
+		}
+		if hidden := total - len(items); hidden > 0 {
+			lines = append(lines, fmt.Sprintf("  … %d lagi", hidden))
+		}
+		return lines
+	}
+
+	lines := make([]string, 0, len(items)+2)
+	lines = append(lines, escDim+boxTopLeft+strings.Repeat(boxHorizontal, inner)+boxTopRight+escReset)
+	for i, it := range items {
+		lines = append(lines, r.boxedRow(it, nameW, descW, inner, i == selected))
+	}
+	lines = append(lines, r.bottomBorder(inner, selected, total))
+	return lines
+}
+
+// columns menghitung lebar kolom nama, kolom keterangan, dan lebar dalam kotak.
+func (r *Renderer) columns(items []Item) (nameW, descW, inner int) {
 	for _, it := range items {
 		if n := utf8.RuneCountInString(it.Name); n > nameW {
 			nameW = n
@@ -182,62 +245,87 @@ func (r *Renderer) compose(items []Item, selected, total int) []string {
 		nameW = max
 	}
 
-	lines := make([]string, 0, len(items)+1)
-	for i, it := range items {
-		lines = append(lines, r.composeRow(it, nameW, i == selected))
+	for _, it := range items {
+		if n := utf8.RuneCountInString(it.Description); n > descW {
+			descW = n
+		}
 	}
 
-	if hidden := total - len(items); hidden > 0 {
-		note := fmt.Sprintf("  … %d lagi", hidden)
-		if !r.simple {
-			note = escDim + note + escReset
+	// marker + nama + jarak + keterangan, ditambah satu spasi di tiap tepi.
+	inner = 2 + nameW + 2 + descW + 2
+	if maxInner := r.width - 2; inner > maxInner {
+		inner = maxInner
+		if d := inner - (2 + nameW + 2 + 2); d >= 0 {
+			descW = d
+		} else {
+			descW = 0
 		}
-		lines = append(lines, note)
 	}
-	return lines
+	return nameW, descW, inner
 }
 
-func (r *Renderer) composeRow(it Item, nameW int, selected bool) string {
-	marker := "  "
+// rowText menyusun isi satu baris tanpa warna, sudah rata kolom.
+func rowText(it Item, nameW, descW int, selected bool) (marker, name, pad, desc string) {
+	marker = "  "
 	if selected {
 		marker = "❯ "
 	}
-
-	name := truncate(it.Name, nameW)
-	pad := strings.Repeat(" ", max(0, nameW-utf8.RuneCountInString(name)))
-
-	// Sisa lebar untuk deskripsi: total dikurangi marker, nama, dan dua spasi.
-	descW := r.width - 2 - nameW - 2
-	desc := ""
-	if descW > 4 && it.Description != "" {
-		desc = "  " + truncate(it.Description, descW)
+	name = truncate(it.Name, nameW)
+	pad = strings.Repeat(" ", max(0, nameW-utf8.RuneCountInString(name)))
+	if descW > 3 && it.Description != "" {
+		desc = "  " + truncate(it.Description, descW-2)
 	}
-
-	plain := marker + name + pad + desc
-	if r.simple {
-		return plain
-	}
-	if selected {
-		// Reverse video berlaku untuk seluruh baris, jadi sorotan per huruf
-		// tidak dipasang sama sekali — bukan dipasang lalu dibuang.
-		return escReverse + plain + escReset
-	}
-
-	// Satu escReset di ujung sudah membatalkan escDim maupun escCyan;
-	// menutup keduanya secara terpisah hanya menambah byte yang dikirim.
-	color := escCyan
-	if it.Dangerous {
-		color = escRed
-	}
-	row := color + marker + highlight(name, it.Highlight) + pad
-	if desc != "" {
-		row += escDim + desc
-	}
-	return row + escReset
+	return marker, name, pad, desc
 }
 
-// highlight menebalkan rune yang cocok dengan kueri.
-func highlight(name string, positions []int) string {
+// plainRow menggambar satu baris tanpa bingkai dan tanpa warna.
+func (r *Renderer) plainRow(it Item, nameW, descW int, selected bool) string {
+	marker, name, pad, desc := rowText(it, nameW, descW, selected)
+	return marker + name + pad + desc
+}
+
+// boxedRow menggambar satu baris di dalam bingkai.
+func (r *Renderer) boxedRow(it Item, nameW, descW, inner int, selected bool) string {
+	marker, name, pad, desc := rowText(it, nameW, descW, selected)
+
+	plain := " " + marker + name + pad + desc
+	fill := strings.Repeat(" ", max(0, inner-utf8.RuneCountInString(plain)))
+	border := escDim + boxVertical + escReset
+
+	// Baris terpilih disorot SELEBAR isi kotak, bukan selebar teksnya. Inilah
+	// yang membuatnya terbaca sebagai pilihan aktif pada sebuah menu alih-alih
+	// sebagai sepotong teks yang kebetulan berwarna terbalik.
+	if selected {
+		return border + escReverse + plain + fill + escReset + border
+	}
+
+	color := colorFor(it.Kind, it.Dangerous)
+	body := color + " " + marker + highlight(name, it.Highlight, color) + pad + escReset
+	if desc != "" {
+		body += escDim + desc + escReset
+	}
+	return border + body + fill + border
+}
+
+// bottomBorder menyisipkan penghitung posisi ke dalam garis bawah, sehingga
+// tidak memakan satu baris layar sendiri.
+func (r *Renderer) bottomBorder(inner, selected, total int) string {
+	label := fmt.Sprintf(" %d/%d ", selected+1, total)
+	if n := utf8.RuneCountInString(label); n+2 > inner {
+		label = ""
+	}
+	left := 2
+	right := inner - left - utf8.RuneCountInString(label)
+	if right < 0 {
+		right = 0
+	}
+	return escDim + boxBottomLeft + strings.Repeat(boxHorizontal, left) +
+		label + strings.Repeat(boxHorizontal, right) + boxBottomRight + escReset
+}
+
+// highlight menebalkan rune yang cocok dengan kueri, lalu mengembalikan
+// warna dasarnya agar sisa nama tidak ikut berubah.
+func highlight(name string, positions []int, base string) string {
 	if len(positions) == 0 {
 		return name
 	}
@@ -251,7 +339,7 @@ func highlight(name string, positions []int) string {
 		if set[i] {
 			b.WriteString(escBold + escYellow)
 			b.WriteRune(c)
-			b.WriteString(escReset + escCyan)
+			b.WriteString(escReset + base)
 			continue
 		}
 		b.WriteRune(c)

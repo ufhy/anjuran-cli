@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func sample() []Item {
@@ -160,12 +161,129 @@ func TestModeSederhanaTanpaWarna(t *testing.T) {
 
 func TestModeBerwarnaMenyorotHurufCocok(t *testing.T) {
 	r := NewRenderer(nil, 80, 24, false)
-	items := []Item{{Name: "commit", Highlight: []int{0, 1, 2}}}
-	// Baris tidak terpilih mempertahankan sorotan; baris terpilih memakai
-	// reverse video sehingga sorotannya sengaja dilepas.
+	items := []Item{{Name: "commit", Kind: "subcommand", Highlight: []int{0, 1, 2}}}
+	// Baris pertama adalah bingkai atas; baris kedua barulah isinya.
+	// selected = 1 berarti tidak ada baris yang terpilih di sini, sehingga
+	// sorotan per huruf tetap terpasang.
 	lines := r.compose(items, 1, 1)
-	if !strings.Contains(lines[0], escBold) {
-		t.Errorf("mau sorotan tebal pada huruf yang cocok, dapat %q", lines[0])
+	if !strings.Contains(lines[1], escBold) {
+		t.Errorf("mau sorotan tebal pada huruf yang cocok, dapat %q", lines[1])
+	}
+}
+
+// Bingkai membuat dropdown terbaca sebagai satu benda. Garisnya tidak pernah
+// berubah antar penekanan tombol, jadi renderer diff hanya mengirimnya sekali.
+func TestBingkaiDigambar(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	lines := r.compose(sample(), 0, 3)
+
+	if len(lines) != len(sample())+2 {
+		t.Fatalf("mau %d baris isi ditambah dua garis bingkai, dapat %d", len(sample()), len(lines))
+	}
+	if !strings.Contains(lines[0], boxTopLeft) || !strings.Contains(lines[0], boxTopRight) {
+		t.Errorf("baris pertama harus bingkai atas, dapat %q", lines[0])
+	}
+	last := lines[len(lines)-1]
+	if !strings.Contains(last, boxBottomLeft) || !strings.Contains(last, boxBottomRight) {
+		t.Errorf("baris terakhir harus bingkai bawah, dapat %q", last)
+	}
+	for _, l := range lines[1 : len(lines)-1] {
+		if strings.Count(stripStyles(l), boxVertical) != 2 {
+			t.Errorf("baris isi harus diapit dua garis tegak, dapat %q", stripStyles(l))
+		}
+	}
+}
+
+func TestSemuaBarisSamaLebar(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	items := []Item{
+		{Name: "a", Description: "pendek"},
+		{Name: "nama-yang-jauh-lebih-panjang", Description: "keterangan yang juga panjang sekali"},
+		{Name: "bb"},
+	}
+	lines := r.compose(items, 0, 3)
+
+	want := utf8.RuneCountInString(stripStyles(lines[0]))
+	for i, l := range lines {
+		if got := utf8.RuneCountInString(stripStyles(l)); got != want {
+			t.Errorf("baris %d selebar %d, mau %d: %q", i, got, want, stripStyles(l))
+		}
+	}
+}
+
+// Baris terpilih harus tersorot SELEBAR isi kotak. Sorotan selebar teks saja
+// terbaca sebagai potongan teks berwarna, bukan sebagai pilihan aktif.
+func TestBarisTerpilihTersorotPenuh(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	items := []Item{
+		{Name: "a", Description: "pendek"},
+		{Name: "nama-panjang", Description: "keterangan panjang sekali"},
+	}
+	lines := r.compose(items, 0, 2)
+
+	baris := lines[1] // baris pertama isi, yang terpilih
+	if !strings.Contains(baris, escReverse) {
+		t.Fatalf("baris terpilih harus memakai reverse video: %q", baris)
+	}
+
+	// Ambil teks di antara reverse dan reset; panjangnya harus mengisi kotak.
+	mulai := strings.Index(baris, escReverse) + len(escReverse)
+	selesai := strings.Index(baris[mulai:], escReset)
+	isi := baris[mulai : mulai+selesai]
+
+	innerWidth := utf8.RuneCountInString(stripStyles(lines[0])) - 2
+	if got := utf8.RuneCountInString(isi); got != innerWidth {
+		t.Errorf("sorotan selebar %d, mau selebar isi kotak %d: %q", got, innerWidth, isi)
+	}
+}
+
+func TestPenghitungPosisiDiGarisBawah(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	lines := r.compose(sample(), 1, 13)
+	last := stripStyles(lines[len(lines)-1])
+	if !strings.Contains(last, "2/13") {
+		t.Errorf("garis bawah harus memuat posisi, dapat %q", last)
+	}
+}
+
+// Terminal sempit lebih butuh kolomnya untuk teks daripada untuk bingkai.
+func TestTerminalSempitTanpaBingkai(t *testing.T) {
+	r := NewRenderer(nil, 30, 24, false)
+	for _, l := range r.compose(sample(), 0, 3) {
+		if strings.Contains(l, boxVertical) || strings.Contains(l, boxTopLeft) {
+			t.Errorf("terminal sempit tidak boleh berbingkai: %q", l)
+		}
+	}
+}
+
+func TestWarnaBerbedaPerJenis(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	items := []Item{
+		{Name: "commit", Kind: "subcommand"},
+		{Name: "--force", Kind: "option"},
+		{Name: "main", Kind: "arg"},
+	}
+	// selected = 3 berarti tidak ada yang terpilih, sehingga setiap baris
+	// memakai warna jenisnya sendiri.
+	lines := r.compose(items, 3, 3)
+	warna := map[string]string{
+		"commit":  escCyan,
+		"--force": escBlue,
+		"main":    escGreen,
+	}
+	for i, it := range items {
+		if !strings.Contains(lines[i+1], warna[it.Name]) {
+			t.Errorf("%s (%s) tidak memakai warna jenisnya: %q", it.Name, it.Kind, lines[i+1])
+		}
+	}
+}
+
+func TestKandidatBerbahayaBerwarnaMerah(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	items := []Item{{Name: "--force", Kind: "option", Dangerous: true}}
+	lines := r.compose(items, 1, 1)
+	if !strings.Contains(lines[1], escRed) {
+		t.Errorf("kandidat berbahaya harus merah, dapat %q", lines[1])
 	}
 }
 
