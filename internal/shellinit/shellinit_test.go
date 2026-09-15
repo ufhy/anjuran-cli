@@ -91,17 +91,16 @@ func TestPwshAliasKePowershell(t *testing.T) {
 	}
 }
 
-// Dropdown otomatis dipicu SPASI, bukan setiap huruf. Setelah sebuah kata
-// selesai barulah ada yang bisa ditawarkan, dan biayanya hanya dibayar di
-// tempat yang jarang ditekan.
-func TestZshOtomatisDipicuSpasi(t *testing.T) {
+// Pemicunya bukan satu tombol, melainkan titik-titik di mana ada sesuatu yang
+// layak ditawarkan — mengikuti cara IDE bekerja.
+func TestZshPemicu(t *testing.T) {
 	s, _ := Script("zsh")
 	for _, want := range []string{
-		"UF_AUTO",      // harus opt-in
-		"uf render",    // memakai mode gambar-saja
-		"--prev-lines", // zsh yang menyimpan jumlah barisnya
-		"zle .self-insert",
-		"TRAPINT", // Ctrl-C tidak pernah sampai ke widget
+		"UF_AUTO",               // pemicu otomatis harus opt-in
+		`bindkey " " _uf_spasi`, // spasi
+		`bindkey "/" _uf_garismiring`,
+		`bindkey "=" _uf_samadengan`,
+		"viins", // mode vi memakai keymap terpisah
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("skrip zsh tidak memuat %q", want)
@@ -109,13 +108,34 @@ func TestZshOtomatisDipicuSpasi(t *testing.T) {
 	}
 }
 
-// Shell lain tidak punya hook per-ketikan yang layak, jadi tidak boleh
-// berpura-pura punya mode otomatis.
-func TestShellLainTanpaModeOtomatis(t *testing.T) {
+// Widget yang sudah terpasang pada tombol pemicu dipanggil lebih dulu, supaya
+// perilakunya tetap utuh: oh-my-zsh memetakan spasi ke magic-space.
+func TestZshMembungkusWidgetYangAda(t *testing.T) {
+	s, _ := Script("zsh")
+	for _, want := range []string{"bindkey ", "magic-space", "_uf_asli"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("skrip zsh tidak memuat %q", want)
+		}
+	}
+}
+
+// Tombol yang bukan urusan dropdown dikembalikan ke antrean masukan zsh.
+// Tanpa itu, sesi yang memegang masukan akan menelan tombol seperti Ctrl-A.
+func TestZshMengembalikanTombolSisa(t *testing.T) {
+	s, _ := Script("zsh")
+	for _, want := range []string{"zle -U", "_uf_kembalikan"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("skrip zsh tidak memuat %q", want)
+		}
+	}
+}
+
+// Shell lain belum punya pemicu otomatis; mereka hanya memakai Tab.
+func TestShellLainTanpaPemicuOtomatis(t *testing.T) {
 	for _, sh := range []string{"bash", "fish", "powershell"} {
 		s, _ := Script(sh)
-		if strings.Contains(s, "uf render") {
-			t.Errorf("skrip %s seharusnya belum memakai mode gambar-saja", sh)
+		if strings.Contains(s, "UF_AUTO") {
+			t.Errorf("skrip %s seharusnya belum punya pemicu otomatis", sh)
 		}
 	}
 }
@@ -123,34 +143,3 @@ func TestShellLainTanpaModeOtomatis(t *testing.T) {
 // Spasi belum tentu terpasang ke self-insert: oh-my-zsh memetakannya ke
 // magic-space. Membungkus self-insert saja berarti fitur ini mati diam-diam
 // di konfigurasi yang justru paling banyak dipakai.
-func TestZshMembungkusWidgetSpasiYangAda(t *testing.T) {
-	s, _ := Script("zsh")
-	for _, want := range []string{
-		`bindkey ' '`,           // menanyakan widget yang sedang terpasang
-		`bindkey " " _uf_space`, // memasang pembungkusnya
-		"magic-space",           // alasannya ditulis, bukan sekadar dikerjakan
-		"viins",                 // mode vi memakai keymap terpisah
-	} {
-		if !strings.Contains(s, want) {
-			t.Errorf("skrip zsh tidak memuat %q", want)
-		}
-	}
-}
-
-// Alias harus diteruskan ke uf, kalau tidak "gco" tidak menghasilkan apa pun.
-func TestZshMeneruskanAlias(t *testing.T) {
-	s, _ := Script("zsh")
-	for _, want := range []string{
-		"--alias",       // diteruskan ke uf
-		"${aliases[",    // dibaca dari tabel alias zsh
-		"_uf_alias_exp", // lewat variabel, bukan subshell
-	} {
-		if !strings.Contains(s, want) {
-			t.Errorf("skrip zsh tidak memuat %q", want)
-		}
-	}
-	// Dipakai oleh kedua jalur: Tab dan dropdown otomatis.
-	if n := strings.Count(s, "--alias"); n < 2 {
-		t.Errorf("--alias dipakai %d kali, mau di jalur widget dan render", n)
-	}
-}

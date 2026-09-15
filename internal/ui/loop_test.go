@@ -109,19 +109,6 @@ func TestBackspaceMengembalikanDaftar(t *testing.T) {
 	}
 }
 
-func TestSpasiMenerimaLaluLanjut(t *testing.T) {
-	st, out := run(t, "git ", r('c'), r('o'), r('m'), r(' '))
-	if out != Accepted {
-		t.Fatalf("outcome = %v, mau Accepted", out)
-	}
-	if st.Line != "git commit " {
-		t.Errorf("Line = %q, mau %q", st.Line, "git commit ")
-	}
-	if st.Cursor != len(st.Line) {
-		t.Errorf("Cursor = %d, mau di ujung baris", st.Cursor)
-	}
-}
-
 func TestTabBerputar(t *testing.T) {
 	// Tab menuruni daftar; berapa pun panjang daftarnya harus kembali ke awal.
 	st, out := run(t, "git ", k(tty.KeyTab), k(tty.KeyTab), k(tty.KeyUp), k(tty.KeyUp), k(tty.KeyEnter))
@@ -134,19 +121,21 @@ func TestTabBerputar(t *testing.T) {
 }
 
 func TestKursorDiTengahMenolakKetikan(t *testing.T) {
-	// Kursor tidak di ujung baris: gema karakter tidak aman, sesi harus tutup
-	// alih-alih menulis di posisi yang salah.
-	term := &fakeTerm{keys: []tty.Key{r('c')}}
+	// Kursor tidak di ujung baris: gema karakter tidak aman, jadi sesi tutup
+	// alih-alih menulis di posisi yang salah. Karakternya DIKEMBALIKAN ke
+	// shell, sehingga tetap tersisip — hanya oleh zsh, bukan oleh kita.
+	key := tty.Key{Type: tty.KeyRune, Rune: 'c', Raw: []byte("c")}
+	term := &fakeTerm{keys: []tty.Key{key}}
 	s := NewSession(newEngine(), term, discard(), State{Line: "git  --verbose", Cursor: 4})
-	st, out, err := s.Run()
+	st, _, err := s.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != Cancelled {
-		t.Errorf("outcome = %v, mau Cancelled", out)
-	}
 	if st.Line != "git  --verbose" {
 		t.Errorf("baris harus utuh, dapat %q", st.Line)
+	}
+	if string(s.Leftover()) != "c" {
+		t.Errorf("Leftover = %q, mau karakter dikembalikan ke shell", s.Leftover())
 	}
 }
 
@@ -437,5 +426,108 @@ func TestAwalanBersama(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("awalanBersama(%v, %q) = %q, mau %q", tt.names, tt.prefix, got, tt.want)
 		}
+	}
+}
+
+// Tombol yang bukan urusan dropdown harus DIKEMBALIKAN ke shell, bukan
+// ditelan. Menelannya membuat tombol seperti Ctrl-A atau Home terasa kadang
+// tidak berfungsi — dan itu jauh lebih mengganggu daripada dropdown yang
+// menutup sedikit terlalu cepat.
+func TestTombolAsingDikembalikan(t *testing.T) {
+	tests := []struct {
+		nama string
+		key  tty.Key
+	}{
+		{"Ctrl-A", tty.Key{Type: tty.KeyUnknown, Raw: []byte{0x01}}},
+		{"panah kiri", tty.Key{Type: tty.KeyLeft, Raw: []byte("\x1b[D")}},
+		{"panah kanan", tty.Key{Type: tty.KeyRight, Raw: []byte("\x1b[C")}},
+		{"Ctrl-C", tty.Key{Type: tty.KeyCtrlC, Raw: []byte{0x03}}},
+	}
+
+	for _, tt := range tests {
+		term := &fakeTerm{keys: []tty.Key{tt.key}}
+		s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+		if _, _, err := s.Run(); err != nil {
+			t.Fatalf("%s: %v", tt.nama, err)
+		}
+		if string(s.Leftover()) != string(tt.key.Raw) {
+			t.Errorf("%s: Leftover = %q, mau %q", tt.nama, s.Leftover(), tt.key.Raw)
+		}
+	}
+}
+
+// Esc berarti "batalkan saran", bukan "batalkan baris", jadi ia berhenti di
+// sini dan tidak diteruskan.
+func TestEscTidakDikembalikan(t *testing.T) {
+	term := &fakeTerm{keys: []tty.Key{{Type: tty.KeyEscape, Raw: []byte{0x1b}}}}
+	s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+	if _, out, _ := s.Run(); out != Cancelled {
+		t.Errorf("outcome = %v, mau Cancelled", out)
+	}
+	if len(s.Leftover()) != 0 {
+		t.Errorf("Esc seharusnya berhenti di dropdown, dapat %q", s.Leftover())
+	}
+}
+
+// Di dalam kutip dan sesudah backslash, spasi adalah BAGIAN DARI KATA.
+// Memperlakukannya sebagai pemicu akan menerima kandidat yang tersorot dan
+// merusak nama berkas yang sedang diketik.
+func TestSpasiLiteral(t *testing.T) {
+	tests := []struct {
+		line   string
+		cursor int
+		want   bool
+	}{
+		{"cat berkas", 10, false},
+		{`cat "berkas`, 11, true},   // kutip ganda belum ditutup
+		{`cat 'berkas`, 11, true},   // kutip tunggal belum ditutup
+		{`cat "berkas"`, 12, false}, // sudah ditutup
+		{`cat berkas\`, 11, true},   // backslash melolos berikutnya
+		{`cat berkas\\`, 12, false}, // backslash-nya sendiri sudah dilolos
+		{"cat ", 4, false},
+	}
+	for _, tt := range tests {
+		s := &Session{st: State{Line: tt.line, Cursor: tt.cursor}}
+		if got := s.spasiLiteral(); got != tt.want {
+			t.Errorf("spasiLiteral(%q@%d) = %v, mau %v", tt.line, tt.cursor, got, tt.want)
+		}
+	}
+}
+
+func TestHitungBackslash(t *testing.T) {
+	tests := []struct {
+		s    string
+		want int
+	}{
+		{"", 0}, {"abc", 0}, {`abc\`, 1}, {`abc\\`, 2}, {`abc\\\`, 3},
+	}
+	for _, tt := range tests {
+		if got := hitungBackslash(tt.s); got != tt.want {
+			t.Errorf("hitungBackslash(%q) = %d, mau %d", tt.s, got, tt.want)
+		}
+	}
+}
+
+// Spasi menerima pilihan LALU membuka konteks berikutnya. Menutup dropdown di
+// situ berarti pengguna harus memicunya lagi secara manual — padahal spasinya
+// sudah dikonsumsi sesi dan tidak pernah sampai ke shell untuk memicu ulang.
+func TestSpasiMenerimaLaluLanjut(t *testing.T) {
+	term := &fakeTerm{keys: []tty.Key{
+		r('c'), r('o'), r('m'), // saring ke commit
+		{Type: tty.KeyRune, Rune: ' ', Raw: []byte(" ")},
+		k(tty.KeyEscape),
+	}}
+	s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+	st, out, err := s.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Esc yang mengakhiri sesi, bukan spasinya: sesi tetap berjalan setelah
+	// spasi diterima.
+	if out != Cancelled {
+		t.Errorf("outcome = %v; sesi seharusnya lanjut setelah spasi", out)
+	}
+	if st.Line != "git commit " {
+		t.Errorf("Line = %q, mau %q", st.Line, "git commit ")
 	}
 }

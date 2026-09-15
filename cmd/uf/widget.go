@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"github.com/uf-cli/uf/internal/generator"
 	"github.com/uf-cli/uf/internal/tty"
 	"github.com/uf-cli/uf/internal/ui"
-	"golang.org/x/term"
 )
 
 // runWidget adalah mode interaktif yang dipanggil oleh integrasi shell.
@@ -19,8 +19,14 @@ import (
 // Protokolnya sengaja sederhana karena harus bisa diurai oleh zsh, bash,
 // fish, dan PowerShell tanpa parser JSON:
 //
-//	baris pertama : "<status> <posisi-kursor>"
+//	baris pertama : "<status> <posisi-kursor> <tombol-sisa-heksadesimal>"
 //	sisanya       : isi buffer yang baru, apa adanya
+//
+// Tombol sisa adalah tombol yang mengakhiri sesi tetapi bukan urusan dropdown —
+// Ctrl-A, Home, panah kiri. Shell mengembalikannya ke antrean masukannya
+// sendiri, sehingga tidak ada tombol yang tertelan. Dikirim sebagai
+// heksadesimal karena isinya byte kendali yang tidak aman dilewatkan apa adanya
+// di dalam satu baris teks.
 //
 // status bernilai "ok" bila pengguna memilih sesuatu, "cancel" bila batal,
 // dan "none" bila memang tidak ada kandidat — shell lalu boleh jatuh kembali
@@ -33,7 +39,6 @@ func runWidget(args []string) int {
 	line := fs.String("line", "", "isi buffer shell")
 	cursor := fs.Int("cursor", -1, "posisi kursor")
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
-	prev := fs.Int("prev-lines", 0, "baris yang sudah digambar mode render")
 	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first atau last")
 	alias := fs.String("alias", "", "pemekaran alias untuk kata pertama")
 	specsDir := fs.String("specs", "", "direktori spec")
@@ -58,8 +63,8 @@ func runWidget(args []string) int {
 	// Perhitungan memakai bentuk yang sudah dimekarkan; hasilnya dipetakan
 	// kembali ke baris asli sebelum diserahkan ke shell.
 	ax := newAliasExpansion(*line, byteCursor, *alias)
-	st, outcome, err := interact(eng,
-		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, *prev, start)
+	st, outcome, sisa, err := interact(eng,
+		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
@@ -68,65 +73,41 @@ func runWidget(args []string) int {
 	switch outcome {
 	case ui.Accepted:
 		restored, c := ax.Restore(st.Line, st.Cursor)
-		emit("ok", restored, c, *unit)
+		emit("ok", restored, c, *unit, sisa)
 	case ui.NoCandidates:
-		emit("none", *line, byteCursor, *unit)
+		emit("none", *line, byteCursor, *unit, sisa)
 	default:
-		emit("cancel", *line, byteCursor, *unit)
+		emit("cancel", *line, byteCursor, *unit, sisa)
 	}
 	return 0
 }
 
 // interact membuka terminal, menjalankan sesi, lalu memulihkan mode terminal.
-func interact(eng *engine.Engine, st ui.State, prevLines, start int) (ui.State, ui.Outcome, error) {
+func interact(eng *engine.Engine, st ui.State, start int) (ui.State, ui.Outcome, ui.Leftover, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	pre, err := ui.Prepare(eng, st, newDynamic())
 	if err != nil {
-		return st, ui.Cancelled, err
+		return st, ui.Cancelled, nil, err
 	}
 	if out, outcome, done := pre.Immediate(); done {
-		// Dropdown yang sedang tergambar oleh mode otomatis harus tetap
-		// dibersihkan, meski sesi interaktif tidak jadi dibuka.
-		clearLeftover(prevLines)
-		return out, outcome, nil
+		return out, outcome, nil, nil
 	}
 
 	term, err := tty.Open()
 	if err != nil {
-		clearLeftover(prevLines)
 		// Tanpa terminal interaktif tidak ada yang bisa digambar. Diperlakukan
 		// sebagai "tidak ada kandidat" supaya shell jatuh ke completion bawaan.
-		return st, ui.NoCandidates, nil
+		return st, ui.NoCandidates, nil, nil
 	}
 	defer term.Close()
 
 	w, h := term.Size()
 	rend := ui.NewRenderer(term.Out(), w, h, simpleMode())
-	// Baris yang sudah digambar mode otomatis diambil alih, bukan ditumpuk.
-	rend.Adopt(prevLines)
 
-	return pre.Session(term, rend).StartAt(start).Run()
-}
-
-// clearLeftover menghapus dropdown yang tertinggal dari mode otomatis.
-func clearLeftover(lines int) {
-	if lines <= 0 {
-		return
-	}
-	f, err := os.OpenFile(ttyDevice, os.O_WRONLY, 0)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	w, h := 80, 24
-	if tw, th, err := term.GetSize(int(f.Fd())); err == nil && tw > 0 && th > 0 {
-		w, h = tw, th
-	}
-	r := ui.NewRenderer(f, w, h, simpleMode())
-	r.Adopt(lines)
-	r.Clear()
+	sesi := pre.Session(term, rend).StartAt(start)
+	st2, outcome, err := sesi.Run()
+	return st2, outcome, sesi.Leftover(), err
 }
 
 // newDynamic menyiapkan sumber kandidat dinamis.
@@ -155,9 +136,6 @@ func generatorTimeout() time.Duration {
 	}
 	return d
 }
-
-// ttyDevice adalah terminal pengendali pada sistem mirip Unix.
-const ttyDevice = "/dev/tty"
 
 // simpleMode mematikan warna dan sorotan pada terminal yang terbatas.
 func simpleMode() bool {
@@ -256,6 +234,7 @@ func utf16Len(r rune) int {
 }
 
 // emit menulis hasil dengan posisi kursor dikembalikan ke satuan yang diminta.
-func emit(status, line string, byteCursor int, unit string) {
-	fmt.Printf("%s %d\n%s", status, fromByteCursor(line, byteCursor, unit), line)
+func emit(status, line string, byteCursor int, unit string, sisa ui.Leftover) {
+	fmt.Printf("%s %d %s\n%s", status, fromByteCursor(line, byteCursor, unit),
+		hex.EncodeToString(sisa), line)
 }

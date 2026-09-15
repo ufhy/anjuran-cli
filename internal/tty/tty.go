@@ -43,6 +43,13 @@ const (
 type Key struct {
 	Type KeyType
 	Rune rune
+	// Raw adalah byte asli yang membentuk tombol ini.
+	//
+	// Disimpan supaya tombol yang tidak ditangani bisa DIKEMBALIKAN ke shell
+	// alih-alih tertelan. Tanpa itu, setiap tombol yang belum dikenali sesi
+	// akan hilang tanpa jejak — dan pengguna merasakannya sebagai tombol yang
+	// kadang tidak berfungsi.
+	Raw []byte
 }
 
 // escTimeout adalah jeda untuk membedakan tombol Esc tunggal dari awal sebuah
@@ -58,6 +65,8 @@ type Terminal struct {
 
 	bytes chan byte
 	errs  chan error
+	// raw mengumpulkan byte tombol yang sedang dibaca.
+	raw []byte
 }
 
 // Open membuka terminal pengendali dan memasang mode raw.
@@ -139,6 +148,9 @@ func (t *Terminal) Close() error {
 // readByte mengambil satu byte, atau mengembalikan ok=false bila kanal tutup.
 func (t *Terminal) readByte() (byte, bool) {
 	b, ok := <-t.bytes
+	if ok {
+		t.raw = append(t.raw, b)
+	}
 	return b, ok
 }
 
@@ -147,14 +159,27 @@ func (t *Terminal) readByte() (byte, bool) {
 func (t *Terminal) readByteTimeout(d time.Duration) (byte, bool) {
 	select {
 	case b, ok := <-t.bytes:
+		if ok {
+			t.raw = append(t.raw, b)
+		}
 		return b, ok
 	case <-time.After(d):
 		return 0, false
 	}
 }
 
-// ReadKey membaca satu tombol.
+// ReadKey membaca satu tombol beserta byte aslinya.
 func (t *Terminal) ReadKey() (Key, error) {
+	t.raw = t.raw[:0]
+	k, err := t.readKey()
+	if err != nil {
+		return k, err
+	}
+	k.Raw = append([]byte(nil), t.raw...)
+	return k, nil
+}
+
+func (t *Terminal) readKey() (Key, error) {
 	b, ok := t.readByte()
 	if !ok {
 		return Key{Type: KeyUnknown}, io.EOF

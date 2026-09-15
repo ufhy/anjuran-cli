@@ -46,19 +46,26 @@ _uf_alias() {
   _uf_alias_exp=${aliases[$first]-}
 }
 
+# _uf_widget menjalankan SATU sesi yang memegang seluruh interaksi.
+#
+# Model ini mengikuti cara IDE bekerja: daftar kandidat diambil sekali, lalu
+# disaring di tempat sambil pengguna mengetik — bukan dihitung ulang dari nol
+# pada setiap ketikan. Satu proses per interaksi, bukan satu proses per huruf.
+#
+# Konsekuensinya sesi memegang masukan selama dropdown terbuka. Agar tidak ada
+# yang dirampas dari zsh, tombol yang bukan urusan dropdown dikembalikan lewat
+# zle -U dan diproses zsh seperti biasa.
 _uf_widget() {
   emulate -L zsh
   setopt local_options no_ksh_arrays
 
-  local out head body status_word new_cursor
+  local out head body status_word new_cursor sisa
   local select_from=${1:-first}
 
-  # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
   _uf_alias
+  # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
   out="$(command uf widget --line "$BUFFER" --cursor "$CURSOR" \
-    --prev-lines "${_uf_lines:-0}" --select "$select_from" \
-    --alias "$_uf_alias_exp" 2>/dev/null)"
-  _uf_lines=0
+    --select "$select_from" --alias "$_uf_alias_exp" 2>/dev/null)"
 
   if [[ -z $out ]]; then
     # uf tidak bisa menjalankan sesi, misalnya karena bukan terminal
@@ -74,21 +81,14 @@ _uf_widget() {
     body=''
   fi
 
-  status_word=${head%% *}
-  new_cursor=${head##* }
+  status_word=${${(z)head}[1]}
+  new_cursor=${${(z)head}[2]}
+  sisa=${${(z)head}[3]}
 
   case $status_word in
     ok)
       BUFFER=$body
       CURSOR=$new_cursor
-      # Memilih sebuah DIREKTORI berarti pengguna sedang menelusuri, belum
-      # selesai. Dropdown digambar ulang supaya isinya langsung terlihat,
-      # alih-alih memaksa memulai lagi untuk setiap tingkat.
-      if [[ $BUFFER == */ ]] && (( $+functions[_uf_draw] )); then
-        zle redisplay
-        _uf_draw
-        return
-      fi
       ;;
     none)
       # Tidak ada spec untuk perintah ini. Completion bawaan zsh masih jauh
@@ -102,192 +102,82 @@ _uf_widget() {
   esac
 
   zle redisplay
+  _uf_kembalikan "$sisa"
+}
+
+# _uf_kembalikan mengembalikan tombol yang belum ditangani ke antrean masukan
+# zsh, sehingga diproses seperti tidak pernah lewat uf.
+#
+# Dikirim sebagai heksadesimal karena isinya byte kendali yang tidak aman
+# dilewatkan apa adanya di dalam satu baris teks.
+_uf_kembalikan() {
+  local hex=$1
+  [[ -n $hex && $hex != 0 ]] || return 0
+
+  local esc=""
+  local i
+  for (( i = 1; i <= ${#hex}; i += 2 )); do
+    esc+="\\x${hex[i,i+1]}"
+  done
+  zle -U -- "${(e)$(printf '%s' \"$esc\")}"
 }
 
 zle -N _uf_widget
+
+# ---------------------------------------------------------------------------
+# Pemicu
+#
+# Tab selalu membuka sesi. Dengan UF_AUTO, karakter pemicu ikut membukanya —
+# mengikuti cara IDE: bukan satu tombol khusus, melainkan titik-titik di mana
+# ada sesuatu yang layak ditawarkan.
+# ---------------------------------------------------------------------------
+
 bindkey "${UF_KEY:-^I}" _uf_widget
 
-# ---------------------------------------------------------------------------
-# Dropdown yang muncul sendiri
-#
-# Pemicunya SPASI, bukan setiap huruf. Setelah sebuah kata selesai diketik,
-# barulah ada yang bisa ditawarkan; sebelum itu, isi dropdown hanya akan
-# berganti-ganti mengikuti huruf yang belum tentu selesai.
-#
-# Pilihan itu juga yang membuat fitur ini murah. Satu penggambaran memakan
-# sekitar 7 ms karena uf adalah proses baru; dibayar pada setiap huruf, itu
-# akan terasa. Dibayar pada spasi — dan pada huruf hanya selagi dropdown sudah
-# terbuka — tidak terasa sama sekali.
-#
-# Nyalakan dengan UF_AUTO=1 sebelum eval. Bawaannya mati, supaya perilaku Tab
-# yang sudah ada tidak berubah tanpa diminta.
-# ---------------------------------------------------------------------------
-
 if [[ -n ${UF_AUTO:-} ]]; then
+  # Widget asli yang terpasang pada sebuah tombol, supaya perilakunya tetap
+  # utuh sebelum sesi dibuka. oh-my-zsh memetakan spasi ke magic-space, yang
+  # memekarkan rujukan riwayat lebih dulu.
+  typeset -gA _uf_asli
 
-  # Jumlah baris yang sedang tergambar. zsh yang menyimpannya, karena setiap
-  # pemanggilan uf adalah proses baru yang tidak mewarisi apa pun.
-  typeset -g _uf_lines=0
-
-  _uf_draw() {
-    _uf_alias
-    _uf_lines=$(command uf render --line "$BUFFER" --cursor "$CURSOR" \
-      --prev-lines "$_uf_lines" --alias "$_uf_alias_exp" 2>/dev/null) || _uf_lines=0
-    [[ $_uf_lines == <-> ]] || _uf_lines=0
-  }
-
-  _uf_erase() {
-    (( _uf_lines )) || return 0
-    command uf render --clear --prev-lines "$_uf_lines" >/dev/null 2>&1
-    _uf_lines=0
-  }
-
-  # self-insert dibungkus, bukan diganti: perilaku aslinya dipanggil lebih dulu
-  # lewat .self-insert, sehingga penyisipan karakter tetap milik zsh.
-  _uf_insert() {
-    zle .self-insert
-    # Digambar ulang saat spasi diketik, atau selagi dropdown sudah terbuka
-    # supaya isinya ikut menyaring mengikuti ketikan.
-    if [[ $KEYS == ' ' ]] || (( _uf_lines )); then
-      _uf_draw
+  _uf_simpan_asli() {
+    local key=$1 nama=$2 keluaran orig
+    keluaran="$(bindkey "$key")"
+    orig=${keluaran##* }
+    if [[ -n $orig && $orig != undefined-key ]]; then
+      _uf_asli[$nama]=$orig
     fi
   }
-  zle -N self-insert _uf_insert
 
-  # Spasi belum tentu terpasang ke self-insert.
-  #
-  # oh-my-zsh memetakannya ke magic-space, yang lebih dulu memekarkan rujukan
-  # riwayat seperti !! sebelum menyisipkan spasi. Membungkus self-insert saja
-  # karena itu tidak pernah terpanggil di sana — dan spasi justru pemicu utama
-  # fitur ini. Yang dibungkus harus widget yang SEDANG terpasang, apa pun
-  # namanya, supaya perilaku yang sudah dipasang pengguna tetap utuh.
-  # Keluarannya berbentuk: " " magic-space
-  # Nama widget adalah kata terakhir, jadi segala sesuatu sampai spasi terakhir
-  # dibuang. Memecahnya sebagai kata shell tidak bisa dipakai di sini, karena
-  # tanda kutip pembungkus tombolnya ikut terhitung sebagai kata tersendiri.
-  # Keluarannya berbentuk: " " magic-space
-  # Nama widget adalah kata terakhir. Hasilnya ditampung ke variabel lebih dulu;
-  # bentuk bersarang seperti ${${(f)"$(...)"}[1]##* } tidak menerapkan
-  # pemangkasannya sebagaimana diharapkan.
-  typeset -g _uf_space_orig
-  typeset _uf_bindkey_out
-  _uf_bindkey_out="$(bindkey ' ')"
-  _uf_space_orig=${_uf_bindkey_out##* }
-  unset _uf_bindkey_out
-  if [[ -z $_uf_space_orig || $_uf_space_orig == undefined-key ]]; then
-    _uf_space_orig=self-insert
-  fi
-
-  _uf_space() {
-    if [[ $_uf_space_orig == self-insert ]]; then
-      # Widget bawaan dipanggil langsung, supaya tidak berputar kembali ke
-      # pembungkus self-insert kita dan menggambar dua kali.
+  # _uf_pemicu menjalankan widget asli tombolnya, lalu membuka sesi.
+  _uf_pemicu() {
+    local nama=$1
+    local orig=${_uf_asli[$nama]}
+    if [[ -n $orig && $orig != $nama ]]; then
+      zle "$orig" 2>/dev/null || zle .self-insert
+    else
       zle .self-insert
-    else
-      zle "$_uf_space_orig" || zle .self-insert
     fi
-    _uf_draw
+    _uf_widget
   }
-  zle -N _uf_space
 
-  bindkey " " _uf_space
-  # Mode vi memakai keymap terpisah; tanpa ini fiturnya mati begitu pengguna
-  # berpindah ke sana.
+  _uf_spasi()      { _uf_pemicu _uf_spasi }
+  _uf_garismiring(){ _uf_pemicu _uf_garismiring }
+  _uf_samadengan() { _uf_pemicu _uf_samadengan }
+  zle -N _uf_spasi
+  zle -N _uf_garismiring
+  zle -N _uf_samadengan
+
+  _uf_simpan_asli " " _uf_spasi
+  _uf_simpan_asli "/" _uf_garismiring
+  _uf_simpan_asli "=" _uf_samadengan
+
+  bindkey " " _uf_spasi
+  bindkey "/" _uf_garismiring
+  bindkey "=" _uf_samadengan
   if [[ -n ${keymaps[(r)viins]} ]]; then
-    bindkey -M viins " " _uf_space
+    bindkey -M viins " " _uf_spasi
+    bindkey -M viins "/" _uf_garismiring
+    bindkey -M viins "=" _uf_samadengan
   fi
-
-  # Panah membuka mode memilih selagi kotak terbuka.
-  #
-  # Kotak yang muncul sendiri sengaja tidak menyorot baris mana pun: pengguna
-  # masih mengetik, dan Enter di situ menjalankan perintah. Tetapi menu yang
-  # terlihat jelas mengundang untuk ditekan panahnya, jadi panah itulah yang
-  # memindahkannya ke mode memilih — bukan Tab, yang harus dicari tahu dulu.
-  #
-  # Saat kotak tertutup, panah tetap menjadi riwayat perintah. Mengambil alih
-  # tombol itu tanpa syarat akan merampas fungsi yang jauh lebih sering dipakai.
-  typeset -gA _uf_orig_key
-
-  _uf_bind_arrow() {
-    local wrapper=$1 out orig
-    shift
-    for key in "$@"; do
-      [[ -n $key ]] || continue
-      out="$(bindkey "$key")"
-      orig=${out##* }
-      if [[ -n $orig && $orig != undefined-key && -z ${_uf_orig_key[$wrapper]} ]]; then
-        _uf_orig_key[$wrapper]=$orig
-      fi
-      bindkey "$key" "$wrapper"
-      [[ -n ${keymaps[(r)viins]} ]] && bindkey -M viins "$key" "$wrapper"
-    done
-  }
-
-  _uf_down() {
-    if (( _uf_lines )); then
-      _uf_widget first
-      return
-    fi
-    if [[ -n ${_uf_orig_key[_uf_down]} ]]; then
-      zle "${_uf_orig_key[_uf_down]}"
-    else
-      zle .down-line-or-history
-    fi
-  }
-  zle -N _uf_down
-
-  _uf_up() {
-    if (( _uf_lines )); then
-      # Dibuka dari baris TERAKHIR, supaya arah tekanannya terasa benar.
-      _uf_widget last
-      return
-    fi
-    if [[ -n ${_uf_orig_key[_uf_up]} ]]; then
-      zle "${_uf_orig_key[_uf_up]}"
-    else
-      zle .up-line-or-history
-    fi
-  }
-  zle -N _uf_up
-
-  # Terminal mengirim urutan yang berbeda tergantung mode keypad, jadi keduanya
-  # dipasang; terminfo dipakai bila tersedia.
-  _uf_bind_arrow _uf_down "^[[B" "^[OB" "${terminfo[kcud1]}"
-  _uf_bind_arrow _uf_up   "^[[A" "^[OA" "${terminfo[kcuu1]}"
-
-  _uf_delete() {
-    zle .backward-delete-char
-    (( _uf_lines )) && _uf_draw
-  }
-  zle -N backward-delete-char _uf_delete
-
-  # Dropdown harus hilang sebelum perintahnya dijalankan, kalau tidak
-  # keluarannya akan tercetak menimpa kotak yang masih tergambar.
-  _uf_accept() { _uf_erase; zle .accept-line }
-  zle -N accept-line _uf_accept
-
-  # Ctrl-C tidak pernah sampai ke widget mana pun: ia tiba sebagai SIGINT,
-  # bukan sebagai tombol yang dipetakan ZLE. Satu-satunya tempat yang bisa
-  # membersihkan sebelum baris dibatalkan adalah trap sinyalnya.
-  #
-  # Trap milik pengguna tidak ditimpa. Kalau sudah ada, kotak dibiarkan dan
-  # disapu oleh precmd pada prompt berikutnya — lebih baik meninggalkan satu
-  # kotak daripada mematikan penanganan interupsi yang sudah dipasang orang.
-  if ! typeset -f TRAPINT > /dev/null; then
-    TRAPINT() {
-      _uf_erase
-      return $(( 128 + $1 ))
-    }
-  fi
-
-  # Jaring pengaman: apa pun yang mengakhiri sesi pengeditan ikut membersihkan.
-  _uf_line_finish() { _uf_erase }
-  zle -N zle-line-finish _uf_line_finish
-
-  # Prompt baru berarti kotak lama sudah tidak relevan. Pencatatannya direset
-  # supaya penggambaran berikutnya tidak mencoba menghapus baris yang sudah
-  # tergulung keluar layar.
-  autoload -Uz add-zsh-hook
-  add-zsh-hook precmd _uf_reset
-  _uf_reset() { _uf_lines=0 }
 fi

@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/uf-cli/uf/internal/engine"
+	"github.com/uf-cli/uf/internal/parser"
 )
 
 // Outcome membedakan tiga akhir sesi yang perlu ditangani shell secara
@@ -87,6 +88,14 @@ func (p *Preflight) Immediate() (State, Outcome, bool) {
 	return p.st, Cancelled, false
 }
 
+// Leftover adalah tombol yang mengakhiri sesi tetapi BUKAN urusan sesi.
+//
+// Dikembalikan ke shell alih-alih ditelan. Sebelumnya setiap tombol yang tidak
+// dikenali sesi hilang tanpa jejak — Ctrl-A, Home, panah kiri — dan pengguna
+// merasakannya sebagai tombol yang kadang tidak berfungsi. Inilah yang membuat
+// sesi boleh memegang seluruh interaksi tanpa merampas apa pun dari shell.
+type Leftover []byte
+
 // Session menjalankan interaksi dropdown untuk satu penekanan tombol pelengkap.
 type Session struct {
 	eng  *engine.Engine
@@ -111,7 +120,13 @@ type Session struct {
 	// baris terakhir — dipakai saat sesi dibuka dengan panah ATAS, supaya
 	// arah tekanannya terasa sebagaimana mestinya.
 	start int
+
+	// leftover menampung tombol yang harus dikembalikan ke shell.
+	leftover Leftover
 }
+
+// Leftover mengembalikan tombol yang belum ditangani sesi, bila ada.
+func (s *Session) Leftover() Leftover { return s.leftover }
 
 // StartAt menentukan baris yang tersorot saat sesi dibuka.
 func (s *Session) StartAt(i int) *Session {
@@ -189,7 +204,15 @@ func (s *Session) Run() (State, Outcome, error) {
 		}
 
 		switch key.Type {
-		case KeyCtrlC, KeyEscape, KeyCtrlD:
+		case KeyEscape:
+			// Esc menutup dropdown dan berhenti di situ; itu artinya
+			// "batalkan saran", bukan "batalkan baris".
+			return s.st, Cancelled, nil
+
+		case KeyCtrlC, KeyCtrlD:
+			// Keduanya punya arti bagi shell — membatalkan baris, menutup
+			// sesi — jadi diteruskan alih-alih ditelan.
+			s.leftover = key.Raw
 			return s.st, Cancelled, nil
 
 		case KeyEnter:
@@ -244,21 +267,47 @@ func (s *Session) Run() (State, Outcome, error) {
 			selected = max(selected-s.rend.MaxRows(), 0)
 
 		case KeyRune:
-			if key.Rune == ' ' {
-				// Spasi menerima pilihan lalu menutup dropdown, sehingga
-				// pengguna bisa langsung lanjut mengetik argumen berikutnya.
-				st := apply(s.st, res, rs[selected].cand)
-				st.Line += " "
-				st.Cursor = len(st.Line)
-				return st, Accepted, nil
+			if key.Rune == ' ' && !s.spasiLiteral() {
+				// Spasi menerima pilihan LALU MEMBUKA konteks berikutnya.
+				//
+				// Ini karakter pemicu: di shell, spasi mengakhiri satu kata
+				// dan memulai kata berikutnya — persis titik di mana ada
+				// sesuatu baru yang layak ditawarkan. Menutup dropdown di situ
+				// berarti pengguna harus memicunya lagi secara manual, padahal
+				// spasinya sudah dikonsumsi sesi dan tidak pernah sampai ke
+				// shell untuk memicu ulang.
+				s.st = apply(s.st, res, rs[selected].cand)
+				s.st.Line += " "
+				s.st.Cursor = len(s.st.Line)
+
+				if err := s.rend.EchoRune(' '); err != nil {
+					return s.st, Cancelled, err
+				}
+				if res, rs, selected, err = s.refresh(); err != nil {
+					return s.st, Cancelled, err
+				}
+				if len(rs) == 0 {
+					return s.st, Accepted, nil
+				}
+				continue
 			}
 			if !s.typable {
-				return s.st, Cancelled, nil
+				s.leftover = key.Raw
+				return s.st, Accepted, nil
 			}
 			s.insert(key.Rune)
 			if err := s.rend.EchoRune(key.Rune); err != nil {
 				return s.st, Cancelled, err
 			}
+
+			// Backslash di ujung adalah pelolosan yang BELUM SELESAI. Menyaring
+			// ulang di situ selalu menghasilkan nol kandidat — tidak ada nama
+			// berkas yang berakhir dengan backslash — sehingga sesi menutup
+			// tepat sebelum karakter yang dilolos sempat diketik.
+			if hitungBackslash(s.st.Line[:s.st.Cursor])%2 == 1 {
+				continue
+			}
+
 			if res, rs, selected, err = s.refresh(); err != nil {
 				return s.st, Cancelled, err
 			} else if len(rs) == 0 {
@@ -269,7 +318,8 @@ func (s *Session) Run() (State, Outcome, error) {
 
 		case KeyBackspace:
 			if !s.typable || len(s.st.Line) == 0 {
-				return s.st, Cancelled, nil
+				s.leftover = key.Raw
+				return s.st, Accepted, nil
 			}
 			s.deleteBack()
 			if err := s.rend.EchoBackspace(); err != nil {
@@ -281,10 +331,19 @@ func (s *Session) Run() (State, Outcome, error) {
 				return s.st, Accepted, nil
 			}
 
+		case KeyLeft, KeyRight:
+			// Pergerakan kursor adalah urusan shell, bukan dropdown. Sesi
+			// ditutup dan tombolnya diteruskan, sehingga kursor tetap bergerak
+			// seperti biasa.
+			s.leftover = key.Raw
+			return s.st, Accepted, nil
+
 		default:
-			// Tombol yang tidak ditangani menutup dropdown tanpa mengubah apa
-			// pun, agar tidak ada tombol yang "tertelan" diam-diam.
-			return s.st, Cancelled, nil
+			// Tombol yang tidak ditangani menutup dropdown, lalu DIKEMBALIKAN
+			// ke shell. Menelannya membuat tombol seperti Ctrl-A atau Home
+			// terasa kadang tidak berfungsi.
+			s.leftover = key.Raw
+			return s.st, Accepted, nil
 		}
 	}
 }
@@ -327,6 +386,37 @@ func awalanDua(a, b string) string {
 		i++
 	}
 	return a[:i]
+}
+
+// spasiLiteral menjawab apakah spasi di posisi ini adalah BAGIAN DARI KATA,
+// bukan pemisah kata.
+//
+// "cat \"berkas d" masih berada di dalam kutip yang belum ditutup, dan
+// "cat berkas\ d" baru saja dilolos dengan backslash. Di kedua tempat itu
+// spasi tidak mengakhiri apa pun — memperlakukannya sebagai pemicu akan
+// menerima kandidat yang sedang tersorot dan merusak nama yang sedang diketik.
+func (s *Session) spasiLiteral() bool {
+	// Backslash tepat sebelum kursor melolos karakter berikutnya, kecuali
+	// backslash itu sendiri sudah dilolos.
+	if n := hitungBackslash(s.st.Line[:s.st.Cursor]); n%2 == 1 {
+		return true
+	}
+
+	l := parser.Parse(s.st.Line, s.st.Cursor)
+	if l.CursorIndex < len(l.Tokens) {
+		t := l.Tokens[l.CursorIndex]
+		return t.Quote != parser.QuoteNone && !t.Terminated
+	}
+	return false
+}
+
+// hitungBackslash menghitung backslash beruntun di ujung teks.
+func hitungBackslash(s string) int {
+	n := 0
+	for i := len(s) - 1; i >= 0 && s[i] == '\\'; i-- {
+		n++
+	}
+	return n
 }
 
 // menelusuri menjawab apakah kandidat ini membawa pengguna lebih dalam alih-alih

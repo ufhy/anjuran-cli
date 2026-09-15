@@ -141,7 +141,9 @@ SKENARIO = [
      memuat("fitur-")),
     ("perintah tanpa spec melengkapi berkas", [b"gzip", b" "], memuat("README.md")),
     ("perintah asing melengkapi berkas", [b"perintahkarangan", b" "], memuat("README.md")),
-    ("tanpa kandidat tidak ada kotak", [b"git", b" ", b"zzzq"], tanpa("╭")),
+    # Bingkai tidak bisa dipakai sebagai penanda: prompt powerlevel10k memakai
+    # karakter yang sama. Yang diperiksa adalah isinya.
+    ("tanpa kandidat tidak ada kotak", [b"git", b" ", b"zzzq"], tanpa("commit", "checkout")),
     ("Tab tetap jalan tanpa mode otomatis", [b"git", b" ", b"ch", b"\t"], memuat("checkout")),
 ]
 

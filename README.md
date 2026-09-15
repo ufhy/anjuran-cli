@@ -203,14 +203,27 @@ perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas
 UF_AUTO=1 eval "$(uf init zsh)"
 ```
 
-Ketik `git` lalu **spasi** — dropdown muncul tanpa menekan apa pun. Huruf
-berikutnya menyaringnya.
+Ketik `git` lalu **spasi** — dropdown muncul tanpa menekan apa pun.
 
-Kotak yang muncul sendiri sengaja tidak menyorot baris mana pun: kamu masih
-mengetik, dan Enter di situ menjalankan perintah. Tekan **panah** untuk masuk
-ke mode memilih — panah bawah mulai dari baris pertama, panah atas dari yang
-terakhir. Tab juga bisa. Saat kotak tertutup, panah tetap menjadi riwayat
-perintah seperti biasa.
+Pemicunya bukan satu tombol khusus, melainkan titik-titik di mana ada sesuatu
+yang layak ditawarkan: **spasi**, **`/`**, dan **`=`**. Ini mengikuti cara IDE
+bekerja — VS Code menyebutnya *trigger characters*, dan di shell inilah
+padanannya.
+
+### Satu sesi memegang seluruh interaksi
+
+Begitu dropdown terbuka, uf yang membaca ketikan: menyaring di tempat,
+menggemakan karakter, memindahkan pilihan. **Satu proses per interaksi, bukan
+satu proses per huruf.**
+
+Model ini diambil dari LSP: daftar kandidat diambil sekali, lalu disaring di
+klien sambil pengguna mengetik — bukan dihitung ulang dari nol setiap ketikan.
+Itu pula yang menghapus seluruh kelas bug sinkronisasi antara apa yang tergambar
+dan apa yang ada di buffer.
+
+Agar sesi tidak merampas apa pun dari zsh, tombol yang bukan urusan dropdown —
+Ctrl-A, Home, panah kiri — **dikembalikan** ke antrean masukan zsh dan diproses
+seperti tidak pernah lewat uf.
 
 Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
 sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
@@ -258,10 +271,10 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 |---|---|
 | ketik huruf | menyaring daftar secara langsung |
 | Tab | sisipkan awalan terpanjang yang sama; bila tidak ada, turun |
+| Spasi | terima pilihan lalu buka konteks berikutnya |
 | panah bawah, Ctrl-N | turun |
 | Shift-Tab, panah atas, Ctrl-P | naik |
 | Enter | sisipkan pilihan; pada direktori, lanjut menelusuri ke dalamnya |
-| Spasi | sisipkan lalu tutup, siap mengetik argumen berikutnya |
 | Esc, Ctrl-C | batal, baris dibiarkan apa adanya |
 
 Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik shell:

@@ -34,7 +34,6 @@ Penggunaan:
   uf version
   uf complete --line <baris> [--cursor N] [--json]
   uf widget   --line <baris> --cursor <N>
-  uf render   --line <baris> --cursor <N> --prev-lines <N>
 
 Opsi:
   --line    baris perintah yang sedang diketik
@@ -59,11 +58,6 @@ dengan sadar, lalu selesai.
 
 widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
-
-render menggambar dropdown lalu langsung selesai, tanpa mengambil alih masukan.
-Inilah yang membuat dropdown bisa muncul sambil mengetik. Jumlah baris yang
-terpakai dicetak ke stdout, dan shell menyerahkannya kembali lewat --prev-lines
-pada pemanggilan berikutnya.
 
 Lingkungan:
   UF_SPECS  direktori spec
@@ -97,8 +91,6 @@ func main() {
 		os.Exit(runComplete(os.Args[2:]))
 	case "widget":
 		os.Exit(runWidget(os.Args[2:]))
-	case "render":
-		os.Exit(runRender(os.Args[2:]))
 	case "version", "-v", "--version":
 		fmt.Println(versionString())
 	case "-h", "--help", "help":
