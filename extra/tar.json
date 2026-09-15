@@ -1,0 +1,25 @@
+{
+  "name": "tar",
+  "args": [{ "name": "file", "isOptional": true, "isVariadic": true, "template": ["filepaths"] }],
+  "options": [
+    { "name": ["-c", "--create"], "description": "Buat arsip baru" },
+    { "name": ["-x", "--extract"], "description": "Bongkar arsip" },
+    { "name": ["-t", "--list"], "description": "Daftar isi arsip" },
+    { "name": ["-r", "--append"], "description": "Tambahkan berkas ke arsip" },
+    { "name": ["-u", "--update"], "description": "Perbarui berkas yang lebih baru" },
+    { "name": ["-f", "--file"], "description": "Berkas arsip yang dipakai",
+      "args": [{ "name": "archive", "template": ["filepaths"] }] },
+    { "name": ["-C", "--directory"], "description": "Pindah ke direktori ini lebih dulu",
+      "args": [{ "name": "dir", "template": ["folders"] }] },
+    { "name": ["-z", "--gzip"], "description": "Lewatkan melalui gzip" },
+    { "name": ["-j", "--bzip2"], "description": "Lewatkan melalui bzip2" },
+    { "name": ["-J", "--xz"], "description": "Lewatkan melalui xz" },
+    { "name": ["-v", "--verbose"], "description": "Sebutkan berkas yang diproses" },
+    { "name": ["-p", "--preserve-permissions"], "description": "Pertahankan izin berkas" },
+    { "name": ["-P", "--absolute-names"], "description": "Jangan buang / di awal path" },
+    { "name": ["--exclude"], "description": "Lewati berkas yang cocok pola",
+      "isRepeatable": true, "args": [{ "name": "pattern", "template": ["filepaths"] }] },
+    { "name": ["--strip-components"], "description": "Buang sekian tingkat direktori",
+      "args": [{ "name": "jumlah" }] }
+  ]
+}

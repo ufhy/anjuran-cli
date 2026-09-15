@@ -52,6 +52,50 @@ func (n Names) Has(s string) bool {
 	return false
 }
 
+// Separator menampung field yang di skema Fig boleh berupa bool maupun string.
+//
+// Bentuk bool berarti "wajib menempel, pakai tanda sama dengan"; bentuk string
+// menyebutkan karakter pemisahnya sendiri, misalnya ":" pada beberapa perintah.
+// Memperlakukannya sebagai bool saja membuat SELURUH berkas spec gagal diurai —
+// bukan sekadar satu opsi yang hilang, melainkan perintah itu mati sama sekali.
+type Separator struct {
+	Required bool
+	// Char adalah karakter pemisahnya; kosong berarti tanda sama dengan.
+	Char string
+}
+
+func (s *Separator) UnmarshalJSON(b []byte) error {
+	var flag bool
+	if err := json.Unmarshal(b, &flag); err == nil {
+		s.Required = flag
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(b, &text); err == nil {
+		s.Required = text != ""
+		s.Char = text
+		return nil
+	}
+	// Bentuk lain diabaikan diam-diam. Satu field yang tidak dikenali tidak
+	// boleh menjatuhkan seluruh spec.
+	return nil
+}
+
+func (s Separator) MarshalJSON() ([]byte, error) {
+	if s.Char != "" {
+		return json.Marshal(s.Char)
+	}
+	return json.Marshal(s.Required)
+}
+
+// Rune mengembalikan karakter pemisah yang dipakai.
+func (s Separator) Rune() string {
+	if s.Char != "" {
+		return s.Char
+	}
+	return "="
+}
+
 // Suggestion adalah satu entri statis yang bisa ditawarkan untuk sebuah argumen.
 type Suggestion struct {
 	Name        Names  `json:"name"`
@@ -124,7 +168,7 @@ type Option struct {
 	// RequiresSeparator menandai opsi yang nilainya WAJIB ditulis menempel,
 	// misalnya --jobs=4 dan bukan --jobs 4. Tanpa ini, penelusuran akan salah
 	// menelan token berikutnya sebagai argumen opsi.
-	RequiresSeparator bool `json:"requiresSeparator,omitempty"`
+	RequiresSeparator Separator `json:"requiresSeparator,omitempty"`
 	// ExclusiveOn menyembunyikan opsi ini bila salah satu nama di sini sudah dipakai.
 	ExclusiveOn []string `json:"exclusiveOn,omitempty"`
 	// DependsOn menyembunyikan opsi ini sampai opsi yang disebut sudah dipakai.

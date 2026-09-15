@@ -39,10 +39,13 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 			return
 		}
 		seen[name] = true
+		// Nama berkas berspasi harus dikutip; tanpa itu shell memecahnya
+		// menjadi dua kata dan perintahnya rusak begitu dipilih.
+		insert := engine.Quote(name)
 		out = append(out, engine.Candidate{
 			Name:         name,
-			Insert:       name,
-			CursorOffset: len(name),
+			Insert:       insert,
+			CursorOffset: len(insert),
 			Description:  desc,
 			Kind:         engine.KindArg,
 			Priority:     engine.DefaultPriority,

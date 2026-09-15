@@ -102,7 +102,9 @@ func mergeOptions(base, overlay []Option) []Option {
 		}
 		m.IsPersistent = m.IsPersistent || o.IsPersistent
 		m.IsRepeatable = m.IsRepeatable || o.IsRepeatable
-		m.RequiresSeparator = m.RequiresSeparator || o.RequiresSeparator
+		if o.RequiresSeparator.Required {
+			m.RequiresSeparator = o.RequiresSeparator
+		}
 		m.IsDangerous = m.IsDangerous || o.IsDangerous
 		m.Hidden = m.Hidden || o.Hidden
 		m.Args = mergeArgs(m.Args, o.Args)

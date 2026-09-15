@@ -68,16 +68,55 @@ func makeInsert(name, insertValue, prefix string) (string, int) {
 	if insertValue != "" {
 		text = insertValue
 	}
-	offset := -1
+
+	// insertValue yang menyebut posisi kursornya sendiri dibiarkan apa adanya:
+	// penulisnya sudah menentukan bentuk persisnya, termasuk tanda kutip.
 	if i := strings.Index(text, cursorMarker); i >= 0 {
 		text = text[:i] + text[i+len(cursorMarker):]
-		offset = i
+		if seimbang(text) {
+			return prefix + text, len(prefix) + i
+		}
+		// Korpus spec berasal dari pihak ketiga dan bisa cacat: mysql memuat
+		// insertValue "{cursor}'", yang menyisakan satu kutip menggantung dan
+		// akan menggantung baris perintah pengguna. Dalam keadaan itu nama
+		// kandidatnya dipakai apa adanya.
+		text = name
 	}
-	text = prefix + text
-	if offset < 0 {
-		return text, len(text)
+
+	text = prefix + Quote(text)
+	return text, len(text)
+}
+
+// seimbang menjawab apakah sebuah teks terurai utuh sebagai kata shell.
+func seimbang(text string) bool {
+	for _, tok := range parser.Parse(text, 0).Tokens {
+		if !tok.Terminated {
+			return false
+		}
 	}
-	return text, len(prefix) + offset
+	return true
+}
+
+// perluDikutip menyebut karakter yang mengubah arti sebuah kata di shell.
+//
+// Garis miring dan tilde sengaja TIDAK termasuk: keduanya justru harus tetap
+// bermakna, supaya "~/berkas" tetap menunjuk direktori rumah dan path tetap
+// berupa path.
+const perluDikutip = " \t\n\"'$`\\|&;<>()*?[]{}!#"
+
+// Quote membungkus teks agar shell memperlakukannya sebagai satu kata.
+//
+// Tanpa ini, kandidat berisi spasi — nama berkas, dan 131 saran di korpus Fig
+// seperti "generate install.sh > install.sh" — akan disisipkan apa adanya dan
+// menghasilkan perintah yang rusak. Itu kegagalan yang jauh lebih buruk
+// daripada tidak ada kandidat.
+func Quote(s string) string {
+	if s == "" || !strings.ContainsAny(s, perluDikutip) {
+		return s
+	}
+	// Kutip tunggal mematikan seluruh arti khusus; satu-satunya yang perlu
+	// ditangani adalah kutip tunggal itu sendiri.
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 // Result adalah jawaban lengkap engine untuk satu posisi kursor.
@@ -182,6 +221,7 @@ func (e *Engine) Complete(line string, cursor int) (*Result, error) {
 		return nil, err
 	}
 	e.suggest(res, st, l.Prefix)
+	res.Candidates = dedup(res.Candidates)
 	return res, nil
 }
 
@@ -214,6 +254,9 @@ func (e *Engine) walk(root *spec.Subcommand, words []parser.Token) (*state, erro
 
 		if isOptionToken(tok, words[i].Quote) {
 			opt := st.lookupOption(tok)
+			if opt == nil {
+				opt = st.lookupBundle(tok)
+			}
 			if opt != nil {
 				for _, n := range opt.Name {
 					st.usedOptions[n] = true
@@ -222,7 +265,7 @@ func (e *Engine) walk(root *spec.Subcommand, words []parser.Token) (*state, erro
 
 			// Bentuk --opt=value sudah membawa argumennya sendiri, begitu
 			// pula opsi yang memang mewajibkan nilainya menempel.
-			if opt != nil && !strings.Contains(tok, "=") && !opt.RequiresSeparator {
+			if opt != nil && !strings.Contains(tok, "=") && !opt.RequiresSeparator.Required {
 				for ai := range opt.Args {
 					if opt.Args[ai].IsOptional {
 						break
@@ -262,6 +305,35 @@ func (e *Engine) walk(root *spec.Subcommand, words []parser.Token) (*state, erro
 	}
 
 	return st, nil
+}
+
+// lookupBundle memecah opsi pendek yang ditulis bergabung.
+//
+// "tar -xf berkas.tar" berarti -x dan -f, dan -f-lah yang menerima nama
+// berkasnya. Tanpa pemecahan ini seluruh "-xf" dianggap satu opsi yang tidak
+// dikenal, sehingga argumennya tidak pernah dilengkapi — padahal bentuk
+// bergabung justru yang paling lazim dipakai orang.
+//
+// Mengembalikan opsi TERAKHIR dalam gabungan, karena hanya yang terakhir yang
+// bisa menerima argumen. Nil bila ada satu huruf pun yang tidak dikenali;
+// menebak sebagian hanya akan salah menelan token berikutnya.
+func (st *state) lookupBundle(tok string) *spec.Option {
+	if len(tok) < 3 || tok[0] != '-' || tok[1] == '-' {
+		return nil
+	}
+
+	var last *spec.Option
+	for _, r := range tok[1:] {
+		o := st.lookupOption("-" + string(r))
+		if o == nil {
+			return nil
+		}
+		for _, n := range o.Name {
+			st.usedOptions[n] = true
+		}
+		last = o
+	}
+	return last
 }
 
 // lookupOption mencari opsi di subcommand aktif, lalu di opsi persisten.
@@ -344,6 +416,25 @@ func (e *Engine) suggest(res *Result, st *state, prefix string) {
 	sortCandidates(res.Candidates)
 }
 
+// dedup membuang kandidat kembar.
+//
+// Satu opsi bisa muncul dua kali karena terdaftar di subcommand sekaligus
+// diwarisi sebagai opsi persisten. Di layar itu terlihat sebagai dua baris
+// identik, dan panah terasa macet: menekan bawah tidak mengubah apa pun.
+func dedup(cands []Candidate) []Candidate {
+	seen := make(map[string]bool, len(cands))
+	out := cands[:0]
+	for _, c := range cands {
+		key := string(c.Kind) + "\x00" + c.Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, c)
+	}
+	return out
+}
+
 // addOptions menambahkan opsi subcommand aktif dan opsi persisten.
 func (e *Engine) addOptions(res *Result, st *state, prefix string) {
 	add := func(opts []spec.Option) {
@@ -360,8 +451,8 @@ func (e *Engine) addOptions(res *Result, st *state, prefix string) {
 				// tanda sama dengan, supaya pengguna tidak menulis bentuk yang
 				// justru ditolak perintahnya.
 				insertValue := o.InsertValue
-				if insertValue == "" && o.RequiresSeparator && len(o.Args) > 0 {
-					insertValue = name + "=" + cursorMarker
+				if insertValue == "" && o.RequiresSeparator.Required && len(o.Args) > 0 {
+					insertValue = name + o.RequiresSeparator.Rune() + cursorMarker
 				}
 				insert, offset := makeInsert(name, insertValue, "")
 				res.Candidates = append(res.Candidates, Candidate{
