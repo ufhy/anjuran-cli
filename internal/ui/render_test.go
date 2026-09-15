@@ -23,7 +23,7 @@ func TestRenderUlangIdentikTidakMengirimApaPun(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)
 
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 	first := buf.Len()
@@ -32,7 +32,7 @@ func TestRenderUlangIdentikTidakMengirimApaPun(t *testing.T) {
 	}
 
 	buf.Reset()
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -49,12 +49,12 @@ func TestRenderUlangIdentikTidakMengirimApaPun(t *testing.T) {
 func TestPindahPilihanHanyaMenggambarUlangDuaBaris(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 
 	buf.Reset()
-	if err := r.Render(sample(), 1, 3); err != nil {
+	if err := r.Render(sample(), 1, 2, 3); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -71,12 +71,12 @@ func TestPindahPilihanHanyaMenggambarUlangDuaBaris(t *testing.T) {
 func TestDropdownMenyusutMembersihkanSisa(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 
 	buf.Reset()
-	if err := r.Render(sample()[:1], 0, 1); err != nil {
+	if err := r.Render(sample()[:1], 0, 1, 1); err != nil {
 		t.Fatal(err)
 	}
 	// Dua baris sisa harus dihapus, ditandai escape clear-line.
@@ -88,7 +88,7 @@ func TestDropdownMenyusutMembersihkanSisa(t *testing.T) {
 func TestRuangDipesanSebelumMenggambar(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -113,7 +113,7 @@ func TestRuangDipesanSebelumMenggambar(t *testing.T) {
 func TestClearMengembalikanKeKondisiAwal(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Clear(); err != nil {
@@ -125,7 +125,7 @@ func TestClearMengembalikanKeKondisiAwal(t *testing.T) {
 
 	// Setelah Clear, render berikutnya harus menggambar penuh lagi.
 	buf.Reset()
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), "commit") {
@@ -140,7 +140,7 @@ func TestBarisDipotongSesuaiLebar(t *testing.T) {
 		Name:        "sebuah-nama-subcommand-yang-sangat-panjang",
 		Description: "deskripsi yang juga panjang sekali sampai tidak muat",
 	}}
-	lines := r.compose(items, 0, 1)
+	lines := r.compose(items, 0, 1, 1)
 	for _, l := range lines {
 		if n := len([]rune(stripStyles(l))); n > 30 {
 			t.Errorf("baris %d rune melebihi lebar 30: %q", n, l)
@@ -150,7 +150,7 @@ func TestBarisDipotongSesuaiLebar(t *testing.T) {
 
 func TestSisaKandidatDilaporkan(t *testing.T) {
 	r := NewRenderer(nil, 80, 24, true)
-	lines := r.compose(sample(), 0, 12)
+	lines := r.compose(sample(), 0, 1, 12)
 	last := lines[len(lines)-1]
 	if !strings.Contains(last, "9 lagi") {
 		t.Errorf("mau catatan sisa kandidat, dapat %q", last)
@@ -159,7 +159,7 @@ func TestSisaKandidatDilaporkan(t *testing.T) {
 
 func TestModeSederhanaTanpaWarna(t *testing.T) {
 	r := NewRenderer(nil, 80, 24, true)
-	for _, l := range r.compose(sample(), 0, 3) {
+	for _, l := range r.compose(sample(), 0, 1, 3) {
 		if strings.Contains(l, "\x1b[") {
 			t.Errorf("mode sederhana tidak boleh mengandung escape warna: %q", l)
 		}
@@ -172,7 +172,7 @@ func TestModeBerwarnaMenyorotHurufCocok(t *testing.T) {
 	// Baris pertama adalah bingkai atas; baris kedua barulah isinya.
 	// selected = 1 berarti tidak ada baris yang terpilih di sini, sehingga
 	// sorotan per huruf tetap terpasang.
-	lines := r.compose(items, 1, 1)
+	lines := r.compose(items, 1, 2, 1)
 	if !strings.Contains(lines[1], escBold) {
 		t.Errorf("mau sorotan tebal pada huruf yang cocok, dapat %q", lines[1])
 	}
@@ -182,7 +182,7 @@ func TestModeBerwarnaMenyorotHurufCocok(t *testing.T) {
 // berubah antar penekanan tombol, jadi renderer diff hanya mengirimnya sekali.
 func TestBingkaiDigambar(t *testing.T) {
 	r := NewRenderer(nil, 80, 24, false)
-	lines := r.compose(sample(), 0, 3)
+	lines := r.compose(sample(), 0, 1, 3)
 
 	if len(lines) != len(sample())+2 {
 		t.Fatalf("mau %d baris isi ditambah dua garis bingkai, dapat %d", len(sample()), len(lines))
@@ -208,7 +208,7 @@ func TestSemuaBarisSamaLebar(t *testing.T) {
 		{Name: "nama-yang-jauh-lebih-panjang", Description: "keterangan yang juga panjang sekali"},
 		{Name: "bb"},
 	}
-	lines := r.compose(items, 0, 3)
+	lines := r.compose(items, 0, 1, 3)
 
 	want := utf8.RuneCountInString(stripStyles(lines[0]))
 	for i, l := range lines {
@@ -226,7 +226,7 @@ func TestBarisTerpilihTersorotPenuh(t *testing.T) {
 		{Name: "a", Description: "pendek"},
 		{Name: "nama-panjang", Description: "keterangan panjang sekali"},
 	}
-	lines := r.compose(items, 0, 2)
+	lines := r.compose(items, 0, 1, 2)
 
 	baris := lines[1] // baris pertama isi, yang terpilih
 	if !strings.Contains(baris, escReverse) {
@@ -246,7 +246,7 @@ func TestBarisTerpilihTersorotPenuh(t *testing.T) {
 
 func TestPenghitungPosisiDiGarisBawah(t *testing.T) {
 	r := NewRenderer(nil, 80, 24, false)
-	lines := r.compose(sample(), 1, 13)
+	lines := r.compose(sample(), 1, 2, 13)
 	last := stripStyles(lines[len(lines)-1])
 	if !strings.Contains(last, "2/13") {
 		t.Errorf("garis bawah harus memuat posisi, dapat %q", last)
@@ -256,7 +256,7 @@ func TestPenghitungPosisiDiGarisBawah(t *testing.T) {
 // Terminal sempit lebih butuh kolomnya untuk teks daripada untuk bingkai.
 func TestTerminalSempitTanpaBingkai(t *testing.T) {
 	r := NewRenderer(nil, 30, 24, false)
-	for _, l := range r.compose(sample(), 0, 3) {
+	for _, l := range r.compose(sample(), 0, 1, 3) {
 		if strings.Contains(l, boxVertical) || strings.Contains(l, boxTopLeft) {
 			t.Errorf("terminal sempit tidak boleh berbingkai: %q", l)
 		}
@@ -272,7 +272,7 @@ func TestWarnaBerbedaPerJenis(t *testing.T) {
 	}
 	// selected = 3 berarti tidak ada yang terpilih, sehingga setiap baris
 	// memakai warna jenisnya sendiri.
-	lines := r.compose(items, 3, 3)
+	lines := r.compose(items, 3, 4, 3)
 	warna := map[string]string{
 		"commit":  escCyan,
 		"--force": escBlue,
@@ -288,7 +288,7 @@ func TestWarnaBerbedaPerJenis(t *testing.T) {
 func TestKandidatBerbahayaBerwarnaMerah(t *testing.T) {
 	r := NewRenderer(nil, 80, 24, false)
 	items := []Item{{Name: "--force", Kind: "option", Dangerous: true}}
-	lines := r.compose(items, 1, 1)
+	lines := r.compose(items, 1, 2, 1)
 	if !strings.Contains(lines[1], escRed) {
 		t.Errorf("kandidat berbahaya harus merah, dapat %q", lines[1])
 	}
@@ -314,7 +314,7 @@ func TestAdoptMenggambarUlangSemuanya(t *testing.T) {
 	r := NewRenderer(&buf, 80, 24, true)
 	r.Adopt(5)
 
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -339,7 +339,7 @@ func TestAdoptNolTidakBerpengaruh(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)
 	r.Adopt(0)
-	if err := r.Render(sample(), 0, 3); err != nil {
+	if err := r.Render(sample(), 0, 1, 3); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), escIndex) {
@@ -393,5 +393,25 @@ func TestShowMembersihkanSaatKosong(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), escClearLine) {
 		t.Error("kotak lama harus dibersihkan saat tidak ada kandidat")
+	}
+}
+
+// Penghitung harus melaporkan posisi SEBENARNYA, bukan posisi di dalam jendela
+// yang terlihat. Menyamakan keduanya membuat angkanya salah pada setiap daftar
+// yang lebih panjang dari layar — dan daftar seperti itu justru yang biasa.
+func TestPenghitungMemakaiPosisiSebenarnya(t *testing.T) {
+	items := sample() // tiga baris terlihat
+	r := NewRenderer(nil, 80, 24, false)
+
+	// Baris ke-2 di layar, tetapi kandidat ke-48 dari 56.
+	lines := r.compose(items, 1, 48, 56)
+	last := stripStyles(lines[len(lines)-1])
+	if !strings.Contains(last, "48/56") {
+		t.Errorf("garis bawah = %q, mau memuat 48/56", last)
+	}
+
+	// Yang tersorot tetap baris kedua di layar.
+	if !strings.Contains(lines[2], escReverse) {
+		t.Error("baris kedua di layar seharusnya yang tersorot")
 	}
 }

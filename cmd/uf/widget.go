@@ -35,6 +35,7 @@ func runWidget(args []string) int {
 	cursor := fs.Int("cursor", -1, "posisi kursor")
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
 	prev := fs.Int("prev-lines", 0, "baris yang sudah digambar mode render")
+	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first atau last")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -49,7 +50,11 @@ func runWidget(args []string) int {
 	}
 	eng := engine.New(spec.NewRegistryDirs(dirs...))
 
-	st, outcome, err := interact(eng, ui.State{Line: *line, Cursor: byteCursor}, *prev)
+	start := 0
+	if *sel == "last" {
+		start = -1
+	}
+	st, outcome, err := interact(eng, ui.State{Line: *line, Cursor: byteCursor}, *prev, start)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
@@ -67,7 +72,7 @@ func runWidget(args []string) int {
 }
 
 // interact membuka terminal, menjalankan sesi, lalu memulihkan mode terminal.
-func interact(eng *engine.Engine, st ui.State, prevLines int) (ui.State, ui.Outcome, error) {
+func interact(eng *engine.Engine, st ui.State, prevLines, start int) (ui.State, ui.Outcome, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	pre, err := ui.Prepare(eng, st, newDynamic())
@@ -95,7 +100,7 @@ func interact(eng *engine.Engine, st ui.State, prevLines int) (ui.State, ui.Outc
 	// Baris yang sudah digambar mode otomatis diambil alih, bukan ditumpuk.
 	rend.Adopt(prevLines)
 
-	return pre.Session(term, rend).Run()
+	return pre.Session(term, rend).StartAt(start).Run()
 }
 
 // clearLeftover menghapus dropdown yang tertinggal dari mode otomatis.

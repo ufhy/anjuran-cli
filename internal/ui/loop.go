@@ -96,12 +96,24 @@ type Session struct {
 	res      *engine.Result
 	rs       []ranked
 	prepared bool
+
+	// start adalah baris yang tersorot saat sesi dibuka. Bernilai -1 berarti
+	// baris terakhir — dipakai saat sesi dibuka dengan panah ATAS, supaya
+	// arah tekanannya terasa sebagaimana mestinya.
+	start int
+}
+
+// StartAt menentukan baris yang tersorot saat sesi dibuka.
+func (s *Session) StartAt(i int) *Session {
+	s.start = i
+	return s
 }
 
 // Session membangun sesi interaktif dari hasil preflight, sehingga kandidat
 // tidak dihitung dua kali.
 func (p *Preflight) Session(term Terminal, rend *Renderer) *Session {
 	return &Session{
+		start:    0,
 		eng:      p.eng,
 		dyn:      p.dyn,
 		term:     term,
@@ -144,7 +156,13 @@ func (s *Session) Run() (State, Outcome, error) {
 		return apply(s.st, res, rs[0].cand), Accepted, nil
 	}
 
-	selected := 0
+	selected := s.start
+	if selected < 0 {
+		selected = len(rs) - 1
+	}
+	if selected >= len(rs) {
+		selected = 0
+	}
 	defer s.rend.Clear()
 
 	for {
@@ -267,7 +285,8 @@ func (s *Session) draw(rs []ranked, selected int) error {
 	rows := s.rend.MaxRows()
 	start, rel := window(len(rs), selected, rows)
 	end := min(start+rows, len(rs))
-	return s.rend.Render(items(rs[start:end]), rel, len(rs))
+	// rel menyorot baris di layar; selected+1 melaporkan posisi sebenarnya.
+	return s.rend.Render(items(rs[start:end]), rel, selected+1, len(rs))
 }
 
 func min(a, b int) int {

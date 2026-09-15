@@ -139,8 +139,16 @@ UF_AUTO=1 eval "$(uf init zsh)"
 ```
 
 Ketik `git` lalu **spasi** — dropdown muncul tanpa menekan apa pun. Huruf
-berikutnya menyaringnya, Tab masuk ke mode memilih, Enter menjalankan perintah
-seperti biasa.
+berikutnya menyaringnya.
+
+Kotak yang muncul sendiri sengaja tidak menyorot baris mana pun: kamu masih
+mengetik, dan Enter di situ menjalankan perintah. Tekan **panah** untuk masuk
+ke mode memilih — panah bawah mulai dari baris pertama, panah atas dari yang
+terakhir. Tab juga bisa. Saat kotak tertutup, panah tetap menjadi riwayat
+perintah seperti biasa.
+
+Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
+sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 
 Pemicunya spasi, bukan setiap huruf. Sebelum sebuah kata selesai, isi dropdown
 hanya akan berganti-ganti mengikuti huruf yang belum tentu selesai — dan

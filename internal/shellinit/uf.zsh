@@ -17,10 +17,11 @@ _uf_widget() {
   setopt local_options no_ksh_arrays
 
   local out head body status_word new_cursor
+  local select_from=${1:-first}
 
   # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
   out="$(command uf widget --line "$BUFFER" --cursor "$CURSOR" \
-    --prev-lines "${_uf_lines:-0}" 2>/dev/null)"
+    --prev-lines "${_uf_lines:-0}" --select "$select_from" 2>/dev/null)"
   _uf_lines=0
 
   if [[ -z $out ]]; then
@@ -149,6 +150,64 @@ if [[ -n ${UF_AUTO:-} ]]; then
   if [[ -n ${keymaps[(r)viins]} ]]; then
     bindkey -M viins " " _uf_space
   fi
+
+  # Panah membuka mode memilih selagi kotak terbuka.
+  #
+  # Kotak yang muncul sendiri sengaja tidak menyorot baris mana pun: pengguna
+  # masih mengetik, dan Enter di situ menjalankan perintah. Tetapi menu yang
+  # terlihat jelas mengundang untuk ditekan panahnya, jadi panah itulah yang
+  # memindahkannya ke mode memilih — bukan Tab, yang harus dicari tahu dulu.
+  #
+  # Saat kotak tertutup, panah tetap menjadi riwayat perintah. Mengambil alih
+  # tombol itu tanpa syarat akan merampas fungsi yang jauh lebih sering dipakai.
+  typeset -gA _uf_orig_key
+
+  _uf_bind_arrow() {
+    local wrapper=$1 out orig
+    shift
+    for key in "$@"; do
+      [[ -n $key ]] || continue
+      out="$(bindkey "$key")"
+      orig=${out##* }
+      if [[ -n $orig && $orig != undefined-key && -z ${_uf_orig_key[$wrapper]} ]]; then
+        _uf_orig_key[$wrapper]=$orig
+      fi
+      bindkey "$key" "$wrapper"
+      [[ -n ${keymaps[(r)viins]} ]] && bindkey -M viins "$key" "$wrapper"
+    done
+  }
+
+  _uf_down() {
+    if (( _uf_lines )); then
+      _uf_widget first
+      return
+    fi
+    if [[ -n ${_uf_orig_key[_uf_down]} ]]; then
+      zle "${_uf_orig_key[_uf_down]}"
+    else
+      zle .down-line-or-history
+    fi
+  }
+  zle -N _uf_down
+
+  _uf_up() {
+    if (( _uf_lines )); then
+      # Dibuka dari baris TERAKHIR, supaya arah tekanannya terasa benar.
+      _uf_widget last
+      return
+    fi
+    if [[ -n ${_uf_orig_key[_uf_up]} ]]; then
+      zle "${_uf_orig_key[_uf_up]}"
+    else
+      zle .up-line-or-history
+    fi
+  }
+  zle -N _uf_up
+
+  # Terminal mengirim urutan yang berbeda tergantung mode keypad, jadi keduanya
+  # dipasang; terminfo dipakai bila tersedia.
+  _uf_bind_arrow _uf_down "^[[B" "^[OB" "${terminfo[kcud1]}"
+  _uf_bind_arrow _uf_up   "^[[A" "^[OA" "${terminfo[kcuu1]}"
 
   _uf_delete() {
     zle .backward-delete-char

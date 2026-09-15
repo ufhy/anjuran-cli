@@ -119,10 +119,16 @@ func (r *Renderer) MaxRows() int {
 	return n
 }
 
-// Render menggambar items dengan baris ke-selected disorot. total adalah
-// jumlah kandidat sebenarnya, dipakai untuk menampilkan sisa yang tersembunyi.
-func (r *Renderer) Render(items []Item, selected, total int) error {
-	lines := r.compose(items, selected, total)
+// Render menggambar items dengan baris ke-selected disorot.
+//
+// selected adalah indeks di dalam items — yaitu di dalam jendela yang terlihat —
+// sedangkan position adalah nomor urut sebenarnya di seluruh daftar, dimulai
+// dari 1. Keduanya dipisah karena daftar bisa tergulung: yang disorot adalah
+// baris di layar, tetapi yang dilaporkan harus posisi sesungguhnya. Menyamakan
+// keduanya membuat penghitung salah pada setiap daftar yang lebih panjang dari
+// layar. position bernilai 0 berarti belum ada yang terpilih.
+func (r *Renderer) Render(items []Item, selected, position, total int) error {
+	lines := r.compose(items, selected, position, total)
 
 	// Pastikan ada ruang di bawah prompt SEBELUM posisi kursor disimpan.
 	// Bila terminal ikut menggulung, penggulungan terjadi di sini, sehingga
@@ -234,7 +240,7 @@ func (r *Renderer) EchoBackspace() error {
 }
 
 // compose membentuk seluruh baris dropdown sebagai string siap kirim.
-func (r *Renderer) compose(items []Item, selected, total int) []string {
+func (r *Renderer) compose(items []Item, selected, position, total int) []string {
 	if len(items) == 0 {
 		return nil
 	}
@@ -259,7 +265,7 @@ func (r *Renderer) compose(items []Item, selected, total int) []string {
 	for i, it := range items {
 		lines = append(lines, r.boxedRow(it, nameW, descW, inner, i == selected))
 	}
-	lines = append(lines, r.bottomBorder(inner, selected, total))
+	lines = append(lines, r.bottomBorder(inner, position, total))
 	return lines
 }
 
@@ -339,12 +345,12 @@ func (r *Renderer) boxedRow(it Item, nameW, descW, inner int, selected bool) str
 
 // bottomBorder menyisipkan penghitung posisi ke dalam garis bawah, sehingga
 // tidak memakan satu baris layar sendiri.
-func (r *Renderer) bottomBorder(inner, selected, total int) string {
+func (r *Renderer) bottomBorder(inner, position, total int) string {
 	// Saat belum ada yang terpilih — dropdown yang muncul sambil mengetik —
 	// yang bermakna hanyalah berapa banyak kandidatnya.
 	label := fmt.Sprintf(" %d ", total)
-	if selected >= 0 {
-		label = fmt.Sprintf(" %d/%d ", selected+1, total)
+	if position > 0 {
+		label = fmt.Sprintf(" %d/%d ", position, total)
 	}
 	if n := utf8.RuneCountInString(label); n+2 > inner {
 		label = ""
@@ -452,8 +458,8 @@ func (r *Renderer) Show(cands []engine.Candidate, min int) int {
 	}
 
 	// selected di luar rentang berarti tidak ada baris yang tersorot.
-	lines := r.compose(items, -1, len(cands))
-	if err := r.Render(items, -1, len(cands)); err != nil {
+	lines := r.compose(items, -1, 0, len(cands))
+	if err := r.Render(items, -1, 0, len(cands)); err != nil {
 		return 0
 	}
 	return len(lines)
