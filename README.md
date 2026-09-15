@@ -256,8 +256,8 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
 
    | Kejadian | Byte terkirim |
    |---|---|
-   | dropdown pertama kali digambar | 1.555 |
-   | pindah pilihan satu baris | 422 |
+   | dropdown pertama kali digambar | ~1.600 |
+   | pindah pilihan satu baris | ~430 |
    | render dengan isi identik | 4 |
 
    Garis bingkai tidak pernah berubah antar penekanan tombol, jadi ia hanya

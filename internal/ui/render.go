@@ -54,6 +54,8 @@ const (
 	boxBottomRight = "╯"
 	boxHorizontal  = "─"
 	boxVertical    = "│"
+	boxTeeDown     = "┬"
+	boxTeeUp       = "┴"
 )
 
 // minBoxWidth adalah lebar terminal terkecil yang masih layak diberi bingkai.
@@ -245,14 +247,14 @@ func (r *Renderer) compose(items []Item, selected, position, total int) []string
 		return nil
 	}
 
-	nameW, descW, inner := r.columns(items)
+	c := r.columns(items)
 
 	// Mode sederhana tidak pernah berbingkai: terminal yang memerlukannya
 	// biasanya juga tidak menggambar karakter kotak dengan benar.
 	if r.simple || r.width < minBoxWidth {
 		lines := make([]string, 0, len(items)+1)
 		for i, it := range items {
-			lines = append(lines, r.plainRow(it, nameW, descW, i == selected))
+			lines = append(lines, r.plainRow(it, c, i == selected))
 		}
 		if hidden := total - len(items); hidden > 0 {
 			lines = append(lines, fmt.Sprintf("  … %d lagi", hidden))
@@ -261,107 +263,160 @@ func (r *Renderer) compose(items []Item, selected, position, total int) []string
 	}
 
 	lines := make([]string, 0, len(items)+2)
-	lines = append(lines, escDim+boxTopLeft+strings.Repeat(boxHorizontal, inner)+boxTopRight+escReset)
+	lines = append(lines, escDim+c.topBorder()+escReset)
 	for i, it := range items {
-		lines = append(lines, r.boxedRow(it, nameW, descW, inner, i == selected))
+		lines = append(lines, r.boxedRow(it, c, i == selected))
 	}
-	lines = append(lines, r.bottomBorder(inner, position, total))
+	lines = append(lines, escDim+c.bottomBorder(position, total)+escReset)
 	return lines
 }
 
-// columns menghitung lebar kolom nama, kolom keterangan, dan lebar dalam kotak.
-func (r *Renderer) columns(items []Item) (nameW, descW, inner int) {
-	for _, it := range items {
-		if n := utf8.RuneCountInString(it.Name); n > nameW {
-			nameW = n
-		}
-	}
-	// Kolom nama tidak boleh melahap seluruh lebar terminal.
-	if max := r.width / 2; nameW > max {
-		nameW = max
-	}
-
-	for _, it := range items {
-		if n := utf8.RuneCountInString(it.Description); n > descW {
-			descW = n
-		}
-	}
-
-	// marker + nama + jarak + keterangan, ditambah satu spasi di tiap tepi.
-	inner = 2 + nameW + 2 + descW + 2
-	if maxInner := r.width - 2; inner > maxInner {
-		inner = maxInner
-		if d := inner - (2 + nameW + 2 + 2); d >= 0 {
-			descW = d
-		} else {
-			descW = 0
-		}
-	}
-	return nameW, descW, inner
+// layout menyimpan lebar kedua kolom.
+//
+// Nama dan keterangan dipisah garis tegak, bukan sekadar dijajarkan dengan
+// spasi: pada daftar yang panjang nama-namanya, mata butuh satu titik tetap
+// untuk tahu di mana keterangan dimulai.
+type layout struct {
+	nameW int
+	descW int
+	// left dan right adalah lebar isi masing-masing sel, sudah termasuk
+	// satu spasi di tiap tepinya.
+	left, right int
+	// split bernilai false bila tidak ada keterangan sama sekali; di situ
+	// garis pemisah hanya akan memenggal kotak tanpa memisahkan apa pun.
+	split bool
 }
 
-// rowText menyusun isi satu baris tanpa warna, sudah rata kolom.
-func rowText(it Item, nameW, descW int, selected bool) (marker, name, pad, desc string) {
-	marker = "  "
-	if selected {
-		marker = "❯ "
+func (c layout) topBorder() string {
+	if !c.split {
+		return boxTopLeft + strings.Repeat(boxHorizontal, c.left) + boxTopRight
 	}
-	name = truncate(it.Name, nameW)
-	pad = strings.Repeat(" ", max(0, nameW-utf8.RuneCountInString(name)))
-	if descW > 3 && it.Description != "" {
-		desc = "  " + truncate(it.Description, descW-2)
-	}
-	return marker, name, pad, desc
+	return boxTopLeft + strings.Repeat(boxHorizontal, c.left) +
+		boxTeeDown + strings.Repeat(boxHorizontal, c.right) + boxTopRight
 }
 
-// plainRow menggambar satu baris tanpa bingkai dan tanpa warna.
-func (r *Renderer) plainRow(it Item, nameW, descW int, selected bool) string {
-	marker, name, pad, desc := rowText(it, nameW, descW, selected)
-	return marker + name + pad + desc
-}
-
-// boxedRow menggambar satu baris di dalam bingkai.
-func (r *Renderer) boxedRow(it Item, nameW, descW, inner int, selected bool) string {
-	marker, name, pad, desc := rowText(it, nameW, descW, selected)
-
-	plain := " " + marker + name + pad + desc
-	fill := strings.Repeat(" ", max(0, inner-utf8.RuneCountInString(plain)))
-	border := escDim + boxVertical + escReset
-
-	// Baris terpilih disorot SELEBAR isi kotak, bukan selebar teksnya. Inilah
-	// yang membuatnya terbaca sebagai pilihan aktif pada sebuah menu alih-alih
-	// sebagai sepotong teks yang kebetulan berwarna terbalik.
-	if selected {
-		return border + escReverse + plain + fill + escReset + border
-	}
-
-	color := colorFor(it.Kind, it.Dangerous)
-	body := color + " " + marker + highlight(name, it.Highlight, color) + pad + escReset
-	if desc != "" {
-		body += escDim + desc + escReset
-	}
-	return border + body + fill + border
-}
-
-// bottomBorder menyisipkan penghitung posisi ke dalam garis bawah, sehingga
-// tidak memakan satu baris layar sendiri.
-func (r *Renderer) bottomBorder(inner, position, total int) string {
-	// Saat belum ada yang terpilih — dropdown yang muncul sambil mengetik —
-	// yang bermakna hanyalah berapa banyak kandidatnya.
+// bottomBorder menyisipkan penghitung ke dalam garis bawah, di ujung kanan,
+// sehingga tidak memakan satu baris layar untuk dirinya sendiri.
+func (c layout) bottomBorder(position, total int) string {
 	label := fmt.Sprintf(" %d ", total)
 	if position > 0 {
 		label = fmt.Sprintf(" %d/%d ", position, total)
 	}
-	if n := utf8.RuneCountInString(label); n+2 > inner {
+
+	tail := c.right
+	if !c.split {
+		tail = c.left
+	}
+	n := utf8.RuneCountInString(label)
+	if n+2 > tail {
 		label = ""
+		n = 0
 	}
-	left := 2
-	right := inner - left - utf8.RuneCountInString(label)
-	if right < 0 {
-		right = 0
+	right := strings.Repeat(boxHorizontal, tail-n-1) + label + boxHorizontal
+
+	if !c.split {
+		return boxBottomLeft + right + boxBottomRight
 	}
-	return escDim + boxBottomLeft + strings.Repeat(boxHorizontal, left) +
-		label + strings.Repeat(boxHorizontal, right) + boxBottomRight + escReset
+	return boxBottomLeft + strings.Repeat(boxHorizontal, c.left) +
+		boxTeeUp + right + boxBottomRight
+}
+
+// columns menghitung lebar kedua kolom agar muat di lebar terminal.
+func (r *Renderer) columns(items []Item) layout {
+	var c layout
+	for _, it := range items {
+		if n := utf8.RuneCountInString(it.Name); n > c.nameW {
+			c.nameW = n
+		}
+		if n := utf8.RuneCountInString(it.Description); n > c.descW {
+			c.descW = n
+		}
+	}
+	// Kolom nama tidak boleh melahap seluruh lebar terminal.
+	if max := r.width / 2; c.nameW > max {
+		c.nameW = max
+	}
+
+	// Sel kiri: spasi + penanda + nama + spasi.
+	c.left = 1 + 2 + c.nameW + 1
+	c.split = c.descW > 0
+
+	if !c.split {
+		if max := r.width - 2; c.left > max {
+			c.left = max
+		}
+		return c
+	}
+
+	// Sel kanan: spasi + keterangan + spasi, sisa lebar setelah sel kiri
+	// dan garis pemisahnya.
+	avail := r.width - 2 - c.left - 1 - 2
+	if avail < 4 {
+		// Tidak cukup ruang untuk kolom keterangan yang berguna.
+		c.split = false
+		c.descW = 0
+		return c
+	}
+	if c.descW > avail {
+		c.descW = avail
+	}
+	c.right = c.descW + 2
+	return c
+}
+
+// rowCells menyusun isi kedua sel tanpa warna, sudah rata kolom.
+func rowCells(it Item, c layout, selected bool) (left, right string) {
+	marker := "  "
+	if selected {
+		marker = "❯ "
+	}
+	name := truncate(it.Name, c.nameW)
+	left = " " + marker + name + strings.Repeat(" ", max(0, c.nameW-utf8.RuneCountInString(name))) + " "
+
+	if !c.split {
+		return left, ""
+	}
+	desc := truncate(it.Description, c.descW)
+	right = " " + desc + strings.Repeat(" ", max(0, c.descW-utf8.RuneCountInString(desc))) + " "
+	return left, right
+}
+
+// plainRow menggambar satu baris tanpa bingkai dan tanpa warna.
+func (r *Renderer) plainRow(it Item, c layout, selected bool) string {
+	left, right := rowCells(it, c, selected)
+	if right == "" {
+		return strings.TrimRight(left, " ")
+	}
+	return left + " " + strings.TrimRight(right, " ")
+}
+
+// boxedRow menggambar satu baris di dalam bingkai berkolom.
+func (r *Renderer) boxedRow(it Item, c layout, selected bool) string {
+	left, right := rowCells(it, c, selected)
+	edge := escDim + boxVertical + escReset
+
+	// Baris terpilih disorot SELEBAR isi kotak, garis pemisah ikut di
+	// dalamnya. Sorotan selebar teks saja terbaca sebagai potongan teks
+	// berwarna terbalik, bukan sebagai pilihan aktif pada sebuah menu.
+	if selected {
+		body := left
+		if c.split {
+			body += boxVertical + right
+		}
+		return edge + escReverse + body + escReset + edge
+	}
+
+	color := colorFor(it.Kind, it.Dangerous)
+	marker := left[:3] // spasi + penanda dua karakter
+	rest := left[3:]
+	name := strings.TrimRight(rest, " ")
+	pad := rest[len(name):]
+
+	row := edge + color + marker + highlight(name, it.Highlight, color) + escReset + pad
+	if c.split {
+		row += escDim + boxVertical + right + escReset
+	}
+	return row + edge
 }
 
 // highlight menebalkan rune yang cocok dengan kueri, lalu mengembalikan

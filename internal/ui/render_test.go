@@ -194,10 +194,17 @@ func TestBingkaiDigambar(t *testing.T) {
 	if !strings.Contains(last, boxBottomLeft) || !strings.Contains(last, boxBottomRight) {
 		t.Errorf("baris terakhir harus bingkai bawah, dapat %q", last)
 	}
+	// Dua garis tepi, ditambah satu pemisah kolom di tengah.
 	for _, l := range lines[1 : len(lines)-1] {
-		if strings.Count(stripStyles(l), boxVertical) != 2 {
-			t.Errorf("baris isi harus diapit dua garis tegak, dapat %q", stripStyles(l))
+		if n := strings.Count(stripStyles(l), boxVertical); n != 3 {
+			t.Errorf("baris isi harus punya dua tepi dan satu pemisah, dapat %d: %q", n, stripStyles(l))
 		}
+	}
+	if !strings.Contains(stripStyles(lines[0]), boxTeeDown) {
+		t.Errorf("bingkai atas harus memuat pertemuan kolom, dapat %q", stripStyles(lines[0]))
+	}
+	if !strings.Contains(stripStyles(lines[len(lines)-1]), boxTeeUp) {
+		t.Errorf("bingkai bawah harus memuat pertemuan kolom")
 	}
 }
 
@@ -426,5 +433,59 @@ func TestPenghitungMemakaiPosisiSebenarnya(t *testing.T) {
 	// Yang tersorot tetap baris kedua di layar.
 	if !strings.Contains(lines[2], escReverse) {
 		t.Error("baris kedua di layar seharusnya yang tersorot")
+	}
+}
+
+// Tanpa keterangan sama sekali, garis pemisah hanya akan memenggal kotak tanpa
+// memisahkan apa pun.
+func TestTanpaKeteranganJadiKolomTunggal(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	items := []Item{{Name: "fitur-a"}, {Name: "fitur-b"}}
+	lines := r.compose(items, 0, 1, 2)
+
+	for i, l := range lines {
+		if strings.Contains(stripStyles(l), boxTeeDown) || strings.Contains(stripStyles(l), boxTeeUp) {
+			t.Errorf("baris %d tidak boleh punya pemisah kolom: %q", i, stripStyles(l))
+		}
+	}
+	if n := strings.Count(stripStyles(lines[1]), boxVertical); n != 2 {
+		t.Errorf("baris isi hanya boleh punya dua tepi, dapat %d", n)
+	}
+}
+
+// Kolom keterangan yang terlalu sempit tidak berguna; lebih baik kembali ke
+// satu kolom daripada menampilkan potongan dua huruf.
+func TestKolomKeteranganTerlaluSempitDibuang(t *testing.T) {
+	items := []Item{{
+		Name:        "nama-subcommand-yang-panjang",
+		Description: "keterangan",
+	}}
+
+	// Pada lebar wajar, kolom keterangan masih berguna dan dipertahankan.
+	if c := NewRenderer(nil, 72, 24, false).columns(items); !c.split {
+		t.Error("kolom keterangan seharusnya muat di lebar 72")
+	}
+
+	// Pada terminal yang sangat sempit, sisanya tidak cukup untuk apa pun.
+	if c := NewRenderer(nil, 20, 24, false).columns(items); c.split {
+		t.Error("kolom keterangan yang tidak muat seharusnya dibuang")
+	}
+}
+
+// Garis pemisah ikut tersorot, supaya baris terpilih tetap terbaca sebagai
+// satu blok yang utuh.
+func TestPemisahIkutTersorot(t *testing.T) {
+	r := NewRenderer(nil, 80, 24, false)
+	lines := r.compose(sample(), 0, 1, 3)
+
+	baris := lines[1]
+	mulai := strings.Index(baris, escReverse)
+	if mulai < 0 {
+		t.Fatal("baris terpilih harus memakai reverse video")
+	}
+	selesai := strings.Index(baris[mulai:], escReset)
+	isi := baris[mulai+len(escReverse) : mulai+selesai]
+	if !strings.Contains(isi, boxVertical) {
+		t.Errorf("pemisah kolom harus berada di dalam sorotan: %q", isi)
 	}
 }
