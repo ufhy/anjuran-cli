@@ -90,6 +90,30 @@ Sebagian spec Fig praktis kosong karena isinya disusun saat runtime oleh
 deskripsi. Ada 11 perintah seperti itu: `composer`, `php`, `rails`, `drush`,
 `magento`, `kamal`, `task`, `z`, `mask`, `speedtest`, `create-video`.
 
+### Saat spec tidak punya jawaban
+
+Korpus Fig memuat 716 perintah. Sisanya — `gzip`, `awk`, `openssl`, perintah
+internal perusahaan, skrip apa pun di PATH — tidak ada di sana, dan ratusan spec
+yang ada pun hanya menyebutkan nama argumennya tanpa menyebut isinya dari mana.
+
+Di kedua keadaan itu uf melengkapi **nama berkas**, sebagaimana shell mana pun
+untuk perintah yang tidak dikenalnya. Diam total di situ salah: melengkapi path
+adalah yang paling sering dibutuhkan.
+
+### Syarat `whenFile`
+
+Banyak subcommand hanya bermakna di dalam proyek tertentu. `php artisan` hanya
+ada di proyek Laravel, dan menawarkannya di mana-mana membuat daftarnya
+berbohong tentang apa yang sebenarnya bisa dijalankan.
+
+```json
+{ "name": "artisan", "whenFile": "artisan" }
+```
+
+Entri itu hanya muncul bila berkas atau direktori bernama itu ada di direktori
+kerja. Berlaku untuk subcommand maupun suggestion, dan tidak menjalankan apa pun
+— hanya satu pemeriksaan berkas.
+
 Beberapa sumber dikerjakan uf sendiri tanpa menjalankan proses apa pun, dan
 karena itu tidak tunduk pada kebijakan generator:
 
@@ -305,7 +329,9 @@ Hanya `internal/tty/open_*.go` yang bergantung pada sistem operasi, dan isinya
 sebatas cara membuka perangkat terminal. Penguraian tombol, penyusunan dropdown,
 dan seluruh logika lain sama persis di ketiga platform.
 
-`internal/engine` murni: masukannya `(string, int)`, keluarannya struct. Tidak
+`internal/engine` hampir murni: masukannya `(string, int)`, keluarannya struct.
+Satu-satunya sentuhannya ke dunia luar adalah pemeriksaan berkas untuk
+`whenFile`, yang bisa diganti saat pengujian. Tidak
 menyentuh terminal, tidak punya state global, dan tidak mengeksekusi apa pun.
 Seluruh perilakunya teruji tanpa PTY, dan nantinya bisa dipakai ulang oleh editor
 atau language server.
@@ -478,6 +504,29 @@ Keluaran generator disimpan di disk, bukan di memori: `uf` adalah proses baru
 setiap kali Tab ditekan, jadi cache dalam memori tidak akan pernah terpakai
 sekali pun. Kuncinya mencakup direktori kerja, karena `git branch` menjawab
 berbeda di setiap repo.
+
+## Pengujian
+
+Selain uji unit per paket, ada **uji cakupan** di `internal/generator` yang
+menjalankan JALUR PENUH — engine, spec sungguhan, tambalan, template, dan
+generator — lalu memeriksa bahwa perintah yang benar-benar dipakai orang
+menghasilkan sesuatu:
+
+| Uji | Yang dijaga |
+|---|---|
+| `TestCakupanPerintahUmum` | ~75 perintah sehari-hari tidak diam |
+| `TestCakupanOpsi` | daftar opsi tersedia |
+| `TestCakupanBentukPath` | `~/`, `./`, `../`, `/abs/`, subdirektori |
+| `TestCakupanArgumenDinamis` | argumen dari tambalan buatan tangan |
+| `TestPerintahTanpaSpecTetapMelengkapiBerkas` | perintah asing tetap berguna |
+| `TestSyaratWhenFile` | entri bersyarat muncul di tempat yang tepat |
+| `TestSpecKosongYangDiketahui` | daftar kekosongan yang tersisa, agar terlihat |
+
+Uji ini lahir dari kegagalan berulang: bug yang dilaporkan pengguna berkali-kali
+lolos dari pengujian sebelumnya, karena skenarionya dipilih sendiri dan selalu
+yang sudah diketahui bekerja. Daftar perintahnya diambil dari yang dipakai
+sehari-hari, bukan dari yang mudah lulus — dan begitu ditulis, ia langsung
+menemukan enam perintah yang diam.
 
 ## Windows
 
