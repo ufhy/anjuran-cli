@@ -62,6 +62,13 @@ _uf_widget() {
   local out head body status_word new_cursor sisa
   local select_from=${1:-first}
 
+  # Bayangan disembunyikan selama dropdown terbuka: dua saran sekaligus hanya
+  # menambah kebisingan, dan teks setelah kursor mengganggu gambar kotaknya.
+  if (( $+functions[_uf_ghost_hapus] )); then
+    _uf_ghost_hapus
+    zle redisplay
+  fi
+
   _uf_alias
   # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
   out="$(command uf widget --line "$BUFFER" --cursor "$CURSOR" \
@@ -103,6 +110,11 @@ _uf_widget() {
 
   zle redisplay
   _uf_kembalikan "$sisa"
+
+  # Bayangan dihitung ulang untuk baris yang baru.
+  if (( $+functions[_uf_ghost_perbarui] )); then
+    _uf_ghost_perbarui
+  fi
 }
 
 # _uf_kembalikan mengembalikan tombol yang belum ditangani ke antrean masukan
@@ -114,12 +126,16 @@ _uf_kembalikan() {
   local hex=$1
   [[ -n $hex && $hex != 0 ]] || return 0
 
-  local esc=""
-  local i
+  local esc="" teks="" i
   for (( i = 1; i <= ${#hex}; i += 2 )); do
     esc+="\\x${hex[i,i+1]}"
   done
-  zle -U -- "${(e)$(printf '%s' \"$esc\")}"
+
+  # print tanpa -r menafsirkan \xHH, dan -v menaruh hasilnya ke variabel tanpa
+  # subshell. Substitusi perintah tidak dipakai: ia membuang newline di ujung,
+  # dan byte yang dikembalikan bisa berisi apa saja.
+  print -v teks -n -- "$esc"
+  [[ -n $teks ]] && zle -U -- "$teks"
 }
 
 zle -N _uf_widget
@@ -179,5 +195,83 @@ if [[ -n ${UF_AUTO:-} ]]; then
     bindkey -M viins " " _uf_spasi
     bindkey -M viins "/" _uf_garismiring
     bindkey -M viins "=" _uf_samadengan
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Saran dari riwayat (ghost text)
+#
+# Teks abu-abu yang melanjutkan ketikan berdasarkan perintah yang pernah
+# dijalankan. Untuk perintah panjang yang diulang setiap hari — kubectl logs
+# dengan namespace dan selector — ini lebih sering menolong daripada dropdown.
+#
+# Seluruhnya dikerjakan di dalam zsh, tanpa memanggil uf sama sekali: ia harus
+# diperbarui pada SETIAP ketikan, dan menumbuhkan proses di sana akan terasa
+# berat. uf hanya menggambar dropdown; riwayat sudah ada di dalam shell.
+#
+# Nyalakan dengan UF_GHOST=1. Bawaannya mati.
+# ---------------------------------------------------------------------------
+
+if [[ -n ${UF_GHOST:-} ]]; then
+  if (( $+functions[_zsh_autosuggest_bind_widgets] )) || [[ -n ${ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE:-} ]]; then
+    # zsh-autosuggestions sudah melakukan hal yang sama. Memasang keduanya
+    # membuat dua teks abu-abu bersaing memperebutkan POSTDISPLAY.
+    print -u2 "uf: zsh-autosuggestions terdeteksi; saran riwayat uf dilewati."
+  else
+
+  # Gaya teks bayangan. Warna 8 adalah abu-abu redup di hampir semua tema.
+  typeset -g _uf_ghost_style=${UF_GHOST_STYLE:-fg=8}
+
+  _uf_ghost_hapus() {
+    POSTDISPLAY=""
+    region_highlight=()
+  }
+
+  _uf_ghost_perbarui() {
+    _uf_ghost_hapus
+    (( $#BUFFER )) || return
+    # Hanya saat kursor di ujung: bayangan yang muncul di tengah baris
+    # menyesatkan, karena ia tidak menyambung apa yang sedang diedit.
+    (( CURSOR == $#BUFFER )) || return
+
+    # Karakter pola di dalam buffer dilolos, kalau tidak ia akan dibaca
+    # sebagai glob dan mencocokkan hal yang tidak diketik pengguna.
+    local prefix="${BUFFER//(#m)[\\()\[\]|*?~^#]/\\$MATCH}"
+    local saran="${history[(r)${prefix}*]}"
+
+    [[ -n $saran && $saran != $BUFFER ]] || return
+    POSTDISPLAY="${saran#$BUFFER}"
+    region_highlight=("$#BUFFER $(( $#BUFFER + $#POSTDISPLAY )) $_uf_ghost_style")
+  }
+
+  # Widget pengetikan dibungkus supaya bayangan ikut bergerak. Semuanya murni
+  # zsh, jadi tidak ada proses yang ditumbuhkan per ketikan.
+  _uf_ghost_insert() { zle .self-insert; _uf_ghost_perbarui }
+  _uf_ghost_hapus_mundur() { zle .backward-delete-char; _uf_ghost_perbarui }
+  zle -N self-insert _uf_ghost_insert
+  zle -N backward-delete-char _uf_ghost_hapus_mundur
+
+  # Panah kanan dan End menerima bayangan bila ada; kalau tidak, keduanya
+  # kembali menjadi pergerakan kursor biasa.
+  _uf_ghost_terima() {
+    if [[ -n $POSTDISPLAY ]] && (( CURSOR == $#BUFFER )); then
+      BUFFER="$BUFFER$POSTDISPLAY"
+      CURSOR=$#BUFFER
+      _uf_ghost_hapus
+      return
+    fi
+    zle .end-of-line
+  }
+  zle -N _uf_ghost_terima
+  bindkey "^[[C" _uf_ghost_terima
+  bindkey "^[OC" _uf_ghost_terima
+  bindkey "^E" _uf_ghost_terima
+  [[ -n ${terminfo[kcuf1]} ]] && bindkey "${terminfo[kcuf1]}" _uf_ghost_terima
+
+  # Bayangan harus hilang sebelum barisnya dijalankan, kalau tidak teksnya
+  # ikut terbaca sebagai bagian perintah oleh mata pengguna.
+  _uf_ghost_jalankan() { _uf_ghost_hapus; zle .accept-line }
+  zle -N accept-line _uf_ghost_jalankan
+
   fi
 fi

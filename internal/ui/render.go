@@ -94,6 +94,12 @@ type Renderer struct {
 	prev []string
 	// reserved adalah jumlah baris yang sudah kita amankan di bawah prompt.
 	reserved int
+	// echoed adalah jumlah KOLOM yang kita gemakan sendiri ke baris prompt.
+	//
+	// Dicatat karena shell tidak tahu tentangnya: ia masih mengira barisnya
+	// seperti saat sesi dibuka. Bila gema itu dibiarkan, penggambaran ulang
+	// milik shell dimulai dari kolom yang salah dan barisnya tampak berganda.
+	echoed int
 }
 
 // NewRenderer membuat renderer. width dan height adalah ukuran terminal.
@@ -230,13 +236,33 @@ func (r *Renderer) Clear() error {
 // Dropdown tidak memiliki baris prompt — shell yang memilikinya — sehingga
 // gema karakter dilakukan sendiri agar tidak perlu menggambar ulang prompt.
 func (r *Renderer) EchoRune(c rune) error {
+	r.echoed += runeWidth(c)
 	_, err := io.WriteString(r.w, string(c))
 	return err
 }
 
 // EchoBackspace menghapus satu karakter di baris prompt.
 func (r *Renderer) EchoBackspace() error {
+	if r.echoed > 0 {
+		r.echoed--
+	}
 	_, err := io.WriteString(r.w, "\b \b")
+	return err
+}
+
+// UnEcho menghapus seluruh karakter yang kita gemakan sendiri.
+//
+// Dipanggil sebelum sesi berakhir, supaya baris yang terlihat kembali persis
+// seperti yang terakhir digambar shell. Setelah itu shell menggambar ulang
+// dari buffer barunya dan hasilnya tepat — tanpa ini, gema kita dan gambar
+// shell saling menumpuk.
+func (r *Renderer) UnEcho() error {
+	if r.echoed <= 0 {
+		return nil
+	}
+	n := r.echoed
+	r.echoed = 0
+	_, err := io.WriteString(r.w, strings.Repeat("\b \b", n))
 	return err
 }
 

@@ -75,7 +75,8 @@ def siapkan_sandbox():
     return d
 
 
-def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True):
+def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost=False,
+             persiapan=()):
     """Jalankan satu skenario; periksa(teks_layar) mengembalikan None atau alasan gagal."""
     env = {
         "PATH": bindir + ":" + os.environ["PATH"],
@@ -87,8 +88,14 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True):
     try:
         s.tunggu(3.0)
         s.ketik('PROMPT="%% "\r', 0.6)
-        baris = 'UF_AUTO=1 eval "$(uf init zsh)"' if auto else 'eval "$(uf init zsh)"'
-        s.ketik(baris + "\r", 1.5)
+        env_awal = []
+        if auto:
+            env_awal.append("UF_AUTO=1")
+        if ghost:
+            env_awal.append("UF_GHOST=1")
+        s.ketik(" ".join(env_awal) + ' eval "$(uf init zsh)"\r', 1.5)
+        for baris in persiapan:
+            s.ketik(baris + "\r", 0.8)
         s.bersihkan_layar()
         for k in ketikan:
             s.ketik(k)
@@ -125,6 +132,19 @@ def gabung(*fns):
     return f
 
 
+# Baris yang dijalankan sebelum skenario, untuk mengisi riwayat perintah.
+PERSIAPAN = {
+    "bayangan melanjutkan dari riwayat": (
+        "echo kubectl logs -f pod-produksi --namespace produksi",
+    ),
+    "bayangan diterima panah kanan": (
+        "echo kubectl logs -f pod-produksi --namespace produksi",
+    ),
+    "bayangan hilang saat dropdown terbuka": (
+        "echo git checkout fitur-alpha",
+    ),
+}
+
 SKENARIO = [
     # (nama, ketikan, pemeriksa)
     ("spasi memunculkan kotak", [b"git", b" "], memuat("╭", "commit")),
@@ -158,6 +178,34 @@ SKENARIO = [
       b"\x15",                                             # Ctrl-U: bersihkan baris
       b"git", b" ", b"che", b"\t"],                        # ulangi awalan yang sama
      memuat("❯ cherry-pick")),
+
+    # Teks abu-abu yang melanjutkan ketikan dari perintah yang pernah
+    # dijalankan. Untuk perintah panjang yang diulang setiap hari, ini lebih
+    # sering menolong daripada dropdown.
+    ("bayangan melanjutkan dari riwayat",
+     [b"echo kubectl log"],
+     memuat("--namespace produksi")),
+
+    ("bayangan diterima panah kanan",
+     [b"echo kubectl log", b"\x1b[C"],
+     memuat("echo kubectl logs -f pod-produksi --namespace produksi")),
+
+    # Dua saran sekaligus hanya menambah kebisingan, dan teks setelah kursor
+    # mengganggu gambar kotaknya.
+    # Ketikan cepat tiba dalam satu bongkahan. Karakter yang menyusul setelah
+    # sesi menutup harus tetap sampai ke buffer — hilangnya terasa sebagai
+    # karakter yang kadang tidak muncul.
+    ("ketikan cepat tidak ada yang hilang",
+     [b"echo satu", b"dua", b"tiga"],
+     memuat("echo satuduatiga")),
+
+    ("ketikan cepat sesudah pemicu",
+     [b"echo", b" ", b"kubectl"],
+     memuat("echo kubectl")),
+
+    ("bayangan hilang saat dropdown terbuka",
+     [b"git", b" ", b"che"],
+     tanpa("fitur-alpha")),
 ]
 
 
@@ -175,9 +223,14 @@ def main():
     for nama, ketikan, periksa in SKENARIO:
         if saring and saring not in nama:
             continue
-        auto = "tanpa mode otomatis" not in nama
+        # Skenario bayangan dijalankan tanpa dropdown otomatis, supaya yang
+        # diuji benar-benar mekanismenya dan bukan interaksi keduanya.
+        auto = "tanpa mode otomatis" not in nama and "bayangan" not in nama
         cachedir = tempfile.mkdtemp(prefix="uf-cache-")
-        alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=auto)
+        ghost = "bayangan" in nama
+        persiapan = PERSIAPAN.get(nama, ())
+        alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir,
+                          auto=auto, ghost=ghost, persiapan=persiapan)
         if alasan is None:
             h.lulus += 1
             print(f"  lulus  {nama}")

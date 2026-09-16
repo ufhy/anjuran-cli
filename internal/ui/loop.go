@@ -162,6 +162,18 @@ type Session struct {
 // Leftover mengembalikan tombol yang belum ditangani sesi, bila ada.
 func (s *Session) Leftover() Leftover { return s.leftover }
 
+// selesai mengakhiri sesi, mengembalikan tombol yang mengakhirinya BESERTA
+// seluruh ketikan yang sudah telanjur terbaca.
+//
+// Ketikan cepat dan tempelan teks tiba dalam satu bongkahan. Tanpa
+// mengembalikannya, karakter yang menyusul di bongkahan yang sama hilang
+// bersama proses ini — dan itu terasa sebagai karakter yang kadang tidak
+// muncul, kegagalan yang jauh lebih mengganggu daripada dropdown yang menutup.
+func (s *Session) selesai(raw []byte, st State, out Outcome) (State, Outcome, error) {
+	s.leftover = append(append(Leftover(nil), raw...), s.term.Drain()...)
+	return st, out, nil
+}
+
 // StartAt menentukan baris yang tersorot saat sesi dibuka.
 func (s *Session) StartAt(i int) *Session {
 	s.start = i
@@ -223,7 +235,12 @@ func (s *Session) Run() (State, Outcome, error) {
 	if selected >= len(rs) {
 		selected = 0
 	}
-	defer s.rend.Clear()
+	defer func() {
+		// Urutannya penting: gema dihapus lebih dulu, baru kotaknya, supaya
+		// kursor kembali tepat ke tempat shell terakhir meninggalkannya.
+		s.rend.UnEcho()
+		s.rend.Clear()
+	}()
 
 	for {
 		if err := s.draw(rs, selected); err != nil {
@@ -241,14 +258,14 @@ func (s *Session) Run() (State, Outcome, error) {
 		switch key.Type {
 		case KeyEscape:
 			// Esc menutup dropdown dan berhenti di situ; itu artinya
-			// "batalkan saran", bukan "batalkan baris".
-			return s.st, Cancelled, nil
+			// "batalkan saran", bukan "batalkan baris". Ketikan yang telanjur
+			// terbaca tetap dikembalikan.
+			return s.selesai(nil, s.st, Cancelled)
 
 		case KeyCtrlC, KeyCtrlD:
 			// Keduanya punya arti bagi shell — membatalkan baris, menutup
 			// sesi — jadi diteruskan alih-alih ditelan.
-			s.leftover = key.Raw
-			return s.st, Cancelled, nil
+			return s.selesai(key.Raw, s.st, Cancelled)
 
 		case KeyEnter:
 			cand := rs[selected].cand
@@ -263,7 +280,7 @@ func (s *Session) Run() (State, Outcome, error) {
 					return s.st, Cancelled, err
 				}
 				if len(rs) == 0 {
-					return s.st, Accepted, nil
+					return s.selesai(nil, s.st, Accepted)
 				}
 				continue
 			}
@@ -284,7 +301,7 @@ func (s *Session) Run() (State, Outcome, error) {
 					return s.st, Cancelled, err
 				}
 				if len(rs) == 0 {
-					return s.st, Accepted, nil
+					return s.selesai(nil, s.st, Accepted)
 				}
 				continue
 			}
@@ -324,13 +341,12 @@ func (s *Session) Run() (State, Outcome, error) {
 					return s.st, Cancelled, err
 				}
 				if len(rs) == 0 {
-					return s.st, Accepted, nil
+					return s.selesai(nil, s.st, Accepted)
 				}
 				continue
 			}
 			if !s.typable {
-				s.leftover = key.Raw
-				return s.st, Accepted, nil
+				return s.selesai(key.Raw, s.st, Accepted)
 			}
 			s.insert(key.Rune)
 			if err := s.rend.EchoRune(key.Rune); err != nil {
@@ -350,13 +366,12 @@ func (s *Session) Run() (State, Outcome, error) {
 			} else if len(rs) == 0 {
 				// Tidak ada lagi yang cocok: tutup, tetapi pertahankan
 				// karakter yang sudah terlanjur diketik pengguna.
-				return s.st, Accepted, nil
+				return s.selesai(nil, s.st, Accepted)
 			}
 
 		case KeyBackspace:
 			if !s.typable || len(s.st.Line) == 0 {
-				s.leftover = key.Raw
-				return s.st, Accepted, nil
+				return s.selesai(key.Raw, s.st, Accepted)
 			}
 			s.deleteBack()
 			if err := s.rend.EchoBackspace(); err != nil {
@@ -365,22 +380,20 @@ func (s *Session) Run() (State, Outcome, error) {
 			if res, rs, selected, err = s.refresh(); err != nil {
 				return s.st, Cancelled, err
 			} else if len(rs) == 0 {
-				return s.st, Accepted, nil
+				return s.selesai(nil, s.st, Accepted)
 			}
 
 		case KeyLeft, KeyRight:
 			// Pergerakan kursor adalah urusan shell, bukan dropdown. Sesi
 			// ditutup dan tombolnya diteruskan, sehingga kursor tetap bergerak
 			// seperti biasa.
-			s.leftover = key.Raw
-			return s.st, Accepted, nil
+			return s.selesai(key.Raw, s.st, Accepted)
 
 		default:
 			// Tombol yang tidak ditangani menutup dropdown, lalu DIKEMBALIKAN
 			// ke shell. Menelannya membuat tombol seperti Ctrl-A atau Home
 			// terasa kadang tidak berfungsi.
-			s.leftover = key.Raw
-			return s.st, Accepted, nil
+			return s.selesai(key.Raw, s.st, Accepted)
 		}
 	}
 }

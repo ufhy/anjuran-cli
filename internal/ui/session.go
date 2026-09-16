@@ -27,6 +27,8 @@ type State struct {
 type Terminal interface {
 	ReadKey() (Key, error)
 	Size() (int, int)
+	// Drain mengembalikan byte yang sudah terbaca tetapi belum diolah.
+	Drain() []byte
 }
 
 // Key dan KeyType diekspor ulang agar paket ui tidak memaksa pemanggilnya

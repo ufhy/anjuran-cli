@@ -168,6 +168,28 @@ func (t *Terminal) readByteTimeout(d time.Duration) (byte, bool) {
 	}
 }
 
+// Drain mengambil seluruh byte yang SUDAH terbaca tetapi belum diolah.
+//
+// Terminal mengirim ketikan dalam bongkahan: mengetik cepat atau menempel teks
+// membuat banyak karakter tiba dalam satu pembacaan. Byte yang belum sempat
+// diolah harus dikembalikan ke shell saat sesi berakhir — kalau tidak, ia
+// hilang bersama proses ini, dan pengguna merasakannya sebagai karakter yang
+// kadang tidak muncul.
+func (t *Terminal) Drain() []byte {
+	var out []byte
+	for {
+		select {
+		case b, ok := <-t.bytes:
+			if !ok {
+				return out
+			}
+			out = append(out, b)
+		default:
+			return out
+		}
+	}
+}
+
 // ReadKey membaca satu tombol beserta byte aslinya.
 func (t *Terminal) ReadKey() (Key, error) {
 	t.raw = t.raw[:0]

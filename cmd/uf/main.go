@@ -64,6 +64,7 @@ Lingkungan:
   UF_SIMPLE     bila diisi, matikan warna dan sorotan
   UF_KEY        tombol pemicu, dibaca oleh skrip init
   UF_AUTO       bila diisi, dropdown muncul pada karakter pemicu
+  UF_GHOST      bila diisi, tampilkan saran dari riwayat sebagai teks abu-abu
   UF_CACHE_DIR  lokasi cache generator dan ingatan pilihan
 
 Generator menjalankan perintah sebagai efek samping mengetik, jadi

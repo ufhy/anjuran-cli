@@ -28,6 +28,16 @@ func (f *fakeTerm) ReadKey() (tty.Key, error) {
 
 func (f *fakeTerm) Size() (int, int) { return 80, 24 }
 
+// Drain mengembalikan tombol yang belum sempat dibaca, meniru ketikan yang
+// tiba dalam satu bongkahan.
+func (f *fakeTerm) Drain() []byte {
+	var out []byte
+	for ; f.i < len(f.keys); f.i++ {
+		out = append(out, f.keys[f.i].Raw...)
+	}
+	return out
+}
+
 func k(t tty.KeyType) tty.Key   { return tty.Key{Type: t} }
 func r(c rune) tty.Key          { return tty.Key{Type: tty.KeyRune, Rune: c} }
 func newEngine() *engine.Engine { return engine.New(spec.NewRegistry("../testdata/specs")) }
