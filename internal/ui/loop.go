@@ -352,7 +352,7 @@ func (s *Session) Run() (State, Outcome, error) {
 				// Direktori dibuka isinya: Tab memang berarti "lengkapi lagi",
 				// dan ini permintaan eksplisit — berbeda dari Enter, yang harus
 				// menutup supaya perintahnya bisa dijalankan.
-				if strings.HasSuffix(cand.Insert, "/") {
+				if cand.IsDir() {
 					if res, rs, err = s.recompute(); err != nil {
 						return s.st, Cancelled, err
 					}
@@ -439,7 +439,7 @@ func (s *Session) Run() (State, Outcome, error) {
 			// membuat keduanya bisa dipakai tanpa memilih: → untuk melihat isi
 			// lebih dalam, Enter untuk berhenti dan memakai path itu. Ikon di
 			// tepi kanan baris memberi tahu keduanya ada.
-			if selected >= 0 && strings.HasSuffix(rs[selected].cand.Insert, "/") {
+			if selected >= 0 && rs[selected].cand.IsDir() {
 				cand := rs[selected].cand
 				s.ingat(res, cand)
 				s.st = apply(s.st, res, cand)

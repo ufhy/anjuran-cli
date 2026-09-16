@@ -62,6 +62,10 @@ def siapkan_sandbox():
     # Bertingkat, supaya menelusuri punya tempat untuk TERUS turun — itulah
     # yang dulu terjadi tanpa diminta.
     os.makedirs(os.path.join(d, "proyek", "dalam", "lebih"), exist_ok=True)
+    # Folder BERSPASI: namanya terpecah jadi dua kata oleh shell sebelum uf
+    # melihatnya, dan disisipkan terkutip sesudahnya.
+    os.makedirs(os.path.join(d, "folder dengan spasi", "dalam sini"), exist_ok=True)
+    open(os.path.join(d, "folder dengan spasi", "isi.txt"), "w").close()
     for f in ["README.md", "catatan.txt", "data.json", "berkas dengan spasi.txt"]:
         open(os.path.join(d, f), "w").close()
     # Direktori yang BERISI, supaya menelusuri ke dalamnya punya sesuatu untuk
@@ -164,6 +168,27 @@ SKENARIO = [
     ("berkas berspasi terlolos", [b"cat", b" ", b"berkas\\ d"], memuat("berkas dengan spasi.txt")),
     ("direktori berakhir garis miring", [b"cd", b" ", b"berk"], memuat("berkas/")),
     ("menelusuri direktori", [b"ls", b" ", b"berkas/"], memuat("dalam-satu.txt")),
+    # Folder berspasi harus berperilaku sama persis dengan folder biasa:
+    # ditelusuri, diberi ikon, dan disisipkan terkutip.
+    ("folder berspasi tanpa kutip tetap muncul",
+     [b"cd", b" ", b"folder de"],
+     memuat("folder dengan spasi/")),
+    ("folder berspasi dapat ikon tombol",
+     [b"cd", b" ", b"folder de"],
+     memuat("\u2192 \u23ce")),
+    # Diperiksa lewat tempat mendaratnya, bukan tampilan: bila pengutipannya
+    # salah, cd memecah namanya jadi dua argumen dan gagal sama sekali.
+    ("Tab pada folder berspasi mengutipnya",
+     [b"cd", b" ", b"folder de", b"\t", b"\x1b", b"\r", b"pwd\r"],
+     gabung(memuat("/folder dengan spasi"),
+            tanpa("/folder dengan spasi/dalam sini"))),
+    ("folder berspasi bisa ditelusuri",
+     [b"cd", b" ", b"folder de", b"\t", b"\t", b"\r", b"\r", b"pwd\r"],
+     memuat("/folder dengan spasi/dalam sini")),
+    ("dua argumen terpisah tidak ikut disatukan",
+     [b"ls", b" ", b"berkas cat"],
+     gabung(memuat("catatan.txt"), tanpa("berkas/"))),
+
     # Folder punya dua tindakan; ikon di tepi kanan baris terpilih memberi
     # tahu keduanya ada, dan panah kanan benar-benar melakukannya.
     ("baris folder menampilkan ikon tombol",

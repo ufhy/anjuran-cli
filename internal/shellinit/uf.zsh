@@ -116,7 +116,12 @@ _uf_widget() {
       # ke dalam anaknya — dan bila anaknya tunggal, disisipkan lalu ditelusuri
       # lagi, turun terus sampai dasar tanpa pernah menawarkan cara berhenti.
       # Dengan "none", Enter berarti "cukup, pakai path ini".
-      if [[ $trigger == manual && $BUFFER == */ && -z $sisa ]]; then
+      #
+      # Kutip penutup dilepas dulu: nama berspasi disisipkan terkutip, sehingga
+      # "cd 'folder dengan spasi/'" berakhir dengan kutip, bukan garis miring.
+      # Tanpa ini folder berspasi tidak pernah bisa ditelusuri.
+      local _uf_ekor=${BUFFER%[\'\"]}
+      if [[ $trigger == manual && $_uf_ekor == */ && -z $sisa ]]; then
         zle redisplay
         _uf_widget none manual
         return

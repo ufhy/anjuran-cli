@@ -151,6 +151,19 @@ func Quote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
+// IsDir menjawab apakah kandidat ini sebuah direktori, yaitu sesuatu yang
+// masih bisa ditelusuri lebih dalam.
+//
+// Tidak cukup memeriksa Insert: nama berkas berspasi dikutip, sehingga
+// "folder dengan spasi/" disisipkan sebagai "\'folder dengan spasi/\'" dan
+// garis miringnya tidak lagi berada di ujung. Memeriksa Insert saja membuat
+// folder berspasi kehilangan seluruh perlakuan folder — tidak bisa ditelusuri,
+// dan tidak menampilkan petunjuk tombolnya.
+func (c Candidate) IsDir() bool {
+	return strings.HasSuffix(c.Name, "/") ||
+		strings.HasSuffix(strings.TrimRight(c.Insert, `'"`), "/")
+}
+
 // Result adalah jawaban lengkap engine untuk satu posisi kursor.
 type Result struct {
 	// Command adalah nama perintah yang sedang dilengkapi. Dibawa keluar
@@ -226,6 +239,29 @@ func (e *Engine) available(whenFile string) bool {
 // Complete adalah satu-satunya entry point paket ini.
 func (e *Engine) Complete(line string, cursor int) (*Result, error) {
 	l := parser.Parse(line, cursor)
+	res, err := e.hitung(l)
+	if err != nil {
+		return nil, err
+	}
+
+	// Nama berkas berspasi yang belum dikutip sudah dipecah shell menjadi
+	// beberapa kata. Bila penggabungannya masuk akal, seluruh perhitungan
+	// diulang di atas baris yang sudah disatukan.
+	lebar := e.lebarkan(l)
+	if lebar == nil {
+		return res, nil
+	}
+	res2, err := e.hitung(lebar)
+	if err != nil || !berkasDilengkapi(res2) {
+		// Penggabungan hanya sah bila posisi itu memang meminta nama berkas.
+		// "git commit -m pesan pan" kebetulan bisa cocok dengan sebuah berkas
+		// di disk, dan menggabungkannya di situ hanya merusak.
+		return res, nil
+	}
+	return res2, nil
+}
+
+func (e *Engine) hitung(l *parser.Line) (*Result, error) {
 	res := &Result{Prefix: l.Prefix}
 	res.ReplaceStart, res.ReplaceEnd = replaceRange(l)
 
@@ -267,6 +303,128 @@ func (e *Engine) Complete(line string, cursor int) (*Result, error) {
 	e.suggest(res, st, l.Prefix)
 	res.Candidates = dedup(res.Candidates)
 	return res, nil
+}
+
+// lebarkan memperluas prefix melintasi SPASI yang belum dikutip.
+//
+// "cd folder de" sudah dipecah shell menjadi dua kata sebelum uf melihatnya,
+// jadi yang dilengkapi hanya "de" dan nama seperti "folder dengan spasi/"
+// tidak pernah muncul. Padahal begitulah orang mengetiknya: tanda kutip
+// dipasang belakangan, kalau ingat — dan zsh sendiri melengkapinya.
+//
+// Perluasan hanya dilakukan bila memang MENGHASILKAN sesuatu: ada entri di
+// disk yang berawalan teks gabungan itu. Tanpa syarat itu "ls berkas catatan"
+// yang benar-benar dua argumen akan ikut digabung menjadi satu nama yang tidak
+// pernah ada.
+// Mengembalikan nil bila tidak ada yang layak digabung.
+func (e *Engine) lebarkan(l *parser.Line) *parser.Line {
+	// Token yang sudah dikutip tidak perlu diperluas, dan memperluasnya justru
+	// merusak kutipnya.
+	if l.CursorIndex < len(l.Tokens) {
+		t := l.Tokens[l.CursorIndex]
+		// Token terkutip sudah menyatakan batas namanya sendiri, dan token
+		// berawalan minus menyatakan dengan jelas bahwa ini bukan nama berkas.
+		if t.Quote != parser.QuoteNone || strings.HasPrefix(t.Value, "-") {
+			return nil
+		}
+	}
+
+	mulai := min(l.CursorIndex, len(l.Tokens))
+	terbaik, awal := "", 0
+	// Indeks 0 adalah nama perintah; ia tidak pernah ikut digabung.
+	for i := mulai - 1; i >= 1; i-- {
+		t := l.Tokens[i]
+		if t.IsSeparator || t.Quote != parser.QuoteNone || strings.HasPrefix(t.Value, "-") {
+			break
+		}
+		berikut := l.Cursor
+		if i+1 < len(l.Tokens) {
+			berikut = l.Tokens[i+1].Start
+		}
+		// Tepat satu spasi pemisah. Apa pun selain itu bukan nama berkas yang
+		// terpecah, melainkan dua kata yang memang berbeda.
+		if t.End > berikut || berikut > len(l.Raw) || l.Raw[t.End:berikut] != " " {
+			break
+		}
+		if gabung := l.Raw[t.Start:l.Cursor]; e.adaBerawalan(gabung) {
+			terbaik, awal = gabung, t.Start
+		}
+	}
+	if terbaik == "" {
+		return nil
+	}
+
+	// Token-token yang digabung diganti satu token tunggal yang mencakup
+	// seluruh rentangnya, sehingga sisa engine melihat satu nama berkas —
+	// persis seperti bila pengguna mengutipnya sejak awal.
+	gabungan := parser.Token{
+		Value: terbaik,
+		Start: awal,
+		End:   l.Tokens[mulai-1].End,
+	}
+	if mulai < len(l.Tokens) {
+		gabungan.End = l.Tokens[mulai].End
+	}
+	var tokens []parser.Token
+	for i, t := range l.Tokens {
+		if t.Start >= awal && i <= mulai {
+			continue
+		}
+		tokens = append(tokens, t)
+	}
+	sisip := len(tokens)
+	for i, t := range tokens {
+		if t.Start > gabungan.Start {
+			sisip = i
+			break
+		}
+	}
+	tokens = append(tokens[:sisip], append([]parser.Token{gabungan}, tokens[sisip:]...)...)
+
+	return &parser.Line{
+		Raw:         l.Raw,
+		Cursor:      l.Cursor,
+		Tokens:      tokens,
+		CursorIndex: sisip,
+		Prefix:      terbaik,
+	}
+}
+
+// berkasDilengkapi menjawab apakah posisi ini memang meminta nama berkas.
+func berkasDilengkapi(res *Result) bool {
+	for _, t := range res.Templates {
+		if t == "filepaths" || t == "folders" {
+			return true
+		}
+	}
+	return false
+}
+
+// adaBerawalan menjawab apakah ada entri di disk yang berawalan teks ini.
+func (e *Engine) adaBerawalan(prefix string) bool {
+	dir, base := filepath.Split(prefix)
+	akar := dir
+	if !filepath.IsAbs(akar) {
+		akar = filepath.Join(e.Dir, dir)
+	}
+	entri, err := os.ReadDir(akar)
+	if err != nil {
+		return false
+	}
+	base = strings.ToLower(base)
+	for _, en := range entri {
+		if strings.HasPrefix(strings.ToLower(en.Name()), base) {
+			return true
+		}
+	}
+	return false
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // state adalah posisi engine di dalam pohon spec setelah membaca seluruh

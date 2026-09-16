@@ -2,7 +2,6 @@ package ui
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/uf-cli/uf/internal/engine"
 )
@@ -138,7 +137,7 @@ func items(rs []ranked) []Item {
 // apa adanya — dan keduanya tombol yang berbeda. Menampilkan hanya satu ikon
 // di situ sama saja menyembunyikan setengah dari yang bisa dilakukan.
 func petunjuk(c engine.Candidate) string {
-	if strings.HasSuffix(c.Insert, "/") {
+	if c.IsDir() {
 		return "\u2192 \u23ce"
 	}
 	// Kandidat biasa hanya punya satu tindakan, dan ikon yang selalu sama di
