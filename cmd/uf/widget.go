@@ -42,6 +42,7 @@ func runWidget(args []string) int {
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
 	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first atau last")
 	alias := fs.String("alias", "", "pemekaran alias untuk kata pertama")
+	trigger := fs.String("trigger", "manual", "asal pemicu: manual (Tab) atau auto (karakter pemicu)")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -65,7 +66,8 @@ func runWidget(args []string) int {
 	// kembali ke baris asli sebelum diserahkan ke shell.
 	ax := newAliasExpansion(*line, byteCursor, *alias)
 	st, outcome, sisa, err := interact(eng,
-		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start)
+		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start,
+		*trigger != "auto")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
@@ -84,7 +86,7 @@ func runWidget(args []string) int {
 }
 
 // interact membuka terminal, menjalankan sesi, lalu memulihkan mode terminal.
-func interact(eng *engine.Engine, st ui.State, start int) (ui.State, ui.Outcome, ui.Leftover, error) {
+func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State, ui.Outcome, ui.Leftover, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	// Ingatan pilihan disimpan di disk: setiap penekanan tombol pemicu adalah
@@ -96,7 +98,7 @@ func interact(eng *engine.Engine, st ui.State, start int) (ui.State, ui.Outcome,
 	if err != nil {
 		return st, ui.Cancelled, nil, err
 	}
-	if out, outcome, done := pre.Immediate(); done {
+	if out, outcome, done := pre.Manual(manual).Immediate(manual); done {
 		return out, outcome, nil, nil
 	}
 

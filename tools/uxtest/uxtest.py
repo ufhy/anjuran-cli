@@ -59,6 +59,7 @@ def siapkan_sandbox():
     d = tempfile.mkdtemp(prefix="uf-ux-")
     os.makedirs(os.path.join(d, "berkas"), exist_ok=True)
     os.makedirs(os.path.join(d, "berkas-lain"), exist_ok=True)
+    os.makedirs(os.path.join(d, "proyek", "dalam"), exist_ok=True)
     for f in ["README.md", "catatan.txt", "data.json", "berkas dengan spasi.txt"]:
         open(os.path.join(d, f), "w").close()
     # Direktori yang BERISI, supaya menelusuri ke dalamnya punya sesuatu untuk
@@ -202,6 +203,23 @@ SKENARIO = [
     ("ketikan cepat sesudah pemicu",
      [b"echo", b" ", b"kubectl"],
      memuat("echo kubectl")),
+
+    # Enter harus MENERIMA lalu menutup, kalau tidak perintahnya tidak pernah
+    # bisa dijalankan: setiap Enter hanya turun satu tingkat lagi.
+    ("cd bisa dijalankan",
+     [b"cd", b" ", b"proy", b"\r", b"\r", b"pwd\r"],
+     memuat("/proyek")),
+
+    # Pemicu otomatis tidak boleh menyisipkan sendiri, meski kandidatnya
+    # tinggal satu: ia mengubah baris perintah tanpa diminta.
+    ("pemicu otomatis tidak menyisipkan sendiri",
+     [b"cd", b" ", b"proy"],
+     gabung(memuat("proyek/"), tanpa("cd proyek/"))),
+
+    # Tab memang berarti "lengkapi lagi", jadi di sana menelusuri wajar.
+    ("Tab pada direktori membuka isinya",
+     [b"cd", b" ", b"proy", b"\t"],
+     memuat("dalam")),
 
     ("bayangan hilang saat dropdown terbuka",
      [b"git", b" ", b"che"],

@@ -61,18 +61,29 @@ _uf_widget() {
 
   local out head body status_word new_cursor sisa
   local select_from=${1:-first}
+  # Pemicu otomatis tidak pernah berarti "sisipkan yang ini"; hanya Tab yang
+  # berarti begitu.
+  local trigger=${2:-manual}
 
   # Bayangan disembunyikan selama dropdown terbuka: dua saran sekaligus hanya
   # menambah kebisingan, dan teks setelah kursor mengganggu gambar kotaknya.
   if (( $+functions[_uf_ghost_hapus] )); then
     _uf_ghost_hapus
-    zle redisplay
   fi
+
+  # Baris digambar ulang LEBIH DULU.
+  #
+  # Karakter pemicu baru saja disisipkan ke buffer, tetapi zsh belum
+  # menampilkannya — ia menggambar setelah widget selesai. Tanpa ini uf mulai
+  # menggambar dari kolom yang salah, dan karakter pemicunya tidak pernah
+  # terlihat.
+  zle redisplay
 
   _uf_alias
   # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
   out="$(command uf widget --line "$BUFFER" --cursor "$CURSOR" \
-    --select "$select_from" --alias "$_uf_alias_exp" 2>/dev/null)"
+    --select "$select_from" --trigger "$trigger" \
+    --alias "$_uf_alias_exp" 2>/dev/null)"
 
   if [[ -z $out ]]; then
     # uf tidak bisa menjalankan sesi, misalnya karena bukan terminal
@@ -96,6 +107,14 @@ _uf_widget() {
     ok)
       BUFFER=$body
       CURSOR=$new_cursor
+      # Tab yang menghasilkan sebuah direktori membuka isinya. Hanya untuk
+      # pemicu manual: Tab memang berarti "lengkapi lagi", sedangkan pemicu
+      # otomatis tidak boleh terus membuka kotak tanpa diminta.
+      if [[ $trigger == manual && $BUFFER == */ && -z $sisa ]]; then
+        zle redisplay
+        _uf_widget first manual
+        return
+      fi
       ;;
     none)
       # Tidak ada spec untuk perintah ini. Completion bawaan zsh masih jauh
@@ -174,7 +193,7 @@ if [[ -n ${UF_AUTO:-} ]]; then
     else
       zle .self-insert
     fi
-    _uf_widget
+    _uf_widget first auto
   }
 
   _uf_spasi()      { _uf_pemicu _uf_spasi }

@@ -308,11 +308,11 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 | Tombol | Aksi |
 |---|---|
 | ketik huruf | menyaring daftar secara langsung |
-| Tab | sisipkan awalan terpanjang yang sama; bila tidak ada, turun |
+| Tab | sisipkan awalan terpanjang yang sama; satu kandidat langsung disisipkan, dan direktori dibuka isinya |
 | Spasi | terima pilihan lalu buka konteks berikutnya |
 | panah bawah, Ctrl-N | turun |
 | Shift-Tab, panah atas, Ctrl-P | naik |
-| Enter | sisipkan pilihan; pada direktori, lanjut menelusuri ke dalamnya |
+| Enter | sisipkan pilihan lalu tutup — tekan Enter lagi untuk menjalankan |
 | Esc, Ctrl-C | batal, baris dibiarkan apa adanya |
 
 Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik shell:

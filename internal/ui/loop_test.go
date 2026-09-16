@@ -47,6 +47,7 @@ func run(t *testing.T, line string, keys ...tty.Key) (State, Outcome) {
 	t.Helper()
 	term := &fakeTerm{keys: keys}
 	s := NewSession(newEngine(), term, discard(), State{Line: line, Cursor: len(line)})
+	s.manual = true
 	st, out, err := s.Run()
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -306,7 +307,7 @@ func TestKandidatDinamisTunggalLangsungDisisipkan(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"fitur-unik"}}
 	p := prepare(t, "git checkout fitur-uni", dyn)
 
-	st, out, done := p.Immediate()
+	st, out, done := p.Immediate(true)
 	if !done || out != Accepted {
 		t.Fatalf("outcome = %v, done = %v; mau langsung disisipkan", out, done)
 	}
@@ -323,16 +324,14 @@ func candNamesOf(cs []engine.Candidate) []string {
 	return out
 }
 
-// Memilih direktori berarti sedang menelusuri, belum selesai memilih. Menutup
-// kotak di situ memaksa memulai lagi dari awal untuk setiap tingkat.
-func TestMemilihDirektoriMelanjutkan(t *testing.T) {
-	// Dua kandidat, supaya dropdown benar-benar terbuka: satu kandidat akan
-	// langsung disisipkan tanpa sesi.
+// Enter MENERIMA lalu menutup, juga untuk direktori.
+//
+// Sempat dibuat menelusuri lebih dalam, dan itu keliru: Enter tidak pernah
+// sampai ke shell, sehingga "cd proyek/" tidak bisa dijalankan sama sekali —
+// setiap Enter hanya turun satu tingkat lagi.
+func TestEnterPadaDirektoriTetapMenutup(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"internal/", "integrasi/"}}
-	term := &fakeTerm{keys: []tty.Key{
-		k(tty.KeyEnter), // pilih salah satu direktori
-		k(tty.KeyEscape),
-	}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyEnter)}}
 
 	p, err := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn, nil)
 	if err != nil {
@@ -342,11 +341,8 @@ func TestMemilihDirektoriMelanjutkan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Enter menyisipkan direktorinya lalu sesi TETAP berjalan, sehingga Esc
-	// setelahnya yang mengakhirinya.
-	if out != Cancelled {
-		t.Errorf("outcome = %v; sesi seharusnya lanjut setelah direktori dipilih", out)
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
 	}
 	if !strings.HasSuffix(st.Line, "/") {
 		t.Errorf("Line = %q, mau berakhir dengan direktori", st.Line)
@@ -624,7 +620,7 @@ func TestKandidatTunggalIkutDicatat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, done := p.Immediate(); !done {
+	if _, _, done := p.Immediate(true); !done {
 		t.Fatal("kandidat tunggal seharusnya langsung disisipkan")
 	}
 	if len(rec.dicatat) != 1 {
@@ -639,5 +635,52 @@ func TestTanpaIngatanTetapBerjalan(t *testing.T) {
 	}
 	if len(p.Candidates()) == 0 {
 		t.Error("tanpa ingatan, kandidat tetap harus ada")
+	}
+}
+
+// Satu kandidat: Tab berarti "lengkapi itu". Memutar pilihan di situ tidak
+// mengubah apa pun dan terasa seperti tombol yang mati.
+func TestTabDenganSatuKandidatMenyisipkan(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek.txt"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyTab)}}
+
+	p, err := Prepare(newEngine(), State{Line: "git add pro", Cursor: 11}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, out, err := p.Session(term, discard()).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != Accepted {
+		t.Fatalf("outcome = %v, mau Accepted", out)
+	}
+	if st.Line != "git add proyek.txt" {
+		t.Errorf("Line = %q, mau %q", st.Line, "git add proyek.txt")
+	}
+}
+
+// Pemicu otomatis tidak boleh menyisipkan sendiri meski kandidatnya tinggal
+// satu: ia mengubah baris perintah tanpa diminta, dan karakter yang diketik
+// sesudahnya menempel di tempat yang salah.
+func TestPemicuOtomatisTidakMenyisipkanSendiri(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek.txt"}}
+
+	p, err := Prepare(newEngine(), State{Line: "git add pro", Cursor: 11}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, done := p.Immediate(false); done {
+		t.Error("pemicu otomatis seharusnya menampilkan, bukan menyisipkan")
+	}
+
+	// Menekan tombol completion sendiri memang berarti "sisipkan itu".
+	p2, _ := Prepare(newEngine(), State{Line: "git add pro", Cursor: 11}, dyn, nil)
+	st, out, done := p2.Immediate(true)
+	if !done || out != Accepted {
+		t.Fatalf("Tab dengan satu kandidat seharusnya langsung menyisipkan; done=%v out=%v", done, out)
+	}
+	if st.Line != "git add proyek.txt" {
+		t.Errorf("Line = %q", st.Line)
 	}
 }

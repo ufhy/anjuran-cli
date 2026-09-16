@@ -37,6 +37,7 @@ type Preflight struct {
 	res    *engine.Result
 	rs     []ranked
 	st     State
+	manual bool
 }
 
 // Recall mengingat kandidat yang pernah dipilih pengguna.
@@ -106,13 +107,28 @@ func (p *Preflight) Prefix() string {
 	return p.res.Prefix
 }
 
+// Manual menandakan pengguna meminta completion dengan menekan tombolnya
+// sendiri, bukan sekadar mengetik karakter pemicu.
+func (p *Preflight) Manual(v bool) *Preflight {
+	p.manual = v
+	return p
+}
+
 // Immediate menangani kasus yang tidak memerlukan terminal. Nilai ketiga
 // bernilai false bila dropdown memang harus ditampilkan.
-func (p *Preflight) Immediate() (State, Outcome, bool) {
-	switch len(p.rs) {
-	case 0:
+//
+// manual menandakan pengguna MEMINTA completion — menekan Tab — dan bukan
+// sekadar mengetik karakter pemicu. Bedanya menentukan: menekan Tab dengan
+// satu kandidat memang berarti "sisipkan itu", sedangkan mengetik spasi tidak
+// pernah berarti demikian. Menyisipkan sendiri di sana mengubah baris perintah
+// tanpa diminta, dan karakter yang diketik sesudahnya menempel di tempat yang
+// salah.
+func (p *Preflight) Immediate(manual bool) (State, Outcome, bool) {
+	p.manual = manual
+	switch {
+	case len(p.rs) == 0:
 		return p.st, NoCandidates, true
-	case 1:
+	case len(p.rs) == 1 && manual:
 		if p.recall != nil {
 			p.recall.Record(recallKey(p.res), p.rs[0].cand.Name)
 		}
@@ -157,6 +173,10 @@ type Session struct {
 
 	// leftover menampung tombol yang harus dikembalikan ke shell.
 	leftover Leftover
+
+	// manual menandakan sesi dibuka karena pengguna menekan tombol completion,
+	// bukan karena mengetik karakter pemicu.
+	manual bool
 }
 
 // Leftover mengembalikan tombol yang belum ditangani sesi, bila ada.
@@ -185,6 +205,7 @@ func (s *Session) StartAt(i int) *Session {
 func (p *Preflight) Session(term Terminal, rend *Renderer) *Session {
 	return &Session{
 		start:    0,
+		manual:   p.manual,
 		eng:      p.eng,
 		dyn:      p.dyn,
 		recall:   p.recall,
@@ -220,11 +241,14 @@ func (s *Session) Run() (State, Outcome, error) {
 		}
 	}
 
-	switch len(rs) {
-	case 0:
+	switch {
+	case len(rs) == 0:
 		return s.st, NoCandidates, nil
-	case 1:
-		// Satu kandidat tidak perlu dropdown: langsung sisipkan.
+	case len(rs) == 1 && s.manual:
+		// Menekan tombol completion dengan satu kandidat memang berarti
+		// "sisipkan itu". Mengetik karakter pemicu tidak pernah berarti
+		// demikian, jadi di sana kandidatnya ditampilkan, bukan disisipkan.
+		s.ingat(res, rs[0].cand)
 		return apply(s.st, res, rs[0].cand), Accepted, nil
 	}
 
@@ -268,22 +292,16 @@ func (s *Session) Run() (State, Outcome, error) {
 			return s.selesai(key.Raw, s.st, Cancelled)
 
 		case KeyEnter:
+			// Enter MENERIMA lalu menutup, selalu.
+			//
+			// Sempat dibuat menelusuri lebih dalam saat yang dipilih sebuah
+			// direktori, dan itu keliru: Enter tidak pernah sampai ke shell,
+			// sehingga "cd proyek/" tidak bisa dijalankan sama sekali —
+			// setiap Enter hanya turun satu tingkat lagi. Telusur lanjut
+			// dilakukan dengan Tab, yang memang berarti "lengkapi lagi".
 			cand := rs[selected].cand
 			s.ingat(res, cand)
 			s.st = apply(s.st, res, cand)
-
-			// Memilih sebuah DIREKTORI berarti pengguna sedang menelusuri,
-			// belum selesai memilih. Menutup kotak di situ memaksa memulai
-			// lagi dari awal untuk setiap tingkat.
-			if menelusuri(cand) {
-				if res, rs, selected, err = s.refresh(); err != nil {
-					return s.st, Cancelled, err
-				}
-				if len(rs) == 0 {
-					return s.selesai(nil, s.st, Accepted)
-				}
-				continue
-			}
 			return s.st, Accepted, nil
 
 		case KeyTab:
@@ -304,6 +322,26 @@ func (s *Session) Run() (State, Outcome, error) {
 					return s.selesai(nil, s.st, Accepted)
 				}
 				continue
+			}
+			// Satu kandidat: Tab berarti "lengkapi itu". Memutar pilihan di
+			// situ tidak mengubah apa pun dan terasa seperti tombol yang mati.
+			if len(rs) == 1 {
+				cand := rs[0].cand
+				s.ingat(res, cand)
+				s.st = apply(s.st, res, cand)
+
+				// Direktori dibuka isinya: Tab memang berarti "lengkapi lagi",
+				// dan ini permintaan eksplisit — berbeda dari Enter, yang harus
+				// menutup supaya perintahnya bisa dijalankan.
+				if strings.HasSuffix(cand.Insert, "/") {
+					if res, rs, selected, err = s.refresh(); err != nil {
+						return s.st, Cancelled, err
+					}
+					if len(rs) > 0 {
+						continue
+					}
+				}
+				return s.st, Accepted, nil
 			}
 			selected = (selected + 1) % len(rs)
 
@@ -467,12 +505,6 @@ func hitungBackslash(s string) int {
 		n++
 	}
 	return n
-}
-
-// menelusuri menjawab apakah kandidat ini membawa pengguna lebih dalam alih-alih
-// menyelesaikan pilihannya.
-func menelusuri(c engine.Candidate) bool {
-	return strings.HasSuffix(c.Insert, "/") || strings.HasSuffix(c.Insert, "\\")
 }
 
 // refresh menghitung ulang kandidat setelah baris berubah.
