@@ -137,6 +137,14 @@ func (p *Preflight) Immediate(manual bool) (State, Outcome, bool) {
 	return p.st, Cancelled, false
 }
 
+// NoSelection membuka sesi TANPA ada yang tersorot.
+//
+// Dipakai saat menelusuri ke dalam sebuah direktori: isinya ditampilkan supaya
+// pengguna bisa melihat ada apa di sana, tetapi tidak ada yang dipilihkan
+// untuknya. Tanpa keadaan ini, menelusuri selalu menyorot anak pertama, dan
+// Enter — satu-satunya cara berhenti — justru turun satu tingkat lagi.
+const NoSelection = -2
+
 // Leftover adalah tombol yang mengakhiri sesi tetapi BUKAN urusan sesi.
 //
 // Dikembalikan ke shell alih-alih ditelan. Sebelumnya setiap tombol yang tidak
@@ -244,7 +252,7 @@ func (s *Session) Run() (State, Outcome, error) {
 	switch {
 	case len(rs) == 0:
 		return s.st, NoCandidates, nil
-	case len(rs) == 1 && s.manual:
+	case len(rs) == 1 && s.manual && s.start != NoSelection:
 		// Menekan tombol completion dengan satu kandidat memang berarti
 		// "sisipkan itu". Mengetik karakter pemicu tidak pernah berarti
 		// demikian, jadi di sana kandidatnya ditampilkan, bukan disisipkan.
@@ -253,10 +261,12 @@ func (s *Session) Run() (State, Outcome, error) {
 	}
 
 	selected := s.start
-	if selected < 0 {
+	switch {
+	case s.start == NoSelection:
+		selected = -1
+	case selected < 0:
 		selected = len(rs) - 1
-	}
-	if selected >= len(rs) {
+	case selected >= len(rs):
 		selected = 0
 	}
 	defer func() {
@@ -302,6 +312,12 @@ func (s *Session) Run() (State, Outcome, error) {
 			// sehingga "cd proyek/" tidak bisa dijalankan sama sekali —
 			// setiap Enter hanya turun satu tingkat lagi. Telusur lanjut
 			// dilakukan dengan Tab, yang memang berarti "lengkapi lagi".
+			// Tidak ada yang tersorot berarti pengguna sudah puas dengan
+			// barisnya sendiri — inilah cara berhenti setelah menelusuri ke
+			// dalam sebuah direktori.
+			if selected < 0 {
+				return s.selesai(nil, s.st, Accepted)
+			}
 			cand := rs[selected].cand
 			s.ingat(res, cand)
 			s.st = apply(s.st, res, cand)
@@ -337,10 +353,13 @@ func (s *Session) Run() (State, Outcome, error) {
 				// dan ini permintaan eksplisit — berbeda dari Enter, yang harus
 				// menutup supaya perintahnya bisa dijalankan.
 				if strings.HasSuffix(cand.Insert, "/") {
-					if res, rs, selected, err = s.refresh(); err != nil {
+					if res, rs, _, err = s.refresh(); err != nil {
 						return s.st, Cancelled, err
 					}
 					if len(rs) > 0 {
+						// Isinya ditampilkan, tidak dipilihkan: Tab lagi untuk
+						// masuk ke daftarnya, Enter untuk berhenti di sini.
+						selected = -1
 						continue
 					}
 				}
@@ -352,10 +371,14 @@ func (s *Session) Run() (State, Outcome, error) {
 			selected = (selected + 1) % len(rs)
 
 		case KeyUp, KeyShiftTab:
+			if selected < 0 {
+				selected = len(rs) - 1
+				break
+			}
 			selected = (selected - 1 + len(rs)) % len(rs)
 
 		case KeyPageDown:
-			selected = min(selected+s.rend.MaxRows(), len(rs)-1)
+			selected = min(max(selected, 0)+s.rend.MaxRows(), len(rs)-1)
 
 		case KeyPageUp:
 			selected = max(selected-s.rend.MaxRows(), 0)
@@ -546,7 +569,12 @@ func (s *Session) deleteBack() {
 // draw menggambar potongan daftar yang terlihat.
 func (s *Session) draw(rs []ranked, selected int) error {
 	rows := s.rend.MaxRows()
-	start, rel := window(len(rs), selected, rows)
+	// selected < 0 berarti belum ada yang dipilih: daftar digambar dari awal
+	// tanpa sorotan, dan penghitung hanya melaporkan jumlahnya.
+	start, rel := window(len(rs), max(selected, 0), rows)
+	if selected < 0 {
+		rel = -1
+	}
 	end := min(start+rows, len(rs))
 	// rel menyorot baris di layar; selected+1 melaporkan posisi sebenarnya.
 	return s.rend.Render(items(rs[start:end]), rel, selected+1, len(rs))

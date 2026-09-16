@@ -686,3 +686,76 @@ func TestPemicuOtomatisTidakMenyisipkanSendiri(t *testing.T) {
 		t.Errorf("Line = %q", st.Line)
 	}
 }
+
+// Sesi yang dibuka tanpa pilihan tidak menyisipkan apa pun saat Enter.
+//
+// Inilah cara BERHENTI setelah menelusuri ke dalam sebuah direktori. Dulu
+// isinya dibuka dengan anak pertama tersorot, sehingga Enter — satu-satunya
+// cara berhenti — justru turun satu tingkat lagi.
+func TestTanpaPilihanEnterMembiarkanBaris(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek/dalam/", "proyek/lebih/"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyEnter)}}
+
+	p, err := Prepare(newEngine(), State{Line: "cd proyek/", Cursor: 10}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, out, err := p.Session(term, discard()).StartAt(NoSelection).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
+	}
+	if st.Line != "cd proyek/" {
+		t.Errorf("Line = %q, mau tetap %q", st.Line, "cd proyek/")
+	}
+}
+
+// Kandidat tunggal pun tidak disisipkan sendiri saat dibuka tanpa pilihan:
+// menelusuri satu direktori yang isinya satu direktori lagi tidak boleh
+// menyeret turun tanpa diminta.
+func TestTanpaPilihanKandidatTunggalTidakDisisipkan(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek/dalam/"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyEnter)}}
+
+	p, err := Prepare(newEngine(), State{Line: "cd proyek/", Cursor: 10}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, _, err := p.Manual(true).Session(term, discard()).StartAt(NoSelection).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Line != "cd proyek/" {
+		t.Errorf("Line = %q, mau tetap %q", st.Line, "cd proyek/")
+	}
+}
+
+// Panah bawah dari keadaan tanpa pilihan menyorot baris PERTAMA, dan panah
+// atas menyorot yang terakhir — bukan melompat ke tengah karena indeksnya
+// negatif.
+func TestTanpaPilihanPanahMasukKeDaftar(t *testing.T) {
+	for _, u := range []struct {
+		nama string
+		key  tty.KeyType
+		mau  string
+	}{
+		{"bawah", tty.KeyDown, "cd proyek/dalam/"},
+		{"atas", tty.KeyUp, "cd proyek/lebih/"},
+	} {
+		t.Run(u.nama, func(t *testing.T) {
+			dyn := &fakeDynamic{names: []string{"proyek/dalam/", "proyek/lebih/"}}
+			term := &fakeTerm{keys: []tty.Key{k(u.key), k(tty.KeyEnter)}}
+
+			p, _ := Prepare(newEngine(), State{Line: "cd proyek/", Cursor: 10}, dyn, nil)
+			st, _, err := p.Session(term, discard()).StartAt(NoSelection).Run()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.Line != u.mau {
+				t.Errorf("Line = %q, mau %q", st.Line, u.mau)
+			}
+		})
+	}
+}

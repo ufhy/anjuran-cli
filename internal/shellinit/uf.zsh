@@ -110,9 +110,15 @@ _uf_widget() {
       # Tab yang menghasilkan sebuah direktori membuka isinya. Hanya untuk
       # pemicu manual: Tab memang berarti "lengkapi lagi", sedangkan pemicu
       # otomatis tidak boleh terus membuka kotak tanpa diminta.
+      #
+      # Dibuka TANPA ada yang tersorot. Sebelumnya isinya dibuka dengan anak
+      # pertama terpilih, sehingga menelusuri satu direktori langsung menyeret
+      # ke dalam anaknya — dan bila anaknya tunggal, disisipkan lalu ditelusuri
+      # lagi, turun terus sampai dasar tanpa pernah menawarkan cara berhenti.
+      # Dengan "none", Enter berarti "cukup, pakai path ini".
       if [[ $trigger == manual && $BUFFER == */ && -z $sisa ]]; then
         zle redisplay
-        _uf_widget first manual
+        _uf_widget none manual
         return
       fi
       ;;

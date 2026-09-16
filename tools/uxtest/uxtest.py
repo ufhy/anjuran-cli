@@ -59,7 +59,9 @@ def siapkan_sandbox():
     d = tempfile.mkdtemp(prefix="uf-ux-")
     os.makedirs(os.path.join(d, "berkas"), exist_ok=True)
     os.makedirs(os.path.join(d, "berkas-lain"), exist_ok=True)
-    os.makedirs(os.path.join(d, "proyek", "dalam"), exist_ok=True)
+    # Bertingkat, supaya menelusuri punya tempat untuk TERUS turun — itulah
+    # yang dulu terjadi tanpa diminta.
+    os.makedirs(os.path.join(d, "proyek", "dalam", "lebih"), exist_ok=True)
     for f in ["README.md", "catatan.txt", "data.json", "berkas dengan spasi.txt"]:
         open(os.path.join(d, f), "w").close()
     # Direktori yang BERISI, supaya menelusuri ke dalamnya punya sesuatu untuk
@@ -162,6 +164,19 @@ SKENARIO = [
     ("berkas berspasi terlolos", [b"cat", b" ", b"berkas\\ d"], memuat("berkas dengan spasi.txt")),
     ("direktori berakhir garis miring", [b"cd", b" ", b"berk"], memuat("berkas/")),
     ("menelusuri direktori", [b"ls", b" ", b"berkas/"], memuat("dalam-satu.txt")),
+    # Menelusuri direktori dulu menyeret turun tanpa henti: isinya dibuka
+    # dengan anak pertama tersorot, dan bila anaknya tunggal ia disisipkan lalu
+    # ditelusuri lagi, sampai dasar. Sekarang isinya ditampilkan tanpa ada yang
+    # dipilihkan, sehingga Enter berarti "cukup, pakai path ini".
+    ("isi direktori tampil tanpa dipilihkan",
+     [b"cd", b" ", b"pro", b"\t"],
+     gabung(memuat("proyek/dalam/"), tanpa("\u276f proyek/dalam/"))),
+    ("Enter berhenti di direktori yang sudah dipilih",
+     [b"cd", b" ", b"pro", b"\t", b"\r", b"\r", b"pwd\r"],
+     gabung(memuat("/proyek"), tanpa("/proyek/dalam"))),
+    ("Tab turun satu tingkat tiap tekan",
+     [b"cd", b" ", b"pro", b"\t", b"\t", b"\r", b"\r", b"pwd\r"],
+     gabung(memuat("/proyek/dalam"), tanpa("/proyek/dalam/lebih"))),
     ("branch git sungguhan", [b"git", b" ", b"checkout", b" "], memuat("fitur-alpha")),
     ("Tab menyisipkan awalan bersama", [b"git", b" ", b"checkout", b" ", b"fit", b"\t"],
      memuat("fitur-")),

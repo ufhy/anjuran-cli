@@ -40,7 +40,7 @@ func runWidget(args []string) int {
 	line := fs.String("line", "", "isi buffer shell")
 	cursor := fs.Int("cursor", -1, "posisi kursor")
 	unit := fs.String("cursor-unit", "rune", "satuan posisi kursor: rune, byte, atau utf16")
-	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first atau last")
+	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first, last, atau none")
 	alias := fs.String("alias", "", "pemekaran alias untuk kata pertama")
 	trigger := fs.String("trigger", "manual", "asal pemicu: manual (Tab) atau auto (karakter pemicu)")
 	specsDir := fs.String("specs", "", "direktori spec")
@@ -58,16 +58,23 @@ func runWidget(args []string) int {
 	eng := engine.New(newRegistry(dirs, *specsDir)).InDir(generator.CurrentDir())
 
 	start := 0
-	if *sel == "last" {
+	switch *sel {
+	case "last":
 		start = -1
+	case "none":
+		start = ui.NoSelection
 	}
+
+	// manual berarti "sisipkan kandidat tunggal tanpa bertanya". Menelusuri ke
+	// dalam direktori memakai --select none justru untuk BERHENTI menyisipkan
+	// sendiri, jadi di sana haknya dicabut walaupun pemicunya Tab.
+	manual := *trigger != "auto" && start != ui.NoSelection
 
 	// Perhitungan memakai bentuk yang sudah dimekarkan; hasilnya dipetakan
 	// kembali ke baris asli sebelum diserahkan ke shell.
 	ax := newAliasExpansion(*line, byteCursor, *alias)
 	st, outcome, sisa, err := interact(eng,
-		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start,
-		*trigger != "auto")
+		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start, manual)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1
