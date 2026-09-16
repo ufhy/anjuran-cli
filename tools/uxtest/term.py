@@ -120,6 +120,29 @@ class Layar:
         return "\n".join(self.baris())
 
 
+def potong_tak_lengkap(teks):
+    """Pisahkan teks menjadi (utuh, sisa) pada escape sequence yang terpotong."""
+    i = teks.rfind("\x1b")
+    if i < 0:
+        return teks, ""
+    ekor = teks[i:]
+
+    # OSC: ESC ] ... diakhiri BEL atau ST.
+    if ekor.startswith("\x1b]"):
+        if "\x07" in ekor or "\x1b\\" in ekor[2:]:
+            return teks, ""
+        return teks[:i], ekor
+    # CSI: ESC [ parameter lalu satu huruf penutup.
+    if ekor.startswith("\x1b["):
+        if re.match(r"\x1b\[[0-9;?]*[ -/]*[@-~]", ekor):
+            return teks, ""
+        return teks[:i], ekor
+    # ESC sendirian di ujung: penutupnya belum datang.
+    if len(ekor) == 1:
+        return teks[:i], ekor
+    return teks, ""
+
+
 # Kueri kemampuan terminal yang DITUNGGU jawabannya oleh shell modern.
 # Tanpa menjawabnya, fish dan powershell menggantung sebelum prompt muncul.
 _ST = "\x1b\\"
@@ -166,6 +189,15 @@ class Sesi:
         import termios
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
+    # _sisa menampung escape sequence yang TERPOTONG di ujung chunk.
+    #
+    # Satu pembacaan tidak dijamin berisi urutan yang utuh, dan menyerahkan
+    # potongan ke emulator membuat sisanya digambar sebagai teks biasa. Hook
+    # prompt kiro-cli mengirim OSC 697 pada setiap prompt, sehingga tanpa ini
+    # potongan seperti "=97;NewCmd=..." muncul di tengah baris dan setiap
+    # pengukuran layar jadi tidak bisa dipercaya.
+    _sisa = ""
+
     def tunggu(self, detik):
         akhir = time.time() + detik
         while time.time() < akhir:
@@ -178,7 +210,8 @@ class Sesi:
                 return
             if not chunk:
                 return
-            teks = chunk.decode(errors="replace")
+            teks = self._sisa + chunk.decode(errors="replace")
+            teks, self._sisa = potong_tak_lengkap(teks)
             self.layar.tulis(teks)
             balas = jawab_kueri(teks)
             if balas:
