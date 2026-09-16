@@ -759,3 +759,83 @@ func TestTanpaPilihanPanahMasukKeDaftar(t *testing.T) {
 		})
 	}
 }
+
+// Baris folder yang terpilih menampilkan petunjuk KEDUA tombolnya.
+//
+// Folder punya dua tindakan yang berbeda — masuk ke dalamnya, atau dipakai apa
+// adanya — dan tanpa petunjuk itu pengguna harus menebak tombolnya.
+func TestBarisFolderMenampilkanPetunjukTombol(t *testing.T) {
+	var buf strings.Builder
+	rend := NewRenderer(&buf, 80, 24, false)
+	err := rend.Render([]Item{
+		{Name: "proyek/", Hint: "→ ⏎"},
+		{Name: "catatan.txt"},
+	}, 0, 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "→ ⏎") {
+		t.Errorf("petunjuk tidak digambar:\n%s", buf.String())
+	}
+}
+
+// Petunjuk hanya muncul pada baris yang terpilih; ikon yang sama di setiap
+// baris berhenti menyampaikan apa pun.
+func TestPetunjukHanyaPadaBarisTerpilih(t *testing.T) {
+	var buf strings.Builder
+	rend := NewRenderer(&buf, 80, 24, false)
+	if err := rend.Render([]Item{
+		{Name: "proyek/", Hint: "→ ⏎"},
+		{Name: "lain/", Hint: "→ ⏎"},
+	}, 0, 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(buf.String(), "⏎"); n != 1 {
+		t.Errorf("petunjuk muncul %d kali, mau 1:\n%s", n, buf.String())
+	}
+}
+
+// Panah kanan MASUK ke dalam folder yang tersorot, lalu berhenti tanpa
+// memilihkan apa pun — sama seperti Tab.
+func TestPanahKananMasukKeFolder(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek/", "catatan.txt"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyRight), k(tty.KeyEnter)}}
+
+	p, err := Prepare(newEngine(), State{Line: "cd pro", Cursor: 6}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, out, err := p.Session(term, discard()).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
+	}
+	if st.Line != "cd proyek/" {
+		t.Errorf("Line = %q, mau %q", st.Line, "cd proyek/")
+	}
+}
+
+// Pada baris yang BUKAN folder, panah kanan tetap milik shell: menelannya
+// membuat pergerakan kursor terasa kadang tidak berfungsi.
+func TestPanahKananBukanFolderDikembalikan(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"catatan.txt", "catatan-lain.txt"}}
+	term := &fakeTerm{keys: []tty.Key{{Type: tty.KeyRight, Raw: []byte("\x1b[C")}}}
+
+	p, _ := Prepare(newEngine(), State{Line: "cat cat", Cursor: 7}, dyn, nil)
+	sesi := p.Session(term, discard())
+	st, out, err := sesi.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
+	}
+	if st.Line != "cat cat" {
+		t.Errorf("Line = %q, mau tidak berubah", st.Line)
+	}
+	if len(sesi.Leftover()) == 0 {
+		t.Error("panah kanan tidak dikembalikan ke shell")
+	}
+}

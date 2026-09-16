@@ -11,3 +11,6 @@
 # dinaikkan repo akan bertambah beberapa megabyte secara permanen. Direktori
 # ini dibangun sekali oleh pengembang dan ikut dikirim di paket rilis.
 /specs/
+
+# Cache bytecode Python dari tools/uxtest.
+__pycache__/

@@ -353,7 +353,7 @@ func (s *Session) Run() (State, Outcome, error) {
 				// dan ini permintaan eksplisit — berbeda dari Enter, yang harus
 				// menutup supaya perintahnya bisa dijalankan.
 				if strings.HasSuffix(cand.Insert, "/") {
-					if res, rs, _, err = s.refresh(); err != nil {
+					if res, rs, err = s.recompute(); err != nil {
 						return s.st, Cancelled, err
 					}
 					if len(rs) > 0 {
@@ -432,10 +432,31 @@ func (s *Session) Run() (State, Outcome, error) {
 				return s.selesai(nil, s.st, Accepted)
 			}
 
-		case KeyLeft, KeyRight:
-			// Pergerakan kursor adalah urusan shell, bukan dropdown. Sesi
-			// ditutup dan tombolnya diteruskan, sehingga kursor tetap bergerak
-			// seperti biasa.
+		case KeyRight:
+			// Panah kanan MASUK ke dalam folder yang sedang tersorot.
+			//
+			// Folder punya dua tindakan, dan memisahkannya ke dua tombol
+			// membuat keduanya bisa dipakai tanpa memilih: → untuk melihat isi
+			// lebih dalam, Enter untuk berhenti dan memakai path itu. Ikon di
+			// tepi kanan baris memberi tahu keduanya ada.
+			if selected >= 0 && strings.HasSuffix(rs[selected].cand.Insert, "/") {
+				cand := rs[selected].cand
+				s.ingat(res, cand)
+				s.st = apply(s.st, res, cand)
+				if res, rs, err = s.recompute(); err != nil {
+					return s.st, Cancelled, err
+				}
+				if len(rs) > 0 {
+					selected = -1
+					continue
+				}
+				return s.st, Accepted, nil
+			}
+			// Di baris yang bukan folder, pergerakan kursor tetap urusan
+			// shell: sesi ditutup dan tombolnya diteruskan.
+			return s.selesai(key.Raw, s.st, Accepted)
+
+		case KeyLeft:
 			return s.selesai(key.Raw, s.st, Accepted)
 
 		default:

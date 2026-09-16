@@ -2,6 +2,7 @@ package ui
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/uf-cli/uf/internal/engine"
 )
@@ -125,9 +126,25 @@ func items(rs []ranked) []Item {
 			Kind:        string(r.cand.Kind),
 			Dangerous:   r.cand.Dangerous,
 			Highlight:   r.match.Positions,
+			Hint:        petunjuk(r.cand),
 		}
 	}
 	return out
+}
+
+// petunjuk memilih ikon tombol yang ditampilkan pada baris terpilih.
+//
+// Folder punya DUA tindakan yang masuk akal — masuk ke dalamnya, atau dipakai
+// apa adanya — dan keduanya tombol yang berbeda. Menampilkan hanya satu ikon
+// di situ sama saja menyembunyikan setengah dari yang bisa dilakukan.
+func petunjuk(c engine.Candidate) string {
+	if strings.HasSuffix(c.Insert, "/") {
+		return "\u2192 \u23ce"
+	}
+	// Kandidat biasa hanya punya satu tindakan, dan ikon yang selalu sama di
+	// setiap baris berhenti menyampaikan apa pun — ia hanya memakan kolom
+	// keterangan yang jauh lebih berguna.
+	return ""
 }
 
 // window memilih potongan daftar yang terlihat sehingga baris terpilih selalu

@@ -164,6 +164,18 @@ SKENARIO = [
     ("berkas berspasi terlolos", [b"cat", b" ", b"berkas\\ d"], memuat("berkas dengan spasi.txt")),
     ("direktori berakhir garis miring", [b"cd", b" ", b"berk"], memuat("berkas/")),
     ("menelusuri direktori", [b"ls", b" ", b"berkas/"], memuat("dalam-satu.txt")),
+    # Folder punya dua tindakan; ikon di tepi kanan baris terpilih memberi
+    # tahu keduanya ada, dan panah kanan benar-benar melakukannya.
+    ("baris folder menampilkan ikon tombol",
+     [b"cd", b" "],
+     memuat("\u2192 \u23ce")),
+    ("ikon tidak muncul pada kandidat biasa",
+     [b"git", b" ", b"comm"],
+     gabung(memuat("commit"), tanpa("\u23ce"))),
+    ("panah kanan masuk ke folder",
+     [b"cd", b" ", b"pro", b"\x1b[B", b"\x1b[C", b"\r", b"\r", b"pwd\r"],
+     gabung(memuat("/proyek"), tanpa("/proyek/dalam"))),
+
     # Menelusuri direktori dulu menyeret turun tanpa henti: isinya dibuka
     # dengan anak pertama tersorot, dan bila anaknya tunggal ia disisipkan lalu
     # ditelusuri lagi, sampai dasar. Sekarang isinya ditampilkan tanpa ada yang

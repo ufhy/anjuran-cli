@@ -18,6 +18,13 @@ type Item struct {
 	Dangerous bool
 	// Highlight adalah indeks rune pada Name yang cocok dengan kueri.
 	Highlight []int
+	// Hint adalah petunjuk tombol yang digambar di tepi kanan baris, hanya
+	// pada baris yang sedang terpilih.
+	//
+	// Tanpa ini tidak ada yang memberi tahu bahwa sebuah folder bisa dimasuki
+	// DAN bisa dipakai apa adanya; keduanya tombol yang berbeda, dan menebak
+	// tombol adalah pekerjaan yang tidak seharusnya dibebankan ke pengguna.
+	Hint string
 }
 
 // Escape sequence yang dipakai. Sengaja dikumpulkan di satu tempat agar
@@ -349,6 +356,7 @@ func (c layout) bottomBorder(position, total int) string {
 // columns menghitung lebar kedua kolom agar muat di lebar terminal.
 func (r *Renderer) columns(items []Item) layout {
 	var c layout
+	hintW := 0
 	for _, it := range items {
 		if n := textWidth(it.Name); n > c.nameW {
 			c.nameW = n
@@ -356,15 +364,32 @@ func (r *Renderer) columns(items []Item) layout {
 		if n := textWidth(it.Description); n > c.descW {
 			c.descW = n
 		}
+		if n := textWidth(it.Hint); n > hintW {
+			hintW = n
+		}
 	}
 	// Kolom nama tidak boleh melahap seluruh lebar terminal.
 	if max := r.width / 2; c.nameW > max {
 		c.nameW = max
 	}
 
+	c.split = c.descW > 0
+
+	// Ruang untuk petunjuk tombol pada baris terpilih.
+	//
+	// Tanpa cadangan ini nama terpanjang mengisi kolomnya sampai habis, dan
+	// petunjuknya tidak pernah muat — justru pada daftar folder, satu-satunya
+	// tempat petunjuk itu diperlukan.
+	if hintW > 0 {
+		if c.split {
+			c.descW += hintW + 1
+		} else {
+			c.nameW += hintW + 1
+		}
+	}
+
 	// Sel kiri: spasi + penanda + nama + spasi.
 	c.left = 1 + 2 + c.nameW + 1
-	c.split = c.descW > 0
 
 	if !c.split {
 		if max := r.width - 2; c.left > max {
@@ -399,11 +424,37 @@ func rowCells(it Item, c layout, selected bool) (left, right string) {
 	left = " " + marker + name + strings.Repeat(" ", max(0, c.nameW-textWidth(name))) + " "
 
 	if !c.split {
+		if selected {
+			left = tempelPetunjuk(left, it.Hint)
+		}
 		return left, ""
 	}
 	desc := truncateWidth(it.Description, c.descW)
 	right = " " + desc + strings.Repeat(" ", max(0, c.descW-textWidth(desc))) + " "
+	if selected {
+		right = tempelPetunjuk(right, it.Hint)
+	}
 	return left, right
+}
+
+// tempelPetunjuk menaruh petunjuk tombol di tepi kanan sel, MENGGANTIKAN ruang
+// kosongnya.
+//
+// Lebar selnya tidak boleh berubah: sel inilah yang menentukan di mana bingkai
+// kanan digambar, dan satu kolom saja meleset sudah cukup membuat kotaknya
+// terlihat patah. Bila ruang kosongnya tidak cukup, petunjuknya yang dibuang —
+// bukan barisnya yang dibiarkan melebar.
+func tempelPetunjuk(sel, hint string) string {
+	if hint == "" {
+		return sel
+	}
+	isi := strings.TrimRight(sel, " ")
+	kosong := textWidth(sel) - textWidth(isi)
+	n := textWidth(hint)
+	if kosong < n+2 {
+		return sel
+	}
+	return isi + strings.Repeat(" ", kosong-n-1) + hint + " "
 }
 
 // plainRow menggambar satu baris tanpa bingkai dan tanpa warna.
