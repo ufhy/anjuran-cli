@@ -23,19 +23,24 @@ const EnvRekam = "ANJURAN_LOG"
 // terlihat di sini. Itu justru yang diinginkan: ia menjawab "apakah anjuran
 // yang menghapusnya" tanpa memuat apa pun dari layar pengguna selain gambar
 // kotaknya sendiri.
-func rekam(w io.Writer) io.Writer {
+// Nilai kembalian kedua menutup berkasnya, dan harus selalu dipanggil.
+//
+// Membiarkannya terbuka sampai proses keluar tampak aman di Unix, tetapi di
+// Windows berkas yang masih dipegang tidak bisa dihapus atau dipindahkan oleh
+// siapa pun — termasuk oleh pengguna yang ingin membersihkan rekamannya.
+func rekam(w io.Writer) (io.Writer, func()) {
 	path := os.Getenv(EnvRekam)
 	if path == "" {
-		return w
+		return w, func() {}
 	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		// Perekaman adalah alat bantu; kegagalannya tidak boleh menghalangi
 		// pekerjaan yang sebenarnya.
-		return w
+		return w, func() {}
 	}
 	fmt.Fprintf(f, "\n--- %s pid=%d ---\n", time.Now().Format("15:04:05.000"), os.Getpid())
-	return io.MultiWriter(w, &sebagaiTeks{f})
+	return io.MultiWriter(w, &sebagaiTeks{f}), func() { f.Close() }
 }
 
 // sebagaiTeks menulis byte mentah dalam bentuk yang bisa dibaca mata, supaya

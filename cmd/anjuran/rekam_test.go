@@ -35,7 +35,9 @@ func TestRekamMenulisEscapeSebagaiTeks(t *testing.T) {
 func TestRekamMatiTanpaEnv(t *testing.T) {
 	t.Setenv(EnvRekam, "")
 	var b strings.Builder
-	if got := rekam(&b); got != (&b) {
+	got, tutup := rekam(&b)
+	defer tutup()
+	if got != (&b) {
 		t.Error("tanpa ANJURAN_LOG, penulis harus dikembalikan apa adanya")
 	}
 }
@@ -45,10 +47,13 @@ func TestRekamMenulisKeBerkas(t *testing.T) {
 	t.Setenv(EnvRekam, path)
 
 	var b strings.Builder
-	w := rekam(&b)
+	w, tutup := rekam(&b)
 	if _, err := w.Write([]byte("halo\x1b[K")); err != nil {
 		t.Fatal(err)
 	}
+	// Ditutup sebelum berkasnya dibaca dan sebelum t.TempDir membersihkannya:
+	// Windows menolak menghapus berkas yang masih dipegang proses.
+	tutup()
 
 	isi, err := os.ReadFile(path)
 	if err != nil {
@@ -67,7 +72,31 @@ func TestRekamMenulisKeBerkas(t *testing.T) {
 func TestRekamGagalTidakMenghalangi(t *testing.T) {
 	t.Setenv(EnvRekam, filepath.Join(t.TempDir(), "tidak-ada", "a.log"))
 	var b strings.Builder
-	if got := rekam(&b); got != (&b) {
+	got, tutup := rekam(&b)
+	defer tutup()
+	if got != (&b) {
 		t.Error("kegagalan membuka berkas harus mengembalikan penulis apa adanya")
+	}
+}
+
+// Berkasnya harus benar-benar DITUTUP: di Windows berkas yang masih dipegang
+// tidak bisa dihapus oleh siapa pun, termasuk oleh pengguna yang ingin
+// membersihkan rekamannya.
+func TestRekamMenutupBerkasnya(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a.log")
+	t.Setenv(EnvRekam, path)
+
+	var b strings.Builder
+	w, tutup := rekam(&b)
+	if _, err := w.Write([]byte("halo")); err != nil {
+		t.Fatal(err)
+	}
+	tutup()
+
+	// Menghapusnya adalah cara paling langsung menanyakan "masih dipegang?" —
+	// dan di Windows itu satu-satunya cara yang benar-benar menjawabnya.
+	if err := os.Remove(path); err != nil {
+		t.Errorf("berkas rekaman masih dipegang sesudah ditutup: %v", err)
 	}
 }
