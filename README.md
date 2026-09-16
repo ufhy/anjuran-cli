@@ -228,6 +228,25 @@ seperti tidak pernah lewat uf.
 Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
 sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 
+### Saran dari riwayat
+
+```sh
+UF_GHOST=1 UF_AUTO=1 eval "$(uf init zsh)"
+```
+
+Teks abu-abu yang melanjutkan ketikanmu berdasarkan perintah yang pernah
+dijalankan. Untuk perintah panjang yang diulang setiap hari — `kubectl logs -f`
+dengan namespace dan selector — ini lebih sering menolong daripada dropdown.
+Panah kanan atau `Ctrl-E` menerimanya.
+
+Seluruhnya dikerjakan **di dalam zsh**, tanpa memanggil uf sama sekali: ia
+diperbarui pada setiap ketikan, dan menumbuhkan proses di sana akan terasa
+berat. Riwayat sudah ada di dalam shell; uf hanya menggambar dropdown.
+
+Bayangan disembunyikan selama dropdown terbuka — dua saran sekaligus hanya
+menambah kebisingan. Bila zsh-autosuggestions sudah terpasang, uf menyingkir
+dan memberi tahu: keduanya memperebutkan `POSTDISPLAY` yang sama.
+
 ### Mengingat pilihanmu
 
 Kandidat yang pernah kamu pilih untuk sebuah awalan akan tersorot lebih dulu di
