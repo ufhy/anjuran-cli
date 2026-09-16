@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/generator"
-	"github.com/uf-cli/uf/internal/recall"
-	"github.com/uf-cli/uf/internal/tty"
-	"github.com/uf-cli/uf/internal/ui"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/generator"
+	"github.com/ufhy/anjuran-cli/internal/recall"
+	"github.com/ufhy/anjuran-cli/internal/tty"
+	"github.com/ufhy/anjuran-cli/internal/ui"
 )
 
 // runWidget adalah mode interaktif yang dipanggil oleh integrasi shell.
@@ -52,7 +52,7 @@ func runWidget(args []string) int {
 
 	dirs, err := resolveSpecsDirs(*specsDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 	eng := engine.New(newRegistry(dirs, *specsDir)).InDir(generator.CurrentDir())
@@ -76,7 +76,7 @@ func runWidget(args []string) int {
 	st, outcome, sisa, err := interact(eng,
 		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start, manual)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 
@@ -97,7 +97,7 @@ func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	// Ingatan pilihan disimpan di disk: setiap penekanan tombol pemicu adalah
-	// proses uf yang baru, jadi ingatan dalam memori tidak akan pernah terpakai.
+	// proses anjuran yang baru, jadi ingatan dalam memori tidak akan pernah terpakai.
 	rec := recall.Open()
 	defer rec.Save()
 
@@ -154,7 +154,7 @@ func generatorTimeout() time.Duration {
 
 // simpleMode mematikan warna dan sorotan pada terminal yang terbatas.
 func simpleMode() bool {
-	if os.Getenv("UF_SIMPLE") != "" {
+	if os.Getenv("ANJURAN_SIMPLE") != "" {
 		return true
 	}
 	switch strings.ToLower(os.Getenv("TERM")) {

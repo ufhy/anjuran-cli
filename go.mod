@@ -1,4 +1,4 @@
-module github.com/uf-cli/uf
+module github.com/ufhy/anjuran-cli
 
 go 1.26.0
 

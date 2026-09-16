@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 func newTestEngine(t *testing.T) *Engine {

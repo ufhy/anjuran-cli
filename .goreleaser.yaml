@@ -1,4 +1,4 @@
-# Konfigurasi rilis uf.
+# Konfigurasi rilis anjuran.
 #
 # Paket rilis WAJIB memuat direktori specs/. Tanpa itu binary-nya berjalan
 # tetapi tidak menawarkan apa pun, karena specs/ dihasilkan mesin dan tidak
@@ -6,7 +6,7 @@
 
 version: 2
 
-project_name: uf
+project_name: anjuran
 
 before:
   hooks:
@@ -16,9 +16,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: uf
-    main: ./cmd/uf
-    binary: uf
+  - id: anjuran
+    main: ./cmd/anjuran
+    binary: anjuran
     env:
       - CGO_ENABLED=0
     goos: [linux, darwin, windows]
@@ -31,7 +31,7 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: uf
+  - id: anjuran
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -42,7 +42,7 @@ archives:
       - README.md
       - LICENSE
       - NOTICE
-      # specs/ diletakkan bersebelahan dengan binary; uf mencari di sana
+      # specs/ diletakkan bersebelahan dengan binary; anjuran mencari di sana
       # tanpa konfigurasi tambahan.
       #
       # Polanya "specs/**" dan BUKAN "specs/**/*": bentuk kedua mensyaratkan
@@ -56,42 +56,42 @@ archives:
         dst: extra
 
 nfpms:
-  - id: uf
-    package_name: uf
+  - id: anjuran
+    package_name: anjuran
     vendor: ufhy
-    homepage: https://github.com/uf-cli/uf
+    homepage: https://github.com/ufhy/anjuran-cli
     maintainer: ufhy <metallica.one@live.com>
     description: Autocomplete gaya Fig untuk shell, lintas platform.
     license: MIT
     formats: [deb, rpm, apk]
     bindir: /usr/bin
     contents:
-      # /usr/bin/uf mencari ../share/uf/specs, jadi jalur ini sudah dikenali
+      # /usr/bin/anjuran mencari ../share/anjuran/specs, jadi jalur ini sudah dikenali
       # tanpa variabel lingkungan apa pun.
       - src: specs
-        dst: /usr/share/uf/specs
+        dst: /usr/share/anjuran/specs
       - src: extra
-        dst: /usr/share/uf/extra
+        dst: /usr/share/anjuran/extra
       - src: NOTICE
-        dst: /usr/share/doc/uf/NOTICE
+        dst: /usr/share/doc/anjuran/NOTICE
 
 homebrew_casks:
-  - name: uf
+  - name: anjuran
     repository:
-      owner: uf-cli
+      owner: ufhy
       name: homebrew-tap
       token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
     # Manifest hanya didorong bila token tap tersedia; tanpa itu rilis
     # tetap berhasil, hanya tanpa pembaruan tap.
     skip_upload: '{{ if envOrDefault "TAP_GITHUB_TOKEN" "" }}false{{ else }}true{{ end }}'
-    homepage: https://github.com/uf-cli/uf
+    homepage: https://github.com/ufhy/anjuran-cli
     description: Autocomplete gaya Fig untuk shell, lintas platform
     license: MIT
     # Seluruh isi arsip dipentaskan di Caskroom; hanya binary-nya yang
     # di-symlink ke bin. Spec tetap bersebelahan dengan berkas aslinya, dan
-    # uf menemukannya karena symlink diselesaikan lebih dulu saat mencari.
+    # anjuran menemukannya karena symlink diselesaikan lebih dulu saat mencari.
     binaries:
-      - uf
+      - anjuran
     hooks:
       post:
         install: |
@@ -99,34 +99,34 @@ homebrew_casks:
             # Binary tanpa tanda tangan yang diunduh akan dikarantina Gatekeeper
             # dan menolak dijalankan. Atribut itu dilepas di sini.
             system_command "/usr/bin/xattr",
-                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/uf"]
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/anjuran"]
           end
     caveats: |
       Tambahkan satu baris ke berkas konfigurasi shell:
 
-        zsh         eval "$(uf init zsh)"
-        bash        eval "$(uf init bash)"
-        fish        uf init fish | source
-        PowerShell  uf init powershell | Out-String | Invoke-Expression
+        zsh         eval "$(anjuran init zsh)"
+        bash        eval "$(anjuran init bash)"
+        fish        anjuran init fish | source
+        PowerShell  anjuran init powershell | Out-String | Invoke-Expression
 
 scoops:
   - repository:
-      owner: uf-cli
+      owner: ufhy
       name: scoop-bucket
-    homepage: https://github.com/uf-cli/uf
+    homepage: https://github.com/ufhy/anjuran-cli
     description: Autocomplete gaya Fig untuk shell, lintas platform
     license: MIT
 
 winget:
-  - name: uf
+  - name: anjuran
     publisher: ufhy
     short_description: Autocomplete gaya Fig untuk shell, lintas platform
     license: MIT
-    homepage: https://github.com/uf-cli/uf
+    homepage: https://github.com/ufhy/anjuran-cli
     repository:
-      owner: uf-cli
+      owner: ufhy
       name: winget-pkgs
-      branch: "uf-{{ .Version }}"
+      branch: "anjuran-{{ .Version }}"
       token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
     # Manifest hanya didorong bila token tap tersedia; tanpa itu rilis
     # tetap berhasil, hanya tanpa pembaruan tap.
@@ -151,12 +151,12 @@ release:
   footer: |
     ## Pemasangan
 
-    Unduh arsip untuk platform kamu, letakkan `uf` di dalam PATH, dan biarkan
+    Unduh arsip untuk platform kamu, letakkan `anjuran` di dalam PATH, dan biarkan
     `specs/` bersebelahan dengannya. Lalu satu baris di berkas konfigurasi shell:
 
     | Shell | Baris |
     |---|---|
-    | zsh | `eval "$(uf init zsh)"` |
-    | bash | `eval "$(uf init bash)"` |
-    | fish | `uf init fish \| source` |
-    | PowerShell | `uf init powershell \| Out-String \| Invoke-Expression` |
+    | zsh | `eval "$(anjuran init zsh)"` |
+    | bash | `eval "$(anjuran init bash)"` |
+    | fish | `anjuran init fish \| source` |
+    | PowerShell | `anjuran init powershell \| Out-String \| Invoke-Expression` |

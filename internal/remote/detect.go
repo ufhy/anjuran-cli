@@ -64,7 +64,7 @@ func parseUname(out string) (Platform, error) {
 	return p, nil
 }
 
-// Installed menanyakan versi uf yang sudah terpasang di host.
+// Installed menanyakan versi anjuran yang sudah terpasang di host.
 //
 // Mengembalikan string kosong bila belum ada; itu bukan kondisi kesalahan,
 // melainkan keadaan yang justru diharapkan sebelum pemasangan pertama.

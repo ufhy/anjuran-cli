@@ -1,4 +1,4 @@
 {
   "name": "export",
-  "args": [{ "name": "variable", "isVariadic": true, "template": ["uf:env"] }]
+  "args": [{ "name": "variable", "isVariadic": true, "template": ["anjuran:env"] }]
 }

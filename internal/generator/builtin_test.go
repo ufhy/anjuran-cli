@@ -106,9 +106,9 @@ func TestHostsTanpaBerkasBukanError(t *testing.T) {
 }
 
 func TestEnv(t *testing.T) {
-	t.Setenv("UF_UJI_VARIABEL", "nilai")
+	t.Setenv("ANJURAN_UJI_VARIABEL", "nilai")
 	got := Env()
-	if !punya(got, "UF_UJI_VARIABEL") {
+	if !punya(got, "ANJURAN_UJI_VARIABEL") {
 		t.Error("variabel lingkungan tidak terbaca")
 	}
 	for _, v := range got {
@@ -172,10 +172,10 @@ func TestHistoryArgsTanpaPerintahKosong(t *testing.T) {
 
 func TestTemplateBawaanDikenali(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	t.Setenv("UF_UJI_TEMPLATE", "1")
+	t.Setenv("ANJURAN_UJI_TEMPLATE", "1")
 
 	got := FromTemplates([]string{TemplateEnv}, "", "", "")
-	if !punya(got, "UF_UJI_TEMPLATE") {
+	if !punya(got, "ANJURAN_UJI_TEMPLATE") {
 		t.Errorf("template %s tidak dikerjakan", TemplateEnv)
 	}
 }

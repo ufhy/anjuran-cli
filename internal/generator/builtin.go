@@ -8,15 +8,15 @@ import (
 	"strings"
 )
 
-// Template bawaan tambahan milik uf.
+// Template bawaan tambahan milik anjuran.
 //
-// Diawali "uf:" supaya tidak pernah bertabrakan dengan nama template Fig bila
+// Diawali "anjuran:" supaya tidak pernah bertabrakan dengan nama template Fig bila
 // kelak ada yang baru. Semuanya BUKAN generator: tidak satu pun menumbuhkan
 // proses, sehingga tidak tunduk pada kebijakan generator dan tidak pernah
 // menjadi efek samping yang mahal.
 const (
-	TemplateHosts = "uf:hosts"
-	TemplateEnv   = "uf:env"
+	TemplateHosts = "anjuran:hosts"
+	TemplateEnv   = "anjuran:env"
 )
 
 // maxLines membatasi pembacaan berkas yang bisa saja sangat besar.

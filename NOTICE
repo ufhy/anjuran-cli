@@ -1,8 +1,8 @@
-uf memuat spec CLI yang berasal dari withfig/autocomplete.
+anjuran memuat spec CLI yang berasal dari withfig/autocomplete.
 
     Copyright (c) Fig, Inc.
     Berlisensi MIT, lihat specs/LICENSE pada paket rilis.
 
 Spec itu dihasilkan ulang dari paket npm @withfig/autocomplete lalu disaring ke
-dalam skema uf. Berkas aslinya tidak disertakan; yang didistribusikan adalah
+dalam skema anjuran. Berkas aslinya tidak disertakan; yang didistribusikan adalah
 turunannya, dan lisensi MIT-nya ikut dibawa di dalam direktori specs/.

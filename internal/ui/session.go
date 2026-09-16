@@ -3,7 +3,7 @@ package ui
 import (
 	"sort"
 
-	"github.com/uf-cli/uf/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/engine"
 )
 
 // Dynamic menghasilkan kandidat yang tidak ada di dalam berkas spec, yaitu

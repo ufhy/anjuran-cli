@@ -30,7 +30,7 @@ func TestShellTakDikenalMenghasilkanError(t *testing.T) {
 func TestSetiapSkripMematuhiProtokol(t *testing.T) {
 	for _, sh := range Shells() {
 		s, _ := Script(sh)
-		for _, want := range []string{"uf widget", "--line", "--cursor"} {
+		for _, want := range []string{"anjuran widget", "--line", "--cursor"} {
 			if !strings.Contains(s, want) {
 				t.Errorf("skrip %s tidak memuat %q", sh, want)
 			}
@@ -40,8 +40,8 @@ func TestSetiapSkripMematuhiProtokol(t *testing.T) {
 		if !strings.Contains(s, "none") {
 			t.Errorf("skrip %s tidak menangani status none", sh)
 		}
-		if !strings.Contains(s, "UF_KEY") {
-			t.Errorf("skrip %s tidak menghormati UF_KEY", sh)
+		if !strings.Contains(s, "ANJURAN_KEY") {
+			t.Errorf("skrip %s tidak menghormati ANJURAN_KEY", sh)
 		}
 	}
 }
@@ -96,10 +96,10 @@ func TestPwshAliasKePowershell(t *testing.T) {
 func TestZshPemicu(t *testing.T) {
 	s, _ := Script("zsh")
 	for _, want := range []string{
-		"UF_AUTO",               // pemicu otomatis harus opt-in
-		`bindkey " " _uf_spasi`, // spasi
-		`bindkey "/" _uf_garismiring`,
-		`bindkey "=" _uf_samadengan`,
+		"ANJURAN_AUTO",               // pemicu otomatis harus opt-in
+		`bindkey " " _anjuran_spasi`, // spasi
+		`bindkey "/" _anjuran_garismiring`,
+		`bindkey "=" _anjuran_samadengan`,
 		"viins", // mode vi memakai keymap terpisah
 	} {
 		if !strings.Contains(s, want) {
@@ -112,7 +112,7 @@ func TestZshPemicu(t *testing.T) {
 // perilakunya tetap utuh: oh-my-zsh memetakan spasi ke magic-space.
 func TestZshMembungkusWidgetYangAda(t *testing.T) {
 	s, _ := Script("zsh")
-	for _, want := range []string{"bindkey ", "magic-space", "_uf_asli"} {
+	for _, want := range []string{"bindkey ", "magic-space", "_anjuran_asli"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("skrip zsh tidak memuat %q", want)
 		}
@@ -123,7 +123,7 @@ func TestZshMembungkusWidgetYangAda(t *testing.T) {
 // Tanpa itu, sesi yang memegang masukan akan menelan tombol seperti Ctrl-A.
 func TestZshMengembalikanTombolSisa(t *testing.T) {
 	s, _ := Script("zsh")
-	for _, want := range []string{"zle -U", "_uf_kembalikan"} {
+	for _, want := range []string{"zle -U", "_anjuran_kembalikan"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("skrip zsh tidak memuat %q", want)
 		}
@@ -134,7 +134,7 @@ func TestZshMengembalikanTombolSisa(t *testing.T) {
 func TestShellLainTanpaPemicuOtomatis(t *testing.T) {
 	for _, sh := range []string{"bash", "fish", "powershell"} {
 		s, _ := Script(sh)
-		if strings.Contains(s, "UF_AUTO") {
+		if strings.Contains(s, "ANJURAN_AUTO") {
 			t.Errorf("skrip %s seharusnya belum punya pemicu otomatis", sh)
 		}
 	}

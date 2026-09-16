@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/uf-cli/uf/internal/tty"
+import "github.com/ufhy/anjuran-cli/internal/tty"
 
 // Alias ke tipe tombol milik paket tty. Dipisah ke berkas sendiri supaya
 // ketergantungan ui terhadap tty terlihat jelas dan mudah dilepas bila suatu

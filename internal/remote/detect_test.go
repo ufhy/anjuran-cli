@@ -47,8 +47,8 @@ func TestPesanPlatformTakDidukung(t *testing.T) {
 }
 
 func TestQuoteMenanganiKutipTunggal(t *testing.T) {
-	got := quote("/home/o'brien/bin/uf")
-	want := `'/home/o'\''brien/bin/uf'`
+	got := quote("/home/o'brien/bin/anjuran")
+	want := `'/home/o'\''brien/bin/anjuran'`
 	if got != want {
 		t.Errorf("quote = %s, mau %s", got, want)
 	}
@@ -72,7 +72,7 @@ func indexOf(s, sub string) int {
 // berkas mendarat di direktori bernama harfiah "$HOME".
 func TestHomePath(t *testing.T) {
 	tests := []struct{ in, want string }{
-		{".local/bin/uf", `"$HOME/.local/bin/uf"`},
+		{".local/bin/anjuran", `"$HOME/.local/bin/anjuran"`},
 		{"/.local/bin", `"$HOME/.local/bin"`},
 		{"dir dengan spasi", `"$HOME/dir dengan spasi"`},
 		{`dir"kutip`, `"$HOME/dir\"kutip"`},

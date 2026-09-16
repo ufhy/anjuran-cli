@@ -58,10 +58,10 @@ type Policy struct {
 
 // Nama variabel lingkungan yang mengatur kebijakan ini.
 const (
-	EnvDisable   = "UF_NO_GENERATORS"
-	EnvAllow     = "UF_GENERATOR_ALLOW"
-	EnvAllowRoot = "UF_GENERATOR_ALLOW_ROOT"
-	EnvTimeout   = "UF_GENERATOR_TIMEOUT"
+	EnvDisable   = "ANJURAN_NO_GENERATORS"
+	EnvAllow     = "ANJURAN_GENERATOR_ALLOW"
+	EnvAllowRoot = "ANJURAN_GENERATOR_ALLOW_ROOT"
+	EnvTimeout   = "ANJURAN_GENERATOR_TIMEOUT"
 )
 
 // PolicyFromEnv menyusun kebijakan dari lingkungan proses.
@@ -84,7 +84,7 @@ func PolicyFromEnv(command string) Policy {
 // Check menilai satu baris argv.
 //
 // trusted menandakan argv itu berasal dari spec buatan tangan — tambalan
-// bawaan uf atau milik pengguna — bukan dari korpus hasil transpile.
+// bawaan anjuran atau milik pengguna — bukan dari korpus hasil transpile.
 func (p Policy) Check(argv []string, trusted bool) Decision {
 	if !p.Enabled {
 		return deny("generator dimatikan lewat %s", EnvDisable)
@@ -119,7 +119,7 @@ func (p Policy) Check(argv []string, trusted bool) Decision {
 		return deny("%s adalah interpreter; argumennya adalah kode, bukan data", name)
 	}
 
-	// Aturan utama: uf tidak menjalankan program yang tidak sedang kamu
+	// Aturan utama: anjuran tidak menjalankan program yang tidak sedang kamu
 	// jalankan sendiri. Tab pada "git checkout" boleh memanggil git, dan
 	// hanya git.
 	if name == p.Command {

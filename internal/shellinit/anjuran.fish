@@ -1,21 +1,21 @@
-# Integrasi uf untuk fish.
+# Integrasi anjuran untuk fish.
 #
 # Pasang dengan menambahkan satu baris ini ke ~/.config/fish/config.fish:
 #
-#     uf init fish | source
+#     anjuran init fish | source
 #
-# Tombol pemicu bisa diganti lewat UF_KEY sebelum source, misalnya:
+# Tombol pemicu bisa diganti lewat ANJURAN_KEY sebelum source, misalnya:
 #
-#     set -gx UF_KEY \cspace    # Ctrl-Spasi, Tab tetap milik fish
+#     set -gx ANJURAN_KEY \cspace    # Ctrl-Spasi, Tab tetap milik fish
 
-function _uf_widget --description 'Dropdown completion uf'
+function _anjuran_widget --description 'Dropdown completion anjuran'
     set -l line (commandline)
     set -l pos (commandline -C)
 
     # string collect menjaga baris keluaran tetap utuh; tanpa itu substitusi
     # perintah fish akan memecahnya menjadi daftar dan isi buffer yang memuat
     # newline ikut hancur.
-    set -l out (command uf widget --line "$line" --cursor $pos 2>/dev/null | string collect)
+    set -l out (command anjuran widget --line "$line" --cursor $pos 2>/dev/null | string collect)
 
     if test -z "$out"
         commandline -f complete
@@ -30,10 +30,10 @@ function _uf_widget --description 'Dropdown completion uf'
     end
 
     set -l fields (string split ' ' -- $head)
-    set -l uf_status $fields[1]
+    set -l anjuran_status $fields[1]
     set -l new_cursor $fields[2]
 
-    switch $uf_status
+    switch $anjuran_status
         case ok
             commandline -r -- $body
             commandline -C $new_cursor
@@ -46,18 +46,18 @@ function _uf_widget --description 'Dropdown completion uf'
     end
 end
 
-function _uf_bind --description 'Pasang tombol pemicu uf'
+function _anjuran_bind --description 'Pasang tombol pemicu anjuran'
     set -l key \t
-    if set -q UF_KEY
-        set key $UF_KEY
+    if set -q ANJURAN_KEY
+        set key $ANJURAN_KEY
     end
 
-    bind $key _uf_widget
+    bind $key _anjuran_widget
     # fish memisahkan mode default dan insert saat binding vi aktif; tanpa
     # baris ini tombolnya mati begitu pengguna memakai mode vi.
     if bind --help 2>/dev/null | string match -q '*-M*'
-        bind -M insert $key _uf_widget 2>/dev/null
+        bind -M insert $key _anjuran_widget 2>/dev/null
     end
 end
 
-_uf_bind
+_anjuran_bind

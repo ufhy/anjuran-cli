@@ -1,4 +1,4 @@
-// Package remote memasang uf di host lain lewat SSH.
+// Package remote memasang anjuran di host lain lewat SSH.
 //
 // Yang dikirim adalah binary dan direktori spec, karena engine harus berjalan
 // DI SISI REMOTE: generator seperti `kubectl get pods` hanya menjawab benar
@@ -54,7 +54,7 @@ type SSH struct {
 // berarti jabat tangan baru — dan pada host yang meminta MFA, berarti pengguna
 // diminta menyentuh kunci keamanannya berkali-kali untuk satu perintah.
 func NewSSH(host string, args ...string) (*SSH, error) {
-	dir, err := os.MkdirTemp("", "uf-ssh-")
+	dir, err := os.MkdirTemp("", "anjuran-ssh-")
 	if err != nil {
 		return nil, err
 	}

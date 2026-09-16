@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/uf-cli/uf/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/engine"
 )
 
 func sample() []Item {
@@ -315,7 +315,7 @@ func TestMaxRowsMengikutiTinggiTerminal(t *testing.T) {
 
 // Adopt memungkinkan proses baru melanjutkan gambar proses sebelumnya. Tanpa
 // itu, dropdown yang muncul sambil mengetik tidak mungkin: setiap ketikan
-// menjalankan uf yang baru dan tidak mewarisi apa pun.
+// menjalankan anjuran yang baru dan tidak mewarisi apa pun.
 func TestAdoptMenggambarUlangSemuanya(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRenderer(&buf, 80, 24, true)

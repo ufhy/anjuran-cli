@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/uf-cli/uf/internal/parser"
+	"github.com/ufhy/anjuran-cli/internal/parser"
 )
 
 // aliasExpansion menjembatani baris yang memakai alias dengan perintah
 // sebenarnya.
 //
-// Tanpa ini, `gco fit` tidak menghasilkan apa pun: uf mencari spec bernama
+// Tanpa ini, `gco fit` tidak menghasilkan apa pun: anjuran mencari spec bernama
 // "gco" dan tidak menemukannya. Padahal alias justru cara sehari-hari orang
 // memakai perintah panjang — oh-my-zsh sendiri memasang ratusan.
 //

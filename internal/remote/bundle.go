@@ -15,12 +15,12 @@ import (
 // Layout adalah letak berkas di host tujuan, relatif terhadap direktori dasar.
 //
 // Mengikuti tata letak XDG supaya penemuan spec berjalan tanpa variabel
-// lingkungan: uf mencari ../share/uf/specs relatif terhadap binary-nya, dan
-// bin/uf dengan share/uf/specs memenuhi itu persis.
+// lingkungan: anjuran mencari ../share/anjuran/specs relatif terhadap binary-nya, dan
+// bin/anjuran dengan share/anjuran/specs memenuhi itu persis.
 const (
 	RemoteBase  = ".local"
-	RemoteBin   = "bin/uf"
-	RemoteSpecs = "share/uf/specs"
+	RemoteBin   = "bin/anjuran"
+	RemoteSpecs = "share/anjuran/specs"
 )
 
 // Bundle menulis arsip tar.gz berisi binary dan spec.
@@ -126,7 +126,7 @@ type Source struct {
 
 // ResolveSource menentukan berkas apa yang dikirim untuk sebuah platform.
 //
-// from boleh kosong, sebuah direktori berisi uf dan specs, atau direktori
+// from boleh kosong, sebuah direktori berisi anjuran dan specs, atau direktori
 // hasil rilis yang memuat arsip goreleaser.
 func ResolveSource(from string, p Platform, localSpecs []string) (Source, func(), error) {
 	noop := func() {}
@@ -161,15 +161,15 @@ func ResolveSource(from string, p Platform, localSpecs []string) (Source, func()
 	if specs == "" {
 		return Source{}, noop, fmt.Errorf("direktori spec tidak ditemukan di mesin ini; jalankan `make specs`")
 	}
-	return Source{Binary: exe, Specs: specs, Origin: "binary uf yang sedang berjalan"}, noop, nil
+	return Source{Binary: exe, Specs: specs, Origin: "binary anjuran yang sedang berjalan"}, noop, nil
 }
 
 // fromDir mencari sumber di dalam sebuah direktori.
 func fromDir(dir string, p Platform, noop func()) (Source, func(), error) {
-	// Bentuk pertama: direktori yang sudah berisi uf dan specs.
-	bin := filepath.Join(dir, "uf")
+	// Bentuk pertama: direktori yang sudah berisi anjuran dan specs.
+	bin := filepath.Join(dir, "anjuran")
 	if p.OS == "windows" {
-		bin = filepath.Join(dir, "uf.exe")
+		bin = filepath.Join(dir, "anjuran.exe")
 	}
 	if fi, err := os.Stat(bin); err == nil && !fi.IsDir() {
 		specs := filepath.Join(dir, "specs")
@@ -185,7 +185,7 @@ func fromDir(dir string, p Platform, noop func()) (Source, func(), error) {
 	}
 
 	return Source{}, noop, fmt.Errorf(
-		"tidak menemukan uf untuk %s di %s; isinya harus berupa uf dan specs, atau arsip rilis", p, dir)
+		"tidak menemukan anjuran untuk %s di %s; isinya harus berupa anjuran dan specs, atau arsip rilis", p, dir)
 }
 
 // findArchive mencari arsip goreleaser untuk sebuah platform.
@@ -214,7 +214,7 @@ func extractArchive(arc string, p Platform) (Source, func(), error) {
 		return Source{}, noop, fmt.Errorf("arsip zip belum didukung sebagai sumber; pakai direktori hasil ekstraksinya")
 	}
 
-	dir, err := os.MkdirTemp("", "uf-src-")
+	dir, err := os.MkdirTemp("", "anjuran-src-")
 	if err != nil {
 		return Source{}, noop, err
 	}
@@ -225,13 +225,13 @@ func extractArchive(arc string, p Platform) (Source, func(), error) {
 		return Source{}, noop, err
 	}
 
-	bin := filepath.Join(dir, "uf")
+	bin := filepath.Join(dir, "anjuran")
 	if p.OS == "windows" {
-		bin = filepath.Join(dir, "uf.exe")
+		bin = filepath.Join(dir, "anjuran.exe")
 	}
 	if _, err := os.Stat(bin); err != nil {
 		cleanup()
-		return Source{}, noop, fmt.Errorf("arsip %s tidak memuat binary uf", filepath.Base(arc))
+		return Source{}, noop, fmt.Errorf("arsip %s tidak memuat binary anjuran", filepath.Base(arc))
 	}
 
 	specs := filepath.Join(dir, "specs")

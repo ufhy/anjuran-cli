@@ -5,14 +5,14 @@ import (
 	"path/filepath"
 )
 
-// EnvCacheDir menimpa lokasi cache uf.
+// EnvCacheDir menimpa lokasi cache anjuran.
 //
 // Ada supaya pengujian bisa berjalan tanpa mengotori cache pengguna, dan
 // supaya pemasangan di lingkungan yang direktori rumahnya hanya-baca tetap
 // bisa mengarahkannya ke tempat lain.
-const EnvCacheDir = "UF_CACHE_DIR"
+const EnvCacheDir = "ANJURAN_CACHE_DIR"
 
-// CacheDir mengembalikan direktori cache uf, membuatnya bila perlu.
+// CacheDir mengembalikan direktori cache anjuran, membuatnya bila perlu.
 // Mengembalikan string kosong bila tidak ada tempat yang bisa dipakai.
 func CacheDir() string {
 	dir := os.Getenv(EnvCacheDir)
@@ -21,7 +21,7 @@ func CacheDir() string {
 		if err != nil {
 			return ""
 		}
-		dir = filepath.Join(base, "uf")
+		dir = filepath.Join(base, "anjuran")
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return ""

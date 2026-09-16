@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uf-cli/uf/internal/recall"
+	"github.com/ufhy/anjuran-cli/internal/recall"
 )
 
 // Cache menyimpan keluaran generator di disk.
 //
-// Harus di disk, bukan di memori: uf adalah proses baru setiap kali Tab
+// Harus di disk, bukan di memori: anjuran adalah proses baru setiap kali Tab
 // ditekan, sehingga cache dalam memori tidak akan pernah terpakai sekali pun.
 // Inilah yang membuat Tab berulang pada `kubectl get pods` terasa instan
 // alih-alih memanggil cluster lagi.
@@ -88,7 +88,7 @@ func (c *Cache) Put(argv []string, dir, out string, ttl time.Duration) {
 	path := filepath.Join(c.Dir, c.key(argv, dir))
 	body := strconv.FormatInt(c.now().Add(ttl).Unix(), 10) + "\n" + out
 
-	// Ditulis lewat berkas sementara lalu dipindahkan, supaya proses uf lain
+	// Ditulis lewat berkas sementara lalu dipindahkan, supaya proses anjuran lain
 	// yang membaca bersamaan tidak pernah melihat isi yang setengah jadi.
 	tmp, err := os.CreateTemp(c.Dir, "tmp-*")
 	if err != nil {

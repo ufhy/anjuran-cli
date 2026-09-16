@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/uf-cli/uf/internal/shellinit"
+	"github.com/ufhy/anjuran-cli/internal/shellinit"
 )
 
 // runInit mencetak skrip integrasi untuk sebuah shell.
@@ -23,14 +23,14 @@ func runInit(args []string) int {
 		shell = detectShell()
 	}
 	if shell == "" {
-		fmt.Fprintf(os.Stderr, "uf: sebutkan shell-nya; pilihan: %s\n",
+		fmt.Fprintf(os.Stderr, "anjuran: sebutkan shell-nya; pilihan: %s\n",
 			strings.Join(shellinit.Shells(), ", "))
 		return 2
 	}
 
 	script, err := shellinit.Script(shell)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 2
 	}
 	fmt.Print(script)

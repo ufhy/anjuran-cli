@@ -12,8 +12,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/uf-cli/uf/internal/parser"
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/parser"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 // Kind mengelompokkan asal sebuah kandidat, dipakai renderer untuk ikon/warna.
@@ -307,7 +307,7 @@ func (e *Engine) hitung(l *parser.Line) (*Result, error) {
 
 // lebarkan memperluas prefix melintasi SPASI yang belum dikutip.
 //
-// "cd folder de" sudah dipecah shell menjadi dua kata sebelum uf melihatnya,
+// "cd folder de" sudah dipecah shell menjadi dua kata sebelum anjuran melihatnya,
 // jadi yang dilengkapi hanya "de" dan nama seperti "folder dengan spasi/"
 // tidak pernah muncul. Padahal begitulah orang mengetiknya: tanda kutip
 // dipasang belakangan, kalau ingat — dan zsh sendiri melengkapinya.

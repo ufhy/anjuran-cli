@@ -10,17 +10,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uf-cli/uf/internal/remote"
+	"github.com/ufhy/anjuran-cli/internal/remote"
 	"golang.org/x/term"
 )
 
-// runBootstrap memasang uf di host lain lewat SSH.
+// runBootstrap memasang anjuran di host lain lewat SSH.
 //
-// Ini bukan pembungkus ssh. uf tidak pernah menyisip di antara kamu dan
+// Ini bukan pembungkus ssh. anjuran tidak pernah menyisip di antara kamu dan
 // koneksimu; perintah ini dijalankan sekali, dengan sadar, lalu selesai.
 func runBootstrap(args []string) int {
 	fs := flag.NewFlagSet("bootstrap", flag.ExitOnError)
-	from := fs.String("from", "", "direktori sumber: berisi uf dan specs, atau arsip rilis")
+	from := fs.String("from", "", "direktori sumber: berisi anjuran dan specs, atau arsip rilis")
 	base := fs.String("base", remote.RemoteBase, "direktori tujuan di host, relatif terhadap rumah pengguna")
 	force := fs.Bool("force", false, "pasang ulang meski versinya sudah sama")
 	dryRun := fs.Bool("dry-run", false, "tampilkan rencananya tanpa mengirim apa pun")
@@ -32,7 +32,7 @@ func runBootstrap(args []string) int {
 
 	rest := fs.Args()
 	if len(rest) == 0 {
-		fmt.Fprintln(os.Stderr, "uf: sebutkan host tujuan, misalnya: uf bootstrap deploy@web-01")
+		fmt.Fprintln(os.Stderr, "anjuran: sebutkan host tujuan, misalnya: anjuran bootstrap deploy@web-01")
 		return 2
 	}
 	host, sshArgs := rest[0], rest[1:]
@@ -42,7 +42,7 @@ func runBootstrap(args []string) int {
 
 	t, err := remote.NewSSH(host, sshArgs...)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 	defer t.Close()
@@ -60,7 +60,7 @@ func runBootstrap(args []string) int {
 
 	plan, cleanup, err := remote.Prepare(ctx, t, opt)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 	defer cleanup()
@@ -70,7 +70,7 @@ func runBootstrap(args []string) int {
 		return 0
 	}
 
-	fmt.Printf("Akan memasang uf di host lain:\n\n%s\n", plan)
+	fmt.Printf("Akan memasang anjuran di host lain:\n\n%s\n", plan)
 
 	if *dryRun {
 		fmt.Println("Mode dry-run; tidak ada yang dikirim.")
@@ -82,7 +82,7 @@ func runBootstrap(args []string) int {
 	}
 
 	if err := remote.Install(ctx, t, plan, opt); err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 
@@ -104,7 +104,7 @@ func confirm(host string) bool {
 
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		fmt.Fprintf(os.Stderr,
-			"uf: bukan terminal interaktif; pakai --yes, atau daftarkan host di %s\n",
+			"anjuran: bukan terminal interaktif; pakai --yes, atau daftarkan host di %s\n",
 			allowlistPath())
 		return false
 	}
@@ -127,5 +127,5 @@ func allowlistPath() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".config", "uf", "hosts")
+	return filepath.Join(home, ".config", "anjuran", "hosts")
 }

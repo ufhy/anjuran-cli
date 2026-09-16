@@ -24,8 +24,8 @@ func sumberPalsu(t *testing.T) string {
 
 	// Binary tiruan yang mencetak versinya, supaya pemeriksaan pasca-pasang
 	// benar-benar menjalankan berkas yang dikirim.
-	bin := filepath.Join(dir, "uf")
-	script := "#!/bin/sh\necho 'uf 9.9.9'\n"
+	bin := filepath.Join(dir, "anjuran")
+	script := "#!/bin/sh\necho 'anjuran 9.9.9'\n"
 	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestPasangDanPeriksa(t *testing.T) {
 
 	// Binary harus mendarat di bawah rumah SUNGGUHAN, bukan di direktori
 	// bernama harfiah $HOME.
-	bin := filepath.Join(home, ".local", "bin", "uf")
+	bin := filepath.Join(home, ".local", "bin", "anjuran")
 	fi, err := os.Stat(bin)
 	if err != nil {
 		t.Fatalf("binary tidak ada di %s: %v", bin, err)
@@ -80,7 +80,7 @@ func TestPasangDanPeriksa(t *testing.T) {
 
 	// Spec, termasuk yang bersarang, harus ikut terbawa.
 	for _, p := range []string{"git.json", "aws/s3.json"} {
-		full := filepath.Join(home, ".local", "share", "uf", "specs", filepath.FromSlash(p))
+		full := filepath.Join(home, ".local", "share", "anjuran", "specs", filepath.FromSlash(p))
 		if _, err := os.Stat(full); err != nil {
 			t.Errorf("spec %s tidak terbawa", p)
 		}
@@ -97,7 +97,7 @@ func TestBinaryTidakBisaDijalankanTerdeteksi(t *testing.T) {
 
 	src := t.TempDir()
 	// Berkas yang bukan program sama sekali.
-	if err := os.WriteFile(filepath.Join(src, "uf"), []byte("bukan program"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(src, "anjuran"), []byte("bukan program"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,7 +175,7 @@ func TestSpecLamaDibersihkan(t *testing.T) {
 	defer cleanup()
 	Install(context.Background(), tr, plan, opt)
 
-	usang := filepath.Join(home, ".local", "share", "uf", "specs", "usang.json")
+	usang := filepath.Join(home, ".local", "share", "anjuran", "specs", "usang.json")
 	if err := os.WriteFile(usang, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestBaseDenganKarakterKhusus(t *testing.T) {
 	if err := Install(context.Background(), tr, plan, opt); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(home, base, "bin", "uf")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, base, "bin", "anjuran")); err != nil {
 		t.Errorf("path dengan spasi tidak ditangani: %v", err)
 	}
 }

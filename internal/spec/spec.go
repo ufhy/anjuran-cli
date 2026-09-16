@@ -120,7 +120,7 @@ type Suggestion struct {
 // engine hanya membawa metadatanya.
 type Generator struct {
 	// Trusted menandai generator yang berasal dari spec buatan tangan —
-	// tambalan bawaan uf atau milik pengguna sendiri — bukan dari 1.472 berkas
+	// tambalan bawaan anjuran atau milik pengguna sendiri — bukan dari 1.472 berkas
 	// hasil transpile korpus pihak ketiga.
 	//
 	// Sengaja TIDAK bisa diisi dari JSON: kalau bisa, berkas spec mana pun

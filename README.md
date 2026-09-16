@@ -1,4 +1,4 @@
-# uf
+# anjuran
 
 Autocomplete gaya Fig untuk shell, jalan di **Linux, macOS, dan Windows** —
 termasuk lewat SSH, tmux, `docker exec`, dan `kubectl exec`.
@@ -11,7 +11,7 @@ kursor terminal lewat Accessibility API milik macOS. Pendekatan itu tidak bisa
 dipindahkan: Wayland melarang positioning window absolut, dan overlay Win32 di atas
 Windows Terminal bermasalah pada DPI serta compositing.
 
-`uf` menggambar **di dalam terminal** memakai escape sequence ANSI, seperti fzf dan
+`anjuran` menggambar **di dalam terminal** memakai escape sequence ANSI, seperti fzf dan
 zsh-autosuggestions. Konsekuensinya nol kode window-management per-OS — dan karena
 UI-nya berupa byte, dropdown-nya melewati pipa SSH sama seperti output perintah biasa.
 
@@ -26,7 +26,7 @@ rilis sungguhan lewat CI.
 | Artefak | Tata letak spec |
 |---|---|
 | tar.gz, zip | `specs/` di samping binary |
-| deb, rpm, apk | `/usr/share/uf/specs` |
+| deb, rpm, apk | `/usr/share/anjuran/specs` |
 | Homebrew cask | di dalam Caskroom, ditemukan lewat resolusi symlink |
 | Scoop, winget | `specs/` di samping binary |
 
@@ -38,7 +38,7 @@ spec yang terbangun kurang dari seribu.
 
 `make specs` mengunduh paket npm `@withfig/autocomplete` — yang sudah berisi spec
 terkompilasi sebagai modul JS, jadi TypeScript tidak dibutuhkan sama sekali — lalu
-menyaringnya menjadi skema uf.
+menyaringnya menjadi skema anjuran.
 
 | | |
 |---|---|
@@ -96,7 +96,7 @@ Korpus Fig memuat 716 perintah. Sisanya — `gzip`, `awk`, `openssl`, perintah
 internal perusahaan, skrip apa pun di PATH — tidak ada di sana, dan ratusan spec
 yang ada pun hanya menyebutkan nama argumennya tanpa menyebut isinya dari mana.
 
-Di kedua keadaan itu uf melengkapi **nama berkas**, sebagaimana shell mana pun
+Di kedua keadaan itu anjuran melengkapi **nama berkas**, sebagaimana shell mana pun
 untuk perintah yang tidak dikenalnya. Diam total di situ salah: melengkapi path
 adalah yang paling sering dibutuhkan.
 
@@ -114,14 +114,14 @@ Entri itu hanya muncul bila berkas atau direktori bernama itu ada di direktori
 kerja. Berlaku untuk subcommand maupun suggestion, dan tidak menjalankan apa pun
 — hanya satu pemeriksaan berkas.
 
-Beberapa sumber dikerjakan uf sendiri tanpa menjalankan proses apa pun, dan
+Beberapa sumber dikerjakan anjuran sendiri tanpa menjalankan proses apa pun, dan
 karena itu tidak tunduk pada kebijakan generator:
 
 | Template | Sumber |
 |---|---|
 | `filepaths`, `folders` | isi direktori |
-| `uf:hosts` | `~/.ssh/config` dan `~/.ssh/known_hosts` |
-| `uf:env` | variabel lingkungan proses |
+| `anjuran:hosts` | `~/.ssh/config` dan `~/.ssh/known_hosts` |
+| `anjuran:env` | variabel lingkungan proses |
 | `history` | argumen yang pernah dipakai bersama perintah itu |
 
 ### Spec sendiri
@@ -130,13 +130,13 @@ Spec dengan nama sama dari beberapa direktori **digabung**, bukan saling
 menggantikan. Urutannya adalah urutan lapisan, dari yang paling menimpa:
 
 ```
-~/.config/uf/specs        milikmu sendiri
+~/.config/anjuran/specs        milikmu sendiri
 ./extra, <bin>/extra      tambalan bawaan
---specs, $UF_SPECS
+--specs, $ANJURAN_SPECS
 ./specs, <bin>/specs      spec hasil transpile
 ```
 
-Jadi CLI internal cukup ditaruh di `~/.config/uf/specs/nama.json`. Berkas itu
+Jadi CLI internal cukup ditaruh di `~/.config/anjuran/specs/nama.json`. Berkas itu
 tidak perlu lengkap — cukup memuat bagian yang ingin ditambal, karena sisanya
 diambil dari lapisan di bawahnya.
 
@@ -164,16 +164,16 @@ dan seterusnya.
 ## Pasang
 
 ```sh
-brew install uf-cli/tap/uf              # macOS, Linux
-scoop bucket add uf-cli https://github.com/uf-cli/scoop-bucket
-scoop install uf                        # Windows
-sudo dpkg -i uf_*_linux_amd64.deb       # Debian, Ubuntu
-sudo rpm -i uf_*_linux_amd64.rpm        # Fedora, RHEL
+brew install ufhy/tap/anjuran              # macOS, Linux
+scoop bucket add anjuran https://github.com/ufhy/scoop-bucket
+scoop install anjuran                        # Windows
+sudo dpkg -i anjuran_*_linux_amd64.deb       # Debian, Ubuntu
+sudo rpm -i anjuran_*_linux_amd64.rpm        # Fedora, RHEL
 ```
 
-Atau unduh arsip dari halaman rilis, letakkan `uf` di dalam PATH, dan biarkan
+Atau unduh arsip dari halaman rilis, letakkan `anjuran` di dalam PATH, dan biarkan
 `specs/` bersebelahan dengannya. Tidak ada variabel lingkungan yang perlu
-disetel: `uf` mencari spec relatif terhadap dirinya sendiri, termasuk saat
+disetel: `anjuran` mencari spec relatif terhadap dirinya sendiri, termasuk saat
 dipasang sebagai symlink oleh Homebrew.
 
 ### Dari sumber
@@ -181,18 +181,18 @@ dipasang sebagai symlink oleh Homebrew.
 ```sh
 make specs                              # unduh + transpile spec Fig (butuh node)
 make build
-sudo cp bin/uf /usr/local/bin/
-mkdir -p ~/.config/uf && cp -r specs ~/.config/uf/
+sudo cp bin/anjuran /usr/local/bin/
+mkdir -p ~/.config/anjuran && cp -r specs ~/.config/anjuran/
 ```
 
 Lalu satu baris di berkas konfigurasi shell:
 
 | Shell | Berkas | Baris |
 |---|---|---|
-| zsh | `~/.zshrc` | `eval "$(uf init zsh)"` |
-| bash | `~/.bashrc` | `eval "$(uf init bash)"` |
-| fish | `~/.config/fish/config.fish` | `uf init fish \| source` |
-| PowerShell | `$PROFILE` | `uf init powershell \| Out-String \| Invoke-Expression` |
+| zsh | `~/.zshrc` | `eval "$(anjuran init zsh)"` |
+| bash | `~/.bashrc` | `eval "$(anjuran init bash)"` |
+| fish | `~/.config/fish/config.fish` | `anjuran init fish \| source` |
+| PowerShell | `$PROFILE` | `anjuran init powershell \| Out-String \| Invoke-Expression` |
 
 Skrip integrasinya disematkan di dalam binary, jadi tidak ada path repo yang
 perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas.
@@ -200,7 +200,7 @@ perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas
 ### Dropdown yang muncul sendiri
 
 ```sh
-UF_AUTO=1 eval "$(uf init zsh)"
+ANJURAN_AUTO=1 eval "$(anjuran init zsh)"
 ```
 
 Ketik `git` lalu **spasi** — dropdown muncul tanpa menekan apa pun.
@@ -212,7 +212,7 @@ padanannya.
 
 ### Satu sesi memegang seluruh interaksi
 
-Begitu dropdown terbuka, uf yang membaca ketikan: menyaring di tempat,
+Begitu dropdown terbuka, anjuran yang membaca ketikan: menyaring di tempat,
 menggemakan karakter, memindahkan pilihan. **Satu proses per interaksi, bukan
 satu proses per huruf.**
 
@@ -223,7 +223,7 @@ dan apa yang ada di buffer.
 
 Agar sesi tidak merampas apa pun dari zsh, tombol yang bukan urusan dropdown —
 Ctrl-A, Home, panah kiri — **dikembalikan** ke antrean masukan zsh dan diproses
-seperti tidak pernah lewat uf.
+seperti tidak pernah lewat anjuran.
 
 Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
 sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
@@ -231,7 +231,7 @@ sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 ### Saran dari riwayat
 
 ```sh
-UF_GHOST=1 UF_AUTO=1 eval "$(uf init zsh)"
+ANJURAN_GHOST=1 ANJURAN_AUTO=1 eval "$(anjuran init zsh)"
 ```
 
 Teks abu-abu yang melanjutkan ketikanmu berdasarkan perintah yang pernah
@@ -239,12 +239,12 @@ dijalankan. Untuk perintah panjang yang diulang setiap hari — `kubectl logs -f
 dengan namespace dan selector — ini lebih sering menolong daripada dropdown.
 Panah kanan atau `Ctrl-E` menerimanya.
 
-Seluruhnya dikerjakan **di dalam zsh**, tanpa memanggil uf sama sekali: ia
+Seluruhnya dikerjakan **di dalam zsh**, tanpa memanggil anjuran sama sekali: ia
 diperbarui pada setiap ketikan, dan menumbuhkan proses di sana akan terasa
-berat. Riwayat sudah ada di dalam shell; uf hanya menggambar dropdown.
+berat. Riwayat sudah ada di dalam shell; anjuran hanya menggambar dropdown.
 
 Bayangan disembunyikan selama dropdown terbuka — dua saran sekaligus hanya
-menambah kebisingan. Bila zsh-autosuggestions sudah terpasang, uf menyingkir
+menambah kebisingan. Bila zsh-autosuggestions sudah terpasang, anjuran menyingkir
 dan memberi tahu: keduanya memperebutkan `POSTDISPLAY` yang sama.
 
 ### Mengingat pilihanmu
@@ -263,12 +263,12 @@ dimunculkan kembali. Bobot sempat dicoba dan ditolak — bobot membuat urutannya
 sulit dinalar, sementara memindahkan satu entri yang memang pernah kamu pilih
 selalu bisa dijelaskan.
 
-Tersimpan di `$UF_CACHE_DIR` atau direktori cache bawaan sistem; hapus
+Tersimpan di `$ANJURAN_CACHE_DIR` atau direktori cache bawaan sistem; hapus
 berkasnya untuk melupakan semuanya.
 
 ### Alias
 
-Alias dikenali. `gco ` menawarkan nama branch karena zsh memberi tahu uf bahwa
+Alias dikenali. `gco ` menawarkan nama branch karena zsh memberi tahu anjuran bahwa
 `gco` berarti `git checkout`:
 
 ```
@@ -318,15 +318,15 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik shell:
 
 ```sh
-UF_KEY='^ '   eval "$(uf init zsh)"     # zsh:  Ctrl-Spasi
-UF_KEY='\C-@' eval "$(uf init bash)"    # bash: Ctrl-Spasi
-set -gx UF_KEY \cspace                  # fish: Ctrl-Spasi
-$env:UF_KEY = 'Ctrl+Spacebar'           # PowerShell
+ANJURAN_KEY='^ '   eval "$(anjuran init zsh)"     # zsh:  Ctrl-Spasi
+ANJURAN_KEY='\C-@' eval "$(anjuran init bash)"    # bash: Ctrl-Spasi
+set -gx ANJURAN_KEY \cspace                  # fish: Ctrl-Spasi
+$env:ANJURAN_KEY = 'Ctrl+Spacebar'           # PowerShell
 ```
 
 ### Saat sebuah perintah tidak punya spec
 
-`uf` mengembalikan tombolnya ke shell, jadi Tab tidak pernah terasa mati:
+`anjuran` mengembalikan tombolnya ke shell, jadi Tab tidak pernah terasa mati:
 
 | Shell | Yang terjadi |
 |---|---|
@@ -339,8 +339,8 @@ Bash memang lebih terbatas, dan itu batasan readline, bukan pilihan desain:
 `bind -x` mengambil alih tombolnya sepenuhnya dan tidak menyediakan cara
 memanggil kembali fungsi yang didaftarkan `complete`. Yang ditiru karena itu
 hanya perilaku bawaan readline, yaitu melengkapi path. Siapa pun yang lebih
-membutuhkan bash-completion daripada uf sebaiknya memindahkan pemicunya ke
-tombol lain lewat `UF_KEY`.
+membutuhkan bash-completion daripada anjuran sebaiknya memindahkan pemicunya ke
+tombol lain lewat `ANJURAN_KEY`.
 
 Bash 4.0 ke atas dibutuhkan, karena `READLINE_LINE` dan `READLINE_POINT` baru
 ada sejak versi itu. Bash 3.2 bawaan macOS tidak didukung; pasang lewat
@@ -350,20 +350,20 @@ ada sejak versi itu. Bash 3.2 bawaan macOS tidak didukung; pasang lewat
 
 ```sh
 make build
-./bin/uf complete --line "git commit --"
-./bin/uf complete --line "kubectl get pods -o " --json
+./bin/anjuran complete --line "git commit --"
+./bin/anjuran complete --line "kubectl get pods -o " --json
 ```
 
 `--cursor` menerima offset byte bila kursor tidak berada di akhir baris:
 
 ```sh
-./bin/uf complete --line "git checkout" --cursor 7   # melengkapi "che"
+./bin/anjuran complete --line "git checkout" --cursor 7   # melengkapi "che"
 ```
 
 ## Arsitektur
 
 ```
-cmd/uf/            entry point CLI: perintah complete dan widget
+cmd/anjuran/            entry point CLI: perintah complete dan widget
 internal/spec/     model skema spec Fig + loader JSON
 internal/parser/   tokenizer sadar-kutip + resolusi posisi kursor
 internal/engine/   penelusuran pohon spec → daftar kandidat
@@ -372,7 +372,7 @@ internal/generator/ eksekusi generator, kebijakannya, cache, template berkas
 internal/remote/   pemasangan ke host lain lewat SSH
 internal/tty/      mode raw, ukuran layar, penguraian tombol
 internal/shellinit/ skrip integrasi shell, disematkan ke binary
-tools/transpile/   pengubah spec Fig menjadi skema uf
+tools/transpile/   pengubah spec Fig menjadi skema anjuran
 specs/             DIHASILKAN oleh `make specs`, tidak masuk git
 internal/testdata/ spec buatan tangan sebagai fixture pengujian
 ```
@@ -404,7 +404,7 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
    Garis bingkai tidak pernah berubah antar penekanan tombol, jadi ia hanya
    dikirim sekali untuk seluruh sesi meski dropdown digambar berkali-kali.
 
-   Mode degradasi `UF_SIMPLE=1` mematikan warna dan sorotan, dan menyala
+   Mode degradasi `ANJURAN_SIMPLE=1` mematikan warna dan sorotan, dan menyala
    otomatis untuk `TERM` bernilai `dumb`, `vt100`, `vt102`, atau `ansi`.
 
    Waktu yang dirasakan saat dropdown muncul sendiri:
@@ -423,7 +423,7 @@ Keduanya mahal bila di-retrofit, jadi dipegang sejak tahap 1:
    | lewat `loadSpec` (aws s3) | 2,3 µs |
    | muat dingin, buka gzip + urai | 1,2 ms |
 
-   Yang dirasakan pengguna lebih besar dari itu, karena `uf` adalah proses
+   Yang dirasakan pengguna lebih besar dari itu, karena `anjuran` adalah proses
    baru setiap kali Tab ditekan:
 
    | | |
@@ -461,7 +461,7 @@ detail yang bisa diabaikan:
 | bash | `$READLINE_POINT` | **byte** |
 | PowerShell | `GetBufferState` | **UTF-16 code unit** |
 
-Tiga satuan berbeda, jadi `uf widget` menerima `--cursor-unit rune\|byte\|utf16`.
+Tiga satuan berbeda, jadi `anjuran widget` menerima `--cursor-unit rune\|byte\|utf16`.
 Salah satuan tidak terlihat sama sekali pada baris ASCII. Ia baru muncul saat
 baris memuat karakter non-ASCII, dan tiap satuan berpisah pada titik berbeda:
 
@@ -519,7 +519,7 @@ biner hanyalah perkiraan kasar untuk itu. `php artisan list` bukan kode;
 melainkan siapa yang menulis argv-nya.
 
 Karena itu spec yang ditulis tangan dan ditinjau — `extra/` bawaan dan
-`~/.config/uf/specs` milikmu — boleh melewati larangan itu. Korpus hasil
+`~/.config/anjuran/specs` milikmu — boleh melewati larangan itu. Korpus hasil
 transpile tidak pernah: 1.472 berkas yang tidak pernah dibaca seorang pun, dan
 194 di antaranya memang berisi `["bash","-c","<skrip>"]`.
 
@@ -531,14 +531,14 @@ perintah yang kamu ketik tetap ditolak, dan berjalan sebagai root tetap
 mematikan semuanya.
 
 ```sh
-UF_NO_GENERATORS=1               # matikan seluruhnya
-UF_GENERATOR_ALLOW=tmux,kubectl  # izinkan biner tambahan
-UF_GENERATOR_ALLOW_ROOT=1        # izinkan berjalan sebagai root
-UF_GENERATOR_TIMEOUT=800ms       # ubah batas waktu
+ANJURAN_NO_GENERATORS=1               # matikan seluruhnya
+ANJURAN_GENERATOR_ALLOW=tmux,kubectl  # izinkan biner tambahan
+ANJURAN_GENERATOR_ALLOW_ROOT=1        # izinkan berjalan sebagai root
+ANJURAN_GENERATOR_TIMEOUT=800ms       # ubah batas waktu
 ```
 
-`uf complete --line "..."` menjalankan jalur yang sama persis dengan Tab, dan
-mencetak alasan setiap penolakan ke stderr — jadi apa yang akan dijalankan uf
+`anjuran complete --line "..."` menjalankan jalur yang sama persis dengan Tab, dan
+mencetak alasan setiap penolakan ke stderr — jadi apa yang akan dijalankan anjuran
 bisa diperiksa sebelum dipasang.
 
 ### Keluaran mentah
@@ -552,7 +552,7 @@ bukan sekadar tampilan yang jelek.
 
 ### Cache
 
-Keluaran generator disimpan di disk, bukan di memori: `uf` adalah proses baru
+Keluaran generator disimpan di disk, bukan di memori: `anjuran` adalah proses baru
 setiap kali Tab ditekan, jadi cache dalam memori tidak akan pernah terpakai
 sekali pun. Kuncinya mencakup direktori kerja, karena `git branch` menjawab
 berbeda di setiap repo.
@@ -619,7 +619,7 @@ menemukan enam perintah yang diam.
 
 PowerShell 5.1 ke atas, dengan PSReadLine yang sudah menjadi bawaannya. Windows
 Terminal mendukung VT penuh sejak 2019, jadi renderer yang sama langsung
-berlaku; pada conhost lama `uf` menyalakan `ENABLE_VIRTUAL_TERMINAL_PROCESSING`
+berlaku; pada conhost lama `anjuran` menyalakan `ENABLE_VIRTUAL_TERMINAL_PROCESSING`
 sendiri, dan bila gagal hanya warnanya yang hilang. `cmd.exe` tidak didukung.
 
 Yang bergantung pada Windows hanyalah `internal/tty/open_windows.go`, sebatas
@@ -639,7 +639,7 @@ Syaratnya sama dengan syarat Tab supaya pintar di sana: satu binary statis di ho
 satu baris di rc file.
 
 ```sh
-uf bootstrap deploy@web-01
+anjuran bootstrap deploy@web-01
 ```
 
 Perintah itu mendeteksi platform host, mengalirkan binary dan spec lewat koneksi
@@ -649,19 +649,19 @@ baru ketahuan di langkah itu.
 
 ```
   host      : deploy@web-01 (linux/amd64)
-  sumber    : uf_1.0.0_linux_amd64.tar.gz
-  binary    : ~/.local/bin/uf
-  spec      : ~/.local/share/uf/specs
+  sumber    : anjuran_1.0.0_linux_amd64.tar.gz
+  binary    : ~/.local/bin/anjuran
+  spec      : ~/.local/share/anjuran/specs
   terkirim  : 6.6 MB
-  terpasang : uf 1.0.0
+  terpasang : anjuran 1.0.0
 ```
 
 Tata letaknya mengikuti XDG, sehingga penemuan spec berjalan tanpa variabel
-lingkungan: `~/.local/bin/uf` mencari `../share/uf/specs` dan menemukannya.
+lingkungan: `~/.local/bin/anjuran` mencari `../share/anjuran/specs` dan menemukannya.
 
 ### Yang TIDAK dilakukan perintah ini
 
-**Bukan pembungkus `ssh`.** uf tidak pernah menyisip di antara kamu dan
+**Bukan pembungkus `ssh`.** anjuran tidak pernah menyisip di antara kamu dan
 koneksimu, tidak mengubah `~/.ssh/config`, dan tidak pernah berjalan otomatis
 saat kamu menyambung ke suatu host. Perintah ini dijalankan sekali, dengan
 sadar, lalu selesai.
@@ -670,11 +670,11 @@ Sebelum mengirim apa pun, rencananya ditampilkan dan persetujuan diminta.
 Di luar terminal interaktif jawabannya selalu tidak — sebuah skrip tidak boleh
 mendapat izin hanya karena tidak ada yang menjawab. Untuk pemakaian terskrip
 ada dua jalan yang meninggalkan jejak: `--yes`, atau mendaftarkan host di
-`~/.config/uf/hosts` — persetujuan yang bisa ditinjau dan disimpan di kendali
+`~/.config/anjuran/hosts` — persetujuan yang bisa ditinjau dan disimpan di kendali
 versi, bukan jawaban di layar yang menguap.
 
 ```
-# ~/.config/uf/hosts
+# ~/.config/anjuran/hosts
 web-01
 web-*.internal
 deploy@bastion
@@ -688,7 +688,7 @@ sumbernya:
 
 ```sh
 make snapshot                                  # atau unduh arsip rilis
-uf bootstrap --from dist web-01
+anjuran bootstrap --from dist web-01
 ```
 
 Mesin lokal yang mengunduh, bukan host — jadi ini tetap bekerja untuk server
@@ -698,7 +698,7 @@ Argumen setelah nama host diteruskan apa adanya ke `ssh`, sehingga `ProxyJump`,
 bastion, dan opsi lain berlaku seperti biasa:
 
 ```sh
-uf bootstrap web-01 -J bastion -i ~/.ssh/deploy
+anjuran bootstrap web-01 -J bastion -i ~/.ssh/deploy
 ```
 
 Perintah `ssh` sistem yang dipakai, bukan pustaka SSH — supaya seluruh isi

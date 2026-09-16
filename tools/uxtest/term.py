@@ -1,4 +1,4 @@
-"""Terminal palsu untuk menguji uf di dalam shell sungguhan.
+"""Terminal palsu untuk menguji anjuran di dalam shell sungguhan.
 
 Menjalankan zsh asli di dalam PTY, mengirim ketikan, lalu MEMUTAR ULANG escape
 sequence yang keluar menjadi kisi teks — sehingga yang diperiksa adalah apa

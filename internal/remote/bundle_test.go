@@ -12,7 +12,7 @@ import (
 
 func TestBundleIsi(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "uf")
+	bin := filepath.Join(dir, "anjuran")
 	os.WriteFile(bin, []byte("BINARY"), 0o755)
 
 	specs := filepath.Join(dir, "specs")
@@ -45,14 +45,14 @@ func TestBundleIsi(t *testing.T) {
 		mode[h.Name] = h.Mode
 	}
 
-	// Tata letak harus sesuai yang dicari uf saat mencari spec bawaan.
-	if _, ok := isi["bin/uf"]; !ok {
-		t.Errorf("binary harus di bin/uf; isi = %v", keys(isi))
+	// Tata letak harus sesuai yang dicari anjuran saat mencari spec bawaan.
+	if _, ok := isi["bin/anjuran"]; !ok {
+		t.Errorf("binary harus di bin/anjuran; isi = %v", keys(isi))
 	}
-	if mode["bin/uf"]&0o111 == 0 {
+	if mode["bin/anjuran"]&0o111 == 0 {
 		t.Error("binary harus punya bit eksekusi")
 	}
-	for _, want := range []string{"share/uf/specs/git.json", "share/uf/specs/aws/s3.json"} {
+	for _, want := range []string{"share/anjuran/specs/git.json", "share/anjuran/specs/aws/s3.json"} {
 		if _, ok := isi[want]; !ok {
 			t.Errorf("mau %s; isi = %v", want, keys(isi))
 		}
@@ -61,7 +61,7 @@ func TestBundleIsi(t *testing.T) {
 
 func TestBundleTanpaSpec(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "uf")
+	bin := filepath.Join(dir, "anjuran")
 	os.WriteFile(bin, []byte("BINARY"), 0o755)
 
 	var buf bytes.Buffer

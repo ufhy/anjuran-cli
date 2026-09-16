@@ -1,4 +1,4 @@
-BINARY := uf
+BINARY := anjuran
 BIN_DIR := bin
 
 # Versi paket spec Fig yang dipakai. Naikkan angka ini untuk menyegarkan spec.
@@ -7,7 +7,7 @@ FIG_VERSION := 2.692.3
 .PHONY: build test bench fmt vet check clean cross specs snapshot release-check ux
 
 build:
-	go build -o $(BIN_DIR)/$(BINARY) ./cmd/uf
+	go build -o $(BIN_DIR)/$(BINARY) ./cmd/anjuran
 
 test:
 	go test ./...
@@ -28,7 +28,7 @@ cross:
 	@for t in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64; do \
 		os=$${t%/*}; arch=$${t#*/}; ext=""; \
 		[ "$$os" = "windows" ] && ext=".exe"; \
-		GOOS=$$os GOARCH=$$arch go build -o $(BIN_DIR)/$(BINARY)-$$os-$$arch$$ext ./cmd/uf || exit 1; \
+		GOOS=$$os GOARCH=$$arch go build -o $(BIN_DIR)/$(BINARY)-$$os-$$arch$$ext ./cmd/anjuran || exit 1; \
 		echo "  ok $$os/$$arch"; \
 	done
 

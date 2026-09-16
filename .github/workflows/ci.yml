@@ -33,11 +33,11 @@ jobs:
       - name: uji asap
         shell: bash
         run: |
-          go build -o uf ./cmd/uf
-          ./uf init powershell > /dev/null
-          ./uf init bash > /dev/null
-          ./uf complete --line "git comm" --specs internal/testdata/specs | grep -q commit
-          ./uf widget --line "git stat" --cursor 8 --specs internal/testdata/specs < /dev/null | grep -q '^ok '
+          go build -o anjuran ./cmd/anjuran
+          ./anjuran init powershell > /dev/null
+          ./anjuran init bash > /dev/null
+          ./anjuran complete --line "git comm" --specs internal/testdata/specs | grep -q commit
+          ./anjuran widget --line "git stat" --cursor 8 --specs internal/testdata/specs < /dev/null | grep -q '^ok '
 
   format:
     runs-on: ubuntu-latest

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Bangun direktori spec uf dari paket npm @withfig/autocomplete (MIT).
+# Bangun direktori spec anjuran dari paket npm @withfig/autocomplete (MIT).
 #
 # Paket itu sudah berisi spec terkompilasi sebagai modul ESM, sehingga yang
 # dibutuhkan hanya Node — bukan TypeScript, bukan pula meng-clone reponya.

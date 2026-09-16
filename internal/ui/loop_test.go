@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/spec"
-	"github.com/uf-cli/uf/internal/tty"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/tty"
 )
 
 // fakeTerm memutar ulang urutan tombol yang sudah ditentukan, sehingga loop

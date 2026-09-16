@@ -1,23 +1,23 @@
-# Integrasi uf untuk PowerShell.
+# Integrasi anjuran untuk PowerShell.
 #
 # Pasang dengan menambahkan satu baris ini ke $PROFILE:
 #
-#     uf init powershell | Out-String | Invoke-Expression
+#     anjuran init powershell | Out-String | Invoke-Expression
 #
 # Membutuhkan PSReadLine, yang sudah menjadi bawaan PowerShell 5.1 ke atas.
-# Tombol pemicu bisa diganti lewat $env:UF_KEY sebelum dijalankan, misalnya:
+# Tombol pemicu bisa diganti lewat $env:ANJURAN_KEY sebelum dijalankan, misalnya:
 #
-#     $env:UF_KEY = 'Ctrl+Spacebar'   # Tab tetap milik PowerShell
+#     $env:ANJURAN_KEY = 'Ctrl+Spacebar'   # Tab tetap milik PowerShell
 
 if (-not (Get-Module -ListAvailable -Name PSReadLine)) {
-    Write-Warning 'uf: PSReadLine tidak tersedia; integrasi dilewati.'
+    Write-Warning 'anjuran: PSReadLine tidak tersedia; integrasi dilewati.'
     return
 }
 Import-Module PSReadLine -ErrorAction SilentlyContinue
 
-$script:UfKey = if ($env:UF_KEY) { $env:UF_KEY } else { 'Tab' }
+$script:UfKey = if ($env:ANJURAN_KEY) { $env:ANJURAN_KEY } else { 'Tab' }
 
-Set-PSReadLineKeyHandler -Key $script:UfKey -BriefDescription 'uf' -LongDescription 'Dropdown completion uf' -ScriptBlock {
+Set-PSReadLineKeyHandler -Key $script:UfKey -BriefDescription 'anjuran' -LongDescription 'Dropdown completion anjuran' -ScriptBlock {
     $line = $null
     $cursor = $null
     [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
@@ -27,7 +27,7 @@ Set-PSReadLineKeyHandler -Key $script:UfKey -BriefDescription 'uf' -LongDescript
     # ketiganya berbeda sekaligus.
     $out = @()
     try {
-        $out = @(& uf widget --line $line --cursor $cursor --cursor-unit utf16 2>$null)
+        $out = @(& anjuran widget --line $line --cursor $cursor --cursor-unit utf16 2>$null)
     } catch {
         # Binary tidak ditemukan atau gagal dijalankan: jangan matikan tombolnya.
     }

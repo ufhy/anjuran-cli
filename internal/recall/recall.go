@@ -94,7 +94,7 @@ func (s *Store) now() int64 {
 
 // Save menulis ingatan ke disk bila ada yang berubah.
 //
-// Ditulis lewat berkas sementara lalu dipindahkan, supaya proses uf lain yang
+// Ditulis lewat berkas sementara lalu dipindahkan, supaya proses anjuran lain yang
 // membaca bersamaan tidak pernah melihat isi yang setengah jadi.
 func (s *Store) Save() {
 	if s == nil || !s.dirty || s.path == "" {

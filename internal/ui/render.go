@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/uf-cli/uf/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/engine"
 )
 
 // Item adalah satu baris yang digambar di dropdown.
@@ -203,7 +203,7 @@ func (r *Renderer) reserve(n int) error {
 // sudah diamankan oleh proses lain.
 //
 // Ini yang membuat penggambaran ulang antar proses mungkin. Saat dropdown
-// muncul otomatis, setiap ketikan menjalankan proses uf yang baru dan tidak
+// muncul otomatis, setiap ketikan menjalankan proses anjuran yang baru dan tidak
 // mewarisi apa pun; zsh yang menyimpan jumlah barisnya lalu menyerahkannya
 // kembali ke sini. Isi baris lama sengaja diisi penanda yang tidak mungkin
 // cocok, supaya seluruhnya digambar ulang dan sisanya dibersihkan.

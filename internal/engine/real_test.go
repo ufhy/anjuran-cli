@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 // realSpecs adalah direktori spec hasil transpile. Berkas ini dihasilkan oleh

@@ -12,16 +12,16 @@ import (
 	"sort"
 )
 
-//go:embed uf.zsh
+//go:embed anjuran.zsh
 var zshScript string
 
-//go:embed uf.bash
+//go:embed anjuran.bash
 var bashScript string
 
-//go:embed uf.fish
+//go:embed anjuran.fish
 var fishScript string
 
-//go:embed uf.ps1
+//go:embed anjuran.ps1
 var powershellScript string
 
 var scripts = map[string]string{

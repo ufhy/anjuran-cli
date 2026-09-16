@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 // Nama berkas berspasi yang belum dikutip sudah dipecah shell menjadi beberapa
-// kata sebelum uf melihatnya. Prefix-nya disatukan kembali, supaya yang
+// kata sebelum anjuran melihatnya. Prefix-nya disatukan kembali, supaya yang
 // dilengkapi adalah namanya yang utuh — begitulah orang mengetiknya.
 func engineDiDir(t *testing.T) (*Engine, string) {
 	t.Helper()

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/parser"
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/parser"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 // Penyapuan korpus.

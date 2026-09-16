@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/uf-cli/uf/internal/parser"
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/parser"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 // engineFor membuat engine dari satu spec inline, agar perilaku setiap field

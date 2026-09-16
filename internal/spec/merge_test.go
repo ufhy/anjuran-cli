@@ -53,14 +53,14 @@ func TestSumberKandidatDiganti(t *testing.T) {
 	writeSpec(t, dasar, "s", `{"name":"s","args":[{"name":"x",
 		"generators":[{"template":["history"]}]}]}`)
 	writeSpec(t, tambalan, "s", `{"name":"s","args":[{"name":"x",
-		"generators":[{"template":["uf:hosts"]}]}]}`)
+		"generators":[{"template":["anjuran:hosts"]}]}]}`)
 
 	sc, _ := NewRegistryDirs(tambalan, dasar).Load("s")
 	gens := sc.Args[0].Generators
 	if len(gens) != 1 {
 		t.Fatalf("generator = %d, mau tepat 1 dari tambalan", len(gens))
 	}
-	if gens[0].Template[0] != "uf:hosts" {
+	if gens[0].Template[0] != "anjuran:hosts" {
 		t.Errorf("generator = %v, mau milik tambalan", gens[0].Template)
 	}
 }

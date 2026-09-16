@@ -72,7 +72,7 @@ func TestCacheTTLNolTidakMenyimpan(t *testing.T) {
 	}
 }
 
-// Proses uf lain bisa membaca bersamaan, jadi berkas tidak boleh pernah
+// Proses anjuran lain bisa membaca bersamaan, jadi berkas tidak boleh pernah
 // terlihat setengah jadi.
 func TestCacheTidakMeninggalkanBerkasSementara(t *testing.T) {
 	c, _ := cacheUji(t)

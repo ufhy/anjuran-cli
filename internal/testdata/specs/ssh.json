@@ -27,7 +27,7 @@
   ],
   "args": [
     { "name": "destination",
-      "generators": [{ "script": ["uf", "internal", "ssh-hosts"], "trim": true, "cacheTtl": 60 }] },
+      "generators": [{ "script": ["anjuran", "internal", "ssh-hosts"], "trim": true, "cacheTtl": 60 }] },
     { "name": "command", "isOptional": true, "isVariadic": true }
   ]
 }

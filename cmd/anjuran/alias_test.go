@@ -4,7 +4,7 @@ import "testing"
 
 // Alias adalah cara sehari-hari orang memakai perintah panjang — oh-my-zsh
 // sendiri memasang ratusan. Tanpa pemetaan ini, "gco" tidak menghasilkan apa
-// pun karena uf mencari spec bernama gco.
+// pun karena anjuran mencari spec bernama gco.
 func TestAliasDipetakanKeBentukSebenarnya(t *testing.T) {
 	a := newAliasExpansion("gco fit", 7, "git checkout")
 	if !a.active {

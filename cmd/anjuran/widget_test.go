@@ -71,9 +71,9 @@ func TestSimpleModeMengikutiTerm(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Setenv("TERM", tt.term)
-		t.Setenv("UF_SIMPLE", tt.simple)
+		t.Setenv("ANJURAN_SIMPLE", tt.simple)
 		if got := simpleMode(); got != tt.want {
-			t.Errorf("TERM=%q UF_SIMPLE=%q -> %v, mau %v", tt.term, tt.simple, got, tt.want)
+			t.Errorf("TERM=%q ANJURAN_SIMPLE=%q -> %v, mau %v", tt.term, tt.simple, got, tt.want)
 		}
 	}
 }
@@ -165,39 +165,39 @@ func TestBundledDirs(t *testing.T) {
 	noSymlink := func(p string) (string, error) { return p, nil }
 
 	t.Run("arsip rilis", func(t *testing.T) {
-		got := bundledDirsFor("/opt/uf/uf", "specs", noSymlink)
-		want := []string{"/opt/uf/specs", "/opt/share/uf/specs"}
+		got := bundledDirsFor("/opt/anjuran/anjuran", "specs", noSymlink)
+		want := []string{"/opt/anjuran/specs", "/opt/share/anjuran/specs"}
 		assertDirs(t, got, want)
 	})
 
 	t.Run("deb dan rpm", func(t *testing.T) {
-		got := bundledDirsFor("/usr/bin/uf", "specs", noSymlink)
-		if !contains(got, "/usr/share/uf/specs") {
-			t.Errorf("mau /usr/share/uf/specs, dapat %v", got)
+		got := bundledDirsFor("/usr/bin/anjuran", "specs", noSymlink)
+		if !contains(got, "/usr/share/anjuran/specs") {
+			t.Errorf("mau /usr/share/anjuran/specs, dapat %v", got)
 		}
 	})
 
 	t.Run("symlink homebrew", func(t *testing.T) {
-		// /opt/homebrew/bin/uf -> /opt/homebrew/Caskroom/uf/1.0.0/uf
+		// /opt/homebrew/bin/anjuran -> /opt/homebrew/Caskroom/anjuran/1.0.0/anjuran
 		eval := func(p string) (string, error) {
-			if p == "/opt/homebrew/bin/uf" {
-				return "/opt/homebrew/Caskroom/uf/1.0.0/uf", nil
+			if p == "/opt/homebrew/bin/anjuran" {
+				return "/opt/homebrew/Caskroom/anjuran/1.0.0/anjuran", nil
 			}
 			return p, nil
 		}
-		got := bundledDirsFor("/opt/homebrew/bin/uf", "specs", eval)
-		if !contains(got, "/opt/homebrew/Caskroom/uf/1.0.0/specs") {
+		got := bundledDirsFor("/opt/homebrew/bin/anjuran", "specs", eval)
+		if !contains(got, "/opt/homebrew/Caskroom/anjuran/1.0.0/specs") {
 			t.Errorf("lokasi sebenarnya di balik symlink harus ikut dicari, dapat %v", got)
 		}
 		// Lokasi sebelum symlink diselesaikan tetap dicoba, karena formula
 		// meletakkan spec di share/ relatif terhadap bin.
-		if !contains(got, "/opt/homebrew/share/uf/specs") {
+		if !contains(got, "/opt/homebrew/share/anjuran/specs") {
 			t.Errorf("lokasi share relatif bin harus tetap dicari, dapat %v", got)
 		}
 	})
 
 	t.Run("tanpa duplikat", func(t *testing.T) {
-		got := bundledDirsFor("/usr/bin/uf", "specs", noSymlink)
+		got := bundledDirsFor("/usr/bin/anjuran", "specs", noSymlink)
 		seen := map[string]bool{}
 		for _, d := range got {
 			if seen[d] {
@@ -209,7 +209,7 @@ func TestBundledDirs(t *testing.T) {
 
 	t.Run("symlink gagal diselesaikan", func(t *testing.T) {
 		eval := func(string) (string, error) { return "", os.ErrNotExist }
-		got := bundledDirsFor("/opt/uf/uf", "specs", eval)
+		got := bundledDirsFor("/opt/anjuran/anjuran", "specs", eval)
 		if len(got) == 0 {
 			t.Error("kegagalan resolusi symlink tidak boleh mengosongkan hasil")
 		}

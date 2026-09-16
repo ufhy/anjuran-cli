@@ -1,32 +1,32 @@
-# Integrasi uf untuk zsh.
+# Integrasi anjuran untuk zsh.
 #
 # Pasang dengan menambahkan satu baris ini ke ~/.zshrc:
 #
-#     eval "$(uf init zsh)"
+#     eval "$(anjuran init zsh)"
 #
-# Tombol pemicu bisa diganti lewat UF_KEY sebelum eval, misalnya:
+# Tombol pemicu bisa diganti lewat ANJURAN_KEY sebelum eval, misalnya:
 #
-#     UF_KEY='^ ' eval "$(uf init zsh)"     # Ctrl-Spasi, Tab tetap bawaan zsh
+#     ANJURAN_KEY='^ ' eval "$(anjuran init zsh)"     # Ctrl-Spasi, Tab tetap bawaan zsh
 
 # Jangan pasang apa pun bila binary-nya tidak ada, agar .zshrc tetap aman
-# disalin ke mesin yang belum terpasang uf.
-(( $+commands[uf] )) || return 0
+# disalin ke mesin yang belum terpasang anjuran.
+(( $+commands[anjuran] )) || return 0
 
-# _uf_alias menaruh pemekaran alias kata pertama ke dalam _uf_alias_exp.
+# _anjuran_alias menaruh pemekaran alias kata pertama ke dalam _anjuran_alias_exp.
 #
-# Tanpa ini alias sama sekali tidak dikenali: uf mencari spec bernama "gco" dan
+# Tanpa ini alias sama sekali tidak dikenali: anjuran mencari spec bernama "gco" dan
 # tidak menemukannya. Padahal alias justru cara sehari-hari orang memakai
 # perintah panjang, dan oh-my-zsh memasang ratusan di antaranya.
 #
 # Nilainya diletakkan di variabel, bukan dicetak, supaya tidak menumbuhkan
 # subshell pada jalur yang dijalankan setiap kali spasi ditekan.
-typeset -g _uf_alias_exp
+typeset -g _anjuran_alias_exp
 
-_uf_alias() {
+_anjuran_alias() {
   emulate -L zsh
   setopt local_options no_ksh_arrays
 
-  _uf_alias_exp=""
+  _anjuran_alias_exp=""
 
   local -a words
   words=(${(z)BUFFER})
@@ -43,10 +43,10 @@ _uf_alias() {
   done
 
   [[ -n $first ]] || return
-  _uf_alias_exp=${aliases[$first]-}
+  _anjuran_alias_exp=${aliases[$first]-}
 }
 
-# _uf_widget menjalankan SATU sesi yang memegang seluruh interaksi.
+# _anjuran_widget menjalankan SATU sesi yang memegang seluruh interaksi.
 #
 # Model ini mengikuti cara IDE bekerja: daftar kandidat diambil sekali, lalu
 # disaring di tempat sambil pengguna mengetik — bukan dihitung ulang dari nol
@@ -55,7 +55,7 @@ _uf_alias() {
 # Konsekuensinya sesi memegang masukan selama dropdown terbuka. Agar tidak ada
 # yang dirampas dari zsh, tombol yang bukan urusan dropdown dikembalikan lewat
 # zle -U dan diproses zsh seperti biasa.
-_uf_widget() {
+_anjuran_widget() {
   emulate -L zsh
   setopt local_options no_ksh_arrays
 
@@ -67,26 +67,26 @@ _uf_widget() {
 
   # Bayangan disembunyikan selama dropdown terbuka: dua saran sekaligus hanya
   # menambah kebisingan, dan teks setelah kursor mengganggu gambar kotaknya.
-  if (( $+functions[_uf_ghost_hapus] )); then
-    _uf_ghost_hapus
+  if (( $+functions[_anjuran_ghost_hapus] )); then
+    _anjuran_ghost_hapus
   fi
 
   # Baris digambar ulang LEBIH DULU.
   #
   # Karakter pemicu baru saja disisipkan ke buffer, tetapi zsh belum
-  # menampilkannya — ia menggambar setelah widget selesai. Tanpa ini uf mulai
+  # menampilkannya — ia menggambar setelah widget selesai. Tanpa ini anjuran mulai
   # menggambar dari kolom yang salah, dan karakter pemicunya tidak pernah
   # terlihat.
   zle redisplay
 
-  _uf_alias
-  # Dropdown digambar uf langsung ke /dev/tty; stdout hanya membawa hasil.
-  out="$(command uf widget --line "$BUFFER" --cursor "$CURSOR" \
+  _anjuran_alias
+  # Dropdown digambar anjuran langsung ke /dev/tty; stdout hanya membawa hasil.
+  out="$(command anjuran widget --line "$BUFFER" --cursor "$CURSOR" \
     --select "$select_from" --trigger "$trigger" \
-    --alias "$_uf_alias_exp" 2>/dev/null)"
+    --alias "$_anjuran_alias_exp" 2>/dev/null)"
 
   if [[ -z $out ]]; then
-    # uf tidak bisa menjalankan sesi, misalnya karena bukan terminal
+    # anjuran tidak bisa menjalankan sesi, misalnya karena bukan terminal
     # interaktif. Serahkan ke completion bawaan zsh.
     zle expand-or-complete
     return
@@ -120,10 +120,10 @@ _uf_widget() {
       # Kutip penutup dilepas dulu: nama berspasi disisipkan terkutip, sehingga
       # "cd 'folder dengan spasi/'" berakhir dengan kutip, bukan garis miring.
       # Tanpa ini folder berspasi tidak pernah bisa ditelusuri.
-      local _uf_ekor=${BUFFER%[\'\"]}
-      if [[ $trigger == manual && $_uf_ekor == */ && -z $sisa ]]; then
+      local _anjuran_ekor=${BUFFER%[\'\"]}
+      if [[ $trigger == manual && $_anjuran_ekor == */ && -z $sisa ]]; then
         zle redisplay
-        _uf_widget none manual
+        _anjuran_widget none manual
         return
       fi
       ;;
@@ -144,20 +144,20 @@ _uf_widget() {
   esac
 
   zle redisplay
-  _uf_kembalikan "$sisa"
+  _anjuran_kembalikan "$sisa"
 
   # Bayangan dihitung ulang untuk baris yang baru.
-  if (( $+functions[_uf_ghost_perbarui] )); then
-    _uf_ghost_perbarui
+  if (( $+functions[_anjuran_ghost_perbarui] )); then
+    _anjuran_ghost_perbarui
   fi
 }
 
-# _uf_kembalikan mengembalikan tombol yang belum ditangani ke antrean masukan
-# zsh, sehingga diproses seperti tidak pernah lewat uf.
+# _anjuran_kembalikan mengembalikan tombol yang belum ditangani ke antrean masukan
+# zsh, sehingga diproses seperti tidak pernah lewat anjuran.
 #
 # Dikirim sebagai heksadesimal karena isinya byte kendali yang tidak aman
 # dilewatkan apa adanya di dalam satu baris teks.
-_uf_kembalikan() {
+_anjuran_kembalikan() {
   local hex=$1
   [[ -n $hex && $hex != 0 ]] || return 0
 
@@ -173,37 +173,37 @@ _uf_kembalikan() {
   [[ -n $teks ]] && zle -U -- "$teks"
 }
 
-zle -N _uf_widget
+zle -N _anjuran_widget
 
 # ---------------------------------------------------------------------------
 # Pemicu
 #
-# Tab selalu membuka sesi. Dengan UF_AUTO, karakter pemicu ikut membukanya —
+# Tab selalu membuka sesi. Dengan ANJURAN_AUTO, karakter pemicu ikut membukanya —
 # mengikuti cara IDE: bukan satu tombol khusus, melainkan titik-titik di mana
 # ada sesuatu yang layak ditawarkan.
 # ---------------------------------------------------------------------------
 
-bindkey "${UF_KEY:-^I}" _uf_widget
+bindkey "${ANJURAN_KEY:-^I}" _anjuran_widget
 
-if [[ -n ${UF_AUTO:-} ]]; then
+if [[ -n ${ANJURAN_AUTO:-} ]]; then
   # Widget asli yang terpasang pada sebuah tombol, supaya perilakunya tetap
   # utuh sebelum sesi dibuka. oh-my-zsh memetakan spasi ke magic-space, yang
   # memekarkan rujukan riwayat lebih dulu.
-  typeset -gA _uf_asli
+  typeset -gA _anjuran_asli
 
-  _uf_simpan_asli() {
+  _anjuran_simpan_asli() {
     local key=$1 nama=$2 keluaran orig
     keluaran="$(bindkey "$key")"
     orig=${keluaran##* }
     if [[ -n $orig && $orig != undefined-key ]]; then
-      _uf_asli[$nama]=$orig
+      _anjuran_asli[$nama]=$orig
     fi
   }
 
-  # _uf_pemicu menjalankan widget asli tombolnya, lalu membuka sesi.
-  _uf_pemicu() {
+  # _anjuran_pemicu menjalankan widget asli tombolnya, lalu membuka sesi.
+  _anjuran_pemicu() {
     local nama=$1
-    local orig=${_uf_asli[$nama]}
+    local orig=${_anjuran_asli[$nama]}
     if [[ -n $orig && $orig != $nama ]]; then
       zle "$orig" 2>/dev/null || zle .self-insert
     else
@@ -219,27 +219,27 @@ if [[ -n ${UF_AUTO:-} ]]; then
     # mengetik cepat: kotak yang digambar dari baris yang sudah basi hanya
     # mengganggu.
     (( PENDING + KEYS_QUEUED_COUNT )) && return
-    _uf_widget first auto
+    _anjuran_widget first auto
   }
 
-  _uf_spasi()      { _uf_pemicu _uf_spasi }
-  _uf_garismiring(){ _uf_pemicu _uf_garismiring }
-  _uf_samadengan() { _uf_pemicu _uf_samadengan }
-  zle -N _uf_spasi
-  zle -N _uf_garismiring
-  zle -N _uf_samadengan
+  _anjuran_spasi()      { _anjuran_pemicu _anjuran_spasi }
+  _anjuran_garismiring(){ _anjuran_pemicu _anjuran_garismiring }
+  _anjuran_samadengan() { _anjuran_pemicu _anjuran_samadengan }
+  zle -N _anjuran_spasi
+  zle -N _anjuran_garismiring
+  zle -N _anjuran_samadengan
 
-  _uf_simpan_asli " " _uf_spasi
-  _uf_simpan_asli "/" _uf_garismiring
-  _uf_simpan_asli "=" _uf_samadengan
+  _anjuran_simpan_asli " " _anjuran_spasi
+  _anjuran_simpan_asli "/" _anjuran_garismiring
+  _anjuran_simpan_asli "=" _anjuran_samadengan
 
-  bindkey " " _uf_spasi
-  bindkey "/" _uf_garismiring
-  bindkey "=" _uf_samadengan
+  bindkey " " _anjuran_spasi
+  bindkey "/" _anjuran_garismiring
+  bindkey "=" _anjuran_samadengan
   if [[ -n ${keymaps[(r)viins]} ]]; then
-    bindkey -M viins " " _uf_spasi
-    bindkey -M viins "/" _uf_garismiring
-    bindkey -M viins "=" _uf_samadengan
+    bindkey -M viins " " _anjuran_spasi
+    bindkey -M viins "/" _anjuran_garismiring
+    bindkey -M viins "=" _anjuran_samadengan
   fi
 fi
 
@@ -250,30 +250,30 @@ fi
 # dijalankan. Untuk perintah panjang yang diulang setiap hari — kubectl logs
 # dengan namespace dan selector — ini lebih sering menolong daripada dropdown.
 #
-# Seluruhnya dikerjakan di dalam zsh, tanpa memanggil uf sama sekali: ia harus
+# Seluruhnya dikerjakan di dalam zsh, tanpa memanggil anjuran sama sekali: ia harus
 # diperbarui pada SETIAP ketikan, dan menumbuhkan proses di sana akan terasa
-# berat. uf hanya menggambar dropdown; riwayat sudah ada di dalam shell.
+# berat. anjuran hanya menggambar dropdown; riwayat sudah ada di dalam shell.
 #
-# Nyalakan dengan UF_GHOST=1. Bawaannya mati.
+# Nyalakan dengan ANJURAN_GHOST=1. Bawaannya mati.
 # ---------------------------------------------------------------------------
 
-if [[ -n ${UF_GHOST:-} ]]; then
+if [[ -n ${ANJURAN_GHOST:-} ]]; then
   if (( $+functions[_zsh_autosuggest_bind_widgets] )) || [[ -n ${ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE:-} ]]; then
     # zsh-autosuggestions sudah melakukan hal yang sama. Memasang keduanya
     # membuat dua teks abu-abu bersaing memperebutkan POSTDISPLAY.
-    print -u2 "uf: zsh-autosuggestions terdeteksi; saran riwayat uf dilewati."
+    print -u2 "anjuran: zsh-autosuggestions terdeteksi; saran riwayat anjuran dilewati."
   else
 
   # Gaya teks bayangan. Warna 8 adalah abu-abu redup di hampir semua tema.
-  typeset -g _uf_ghost_style=${UF_GHOST_STYLE:-fg=8}
+  typeset -g _anjuran_ghost_style=${ANJURAN_GHOST_STYLE:-fg=8}
 
-  _uf_ghost_hapus() {
+  _anjuran_ghost_hapus() {
     POSTDISPLAY=""
     region_highlight=()
   }
 
-  _uf_ghost_perbarui() {
-    _uf_ghost_hapus
+  _anjuran_ghost_perbarui() {
+    _anjuran_ghost_hapus
     (( $#BUFFER )) || return
     # Hanya saat kursor di ujung: bayangan yang muncul di tengah baris
     # menyesatkan, karena ia tidak menyambung apa yang sedang diedit.
@@ -286,37 +286,37 @@ if [[ -n ${UF_GHOST:-} ]]; then
 
     [[ -n $saran && $saran != $BUFFER ]] || return
     POSTDISPLAY="${saran#$BUFFER}"
-    region_highlight=("$#BUFFER $(( $#BUFFER + $#POSTDISPLAY )) $_uf_ghost_style")
+    region_highlight=("$#BUFFER $(( $#BUFFER + $#POSTDISPLAY )) $_anjuran_ghost_style")
   }
 
   # Widget pengetikan dibungkus supaya bayangan ikut bergerak. Semuanya murni
   # zsh, jadi tidak ada proses yang ditumbuhkan per ketikan.
-  _uf_ghost_insert() { zle .self-insert; _uf_ghost_perbarui }
-  _uf_ghost_hapus_mundur() { zle .backward-delete-char; _uf_ghost_perbarui }
-  zle -N self-insert _uf_ghost_insert
-  zle -N backward-delete-char _uf_ghost_hapus_mundur
+  _anjuran_ghost_insert() { zle .self-insert; _anjuran_ghost_perbarui }
+  _anjuran_ghost_hapus_mundur() { zle .backward-delete-char; _anjuran_ghost_perbarui }
+  zle -N self-insert _anjuran_ghost_insert
+  zle -N backward-delete-char _anjuran_ghost_hapus_mundur
 
   # Panah kanan dan End menerima bayangan bila ada; kalau tidak, keduanya
   # kembali menjadi pergerakan kursor biasa.
-  _uf_ghost_terima() {
+  _anjuran_ghost_terima() {
     if [[ -n $POSTDISPLAY ]] && (( CURSOR == $#BUFFER )); then
       BUFFER="$BUFFER$POSTDISPLAY"
       CURSOR=$#BUFFER
-      _uf_ghost_hapus
+      _anjuran_ghost_hapus
       return
     fi
     zle .end-of-line
   }
-  zle -N _uf_ghost_terima
-  bindkey "^[[C" _uf_ghost_terima
-  bindkey "^[OC" _uf_ghost_terima
-  bindkey "^E" _uf_ghost_terima
-  [[ -n ${terminfo[kcuf1]} ]] && bindkey "${terminfo[kcuf1]}" _uf_ghost_terima
+  zle -N _anjuran_ghost_terima
+  bindkey "^[[C" _anjuran_ghost_terima
+  bindkey "^[OC" _anjuran_ghost_terima
+  bindkey "^E" _anjuran_ghost_terima
+  [[ -n ${terminfo[kcuf1]} ]] && bindkey "${terminfo[kcuf1]}" _anjuran_ghost_terima
 
   # Bayangan harus hilang sebelum barisnya dijalankan, kalau tidak teksnya
   # ikut terbaca sebagai bagian perintah oleh mata pengguna.
-  _uf_ghost_jalankan() { _uf_ghost_hapus; zle .accept-line }
-  zle -N accept-line _uf_ghost_jalankan
+  _anjuran_ghost_jalankan() { _anjuran_ghost_hapus; zle .accept-line }
+  zle -N accept-line _anjuran_ghost_jalankan
 
   fi
 fi

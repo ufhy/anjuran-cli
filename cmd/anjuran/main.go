@@ -1,4 +1,4 @@
-// Command uf adalah entry point CLI.
+// Command anjuran adalah entry point CLI.
 //
 // Pada tahap ini hanya ada subperintah `complete`, yang membaca sebuah baris
 // perintah dan mencetak kandidatnya. Bentuk ini disengaja: engine bisa diuji
@@ -12,10 +12,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/generator"
-	"github.com/uf-cli/uf/internal/spec"
-	"github.com/uf-cli/uf/internal/ui"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/generator"
+	"github.com/ufhy/anjuran-cli/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/ui"
 )
 
 // version diisi saat build lewat -ldflags. Nilai "dev" berarti binary ini
@@ -26,14 +26,14 @@ var (
 	date    = ""
 )
 
-const usage = `uf - autocomplete lintas platform untuk shell
+const usage = `anjuran - autocomplete lintas platform untuk shell
 
 Penggunaan:
-  uf init      <zsh|bash|fish|powershell>
-  uf bootstrap [user@]host [--from <dir>] [--dry-run]
-  uf version
-  uf complete --line <baris> [--cursor N] [--json]
-  uf widget   --line <baris> --cursor <N>
+  anjuran init      <zsh|bash|fish|powershell>
+  anjuran bootstrap [user@]host [--from <dir>] [--dry-run]
+  anjuran version
+  anjuran complete --line <baris> [--cursor N] [--json]
+  anjuran widget   --line <baris> --cursor <N>
 
 Opsi:
   --line    baris perintah yang sedang diketik
@@ -42,16 +42,16 @@ Opsi:
   --no-generators
             jangan jalankan generator; hanya kandidat dari berkas spec
   --specs   direktori spec, boleh beberapa dipisah titik dua
-            (default: $UF_SPECS, ~/.config/uf/specs, ./specs, lalu bawaan)
+            (default: $ANJURAN_SPECS, ~/.config/anjuran/specs, ./specs, lalu bawaan)
 
 init mencetak skrip integrasi shell. Pasang dengan menambahkan satu baris ke
 berkas konfigurasi shell:
 
-  zsh   ~/.zshrc                     eval "$(uf init zsh)"
-  bash  ~/.bashrc                    eval "$(uf init bash)"
-  fish  ~/.config/fish/config.fish   uf init fish | source
+  zsh   ~/.zshrc                     eval "$(anjuran init zsh)"
+  bash  ~/.bashrc                    eval "$(anjuran init bash)"
+  fish  ~/.config/fish/config.fish   anjuran init fish | source
 
-bootstrap memasang uf di host lain lewat SSH. Engine harus berjalan di sisi
+bootstrap memasang anjuran di host lain lewat SSH. Engine harus berjalan di sisi
 remote, karena generator seperti "kubectl get pods" hanya menjawab benar di
 tempat datanya berada. Perintah ini bukan pembungkus ssh: ia dijalankan sekali,
 dengan sadar, lalu selesai.
@@ -60,22 +60,22 @@ widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
 
 Lingkungan:
-  UF_SPECS      direktori spec
-  UF_SIMPLE     bila diisi, matikan warna dan sorotan
-  UF_KEY        tombol pemicu, dibaca oleh skrip init
-  UF_AUTO       bila diisi, dropdown muncul pada karakter pemicu
-  UF_GHOST      bila diisi, tampilkan saran dari riwayat sebagai teks abu-abu
-  UF_CACHE_DIR  lokasi cache generator dan ingatan pilihan
+  ANJURAN_SPECS      direktori spec
+  ANJURAN_SIMPLE     bila diisi, matikan warna dan sorotan
+  ANJURAN_KEY        tombol pemicu, dibaca oleh skrip init
+  ANJURAN_AUTO       bila diisi, dropdown muncul pada karakter pemicu
+  ANJURAN_GHOST      bila diisi, tampilkan saran dari riwayat sebagai teks abu-abu
+  ANJURAN_CACHE_DIR  lokasi cache generator dan ingatan pilihan
 
 Generator menjalankan perintah sebagai efek samping mengetik, jadi
 kebijakannya ketat secara bawaan dan diatur lewat lingkungan:
 
-  UF_NO_GENERATORS        bila diisi, matikan seluruh generator
-  UF_GENERATOR_ALLOW      biner tambahan yang boleh dijalankan, dipisah koma
-  UF_GENERATOR_ALLOW_ROOT bila diisi, izinkan generator berjalan sebagai root
-  UF_GENERATOR_TIMEOUT    batas waktu, misalnya 800ms
+  ANJURAN_NO_GENERATORS        bila diisi, matikan seluruh generator
+  ANJURAN_GENERATOR_ALLOW      biner tambahan yang boleh dijalankan, dipisah koma
+  ANJURAN_GENERATOR_ALLOW_ROOT bila diisi, izinkan generator berjalan sebagai root
+  ANJURAN_GENERATOR_TIMEOUT    batas waktu, misalnya 800ms
 
-Secara bawaan uf hanya menjalankan perintah yang sedang kamu ketik sendiri,
+Secara bawaan anjuran hanya menjalankan perintah yang sedang kamu ketik sendiri,
 dan tidak pernah menjalankan interpreter seperti bash, python, atau sudo.
 `
 
@@ -121,7 +121,7 @@ func runComplete(args []string) int {
 
 	dirs, err := resolveSpecsDirs(*specsDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 
@@ -139,7 +139,7 @@ func runComplete(args []string) int {
 
 	pre, err := ui.Prepare(eng, ui.State{Line: *line, Cursor: *cursor}, dyn, nil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "uf:", err)
+		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
 	}
 
@@ -155,7 +155,7 @@ func runComplete(args []string) int {
 			Candidates []engine.Candidate `json:"candidates"`
 			Denied     []string           `json:"denied,omitempty"`
 		}{pre.Candidates(), denied}); err != nil {
-			fmt.Fprintln(os.Stderr, "uf:", err)
+			fmt.Fprintln(os.Stderr, "anjuran:", err)
 			return 1
 		}
 		return 0
@@ -169,7 +169,7 @@ func runComplete(args []string) int {
 		fmt.Printf("%s\t%s\t%s\n", c.Name, c.Kind, c.Description)
 	}
 	for _, d := range denied {
-		fmt.Fprintln(os.Stderr, "uf: generator ditolak:", d)
+		fmt.Fprintln(os.Stderr, "anjuran: generator ditolak:", d)
 	}
 	return 0
 }
@@ -182,7 +182,7 @@ func runComplete(args []string) int {
 func resolveSpecsDirs(flagValue string) ([]string, error) {
 	dirs, _ := resolveSpecsDirsTrust(flagValue)
 	if len(dirs) == 0 {
-		return nil, fmt.Errorf("direktori spec tidak ditemukan; setel UF_SPECS atau pakai --specs")
+		return nil, fmt.Errorf("direktori spec tidak ditemukan; setel ANJURAN_SPECS atau pakai --specs")
 	}
 	return dirs, nil
 }
@@ -212,14 +212,14 @@ func resolveSpecsDirsTrust(flagValue string) (dirs, trusted []string) {
 	// tidak pernah mendapat kelonggaran itu.
 	mark := len(dirs)
 	if home, err := os.UserHomeDir(); err == nil {
-		add(filepath.Join(home, ".config", "uf", "specs"))
+		add(filepath.Join(home, ".config", "anjuran", "specs"))
 	}
 	add("extra")
 	add(bundledDirs("extra")...)
 	trusted = append(trusted, dirs[mark:]...)
 
 	add(filepath.SplitList(flagValue)...)
-	add(filepath.SplitList(os.Getenv("UF_SPECS"))...)
+	add(filepath.SplitList(os.Getenv("ANJURAN_SPECS"))...)
 	add("specs")
 	add(bundledDirs("specs")...)
 
@@ -229,7 +229,7 @@ func resolveSpecsDirsTrust(flagValue string) (dirs, trusted []string) {
 // versionString merangkai keterangan versi. Commit dan tanggal hanya muncul
 // bila binary ini memang dibangun oleh proses rilis.
 func versionString() string {
-	s := "uf " + version
+	s := "anjuran " + version
 	if commit != "" {
 		s += " (" + commit
 		if date != "" {
@@ -271,8 +271,8 @@ func bundledDirsFor(exe, name string, eval func(string) (string, error)) []strin
 	addFor := func(path string) {
 		base := filepath.Dir(path)
 		for _, d := range []string{
-			filepath.Join(base, name),                      // arsip rilis, cask, scoop
-			filepath.Join(base, "..", "share", "uf", name), // deb, rpm, formula
+			filepath.Join(base, name),                           // arsip rilis, cask, scoop
+			filepath.Join(base, "..", "share", "anjuran", name), // deb, rpm, formula
 		} {
 			c := filepath.Clean(d)
 			if !seen[c] {

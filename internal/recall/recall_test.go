@@ -58,7 +58,7 @@ func TestTersimpanAntarProses(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", dir)
 	t.Setenv("HOME", dir)
 
-	// uf adalah proses baru setiap kali; ingatan harus melewati batas proses.
+	// anjuran adalah proses baru setiap kali; ingatan harus melewati batas proses.
 	a := Open()
 	a.Record(Key("kubectl", "g"), "get")
 	a.Save()

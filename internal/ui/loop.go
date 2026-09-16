@@ -5,9 +5,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/parser"
-	"github.com/uf-cli/uf/internal/recall"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/parser"
+	"github.com/ufhy/anjuran-cli/internal/recall"
 )
 
 // Outcome membedakan tiga akhir sesi yang perlu ditangani shell secara

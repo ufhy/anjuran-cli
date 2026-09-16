@@ -22,7 +22,7 @@ type Options struct {
 	Force bool
 	// DryRun hanya melaporkan rencana tanpa mengirim apa pun.
 	DryRun bool
-	// Version adalah versi uf lokal, dipakai membandingkan dengan yang terpasang.
+	// Version adalah versi anjuran lokal, dipakai membandingkan dengan yang terpasang.
 	Version string
 	// Out adalah tempat laporan ditulis.
 	Out io.Writer
@@ -112,7 +112,7 @@ func Install(ctx context.Context, t Transport, plan Plan, opt Options) error {
 	// terlihat sebagai kegagalan mkdir — bukan sebagai arsip rusak.
 	mkdir := fmt.Sprintf("mkdir -p %s %s",
 		homePath(path.Join(base, "bin")),
-		homePath(path.Join(base, "share/uf")))
+		homePath(path.Join(base, "share/anjuran")))
 	if _, err := t.Exec(ctx, mkdir); err != nil {
 		return fmt.Errorf("menyiapkan direktori di %s: %w", t.Target(), err)
 	}
@@ -160,7 +160,7 @@ func ShellHint(base string) string {
 	return fmt.Sprintf(`Tambahkan ke berkas konfigurasi shell di host itu:
 
   export PATH="%s:$PATH"
-  eval "$(uf init zsh)"      # atau bash, fish, powershell`, bin)
+  eval "$(anjuran init zsh)"      # atau bash, fish, powershell`, bin)
 }
 
 // humanBytes memformat ukuran agar mudah dibaca.

@@ -1,4 +1,4 @@
-// Transpiler spec Fig -> JSON milik uf.
+// Transpiler spec Fig -> JSON milik anjuran.
 //
 // Sumbernya adalah paket npm @withfig/autocomplete (MIT), yang sudah berisi
 // spec terkompilasi sebagai modul ESM. Karena itu tidak dibutuhkan kompiler

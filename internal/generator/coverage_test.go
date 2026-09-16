@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/spec"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/spec"
 )
 
 // Uji cakupan.

@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/uf-cli/uf/internal/engine"
-	"github.com/uf-cli/uf/internal/ui"
+	"github.com/ufhy/anjuran-cli/internal/engine"
+	"github.com/ufhy/anjuran-cli/internal/ui"
 )
 
 // Penyapuan lanjutan: sifat-sifat yang belum diperiksa penyapuan pertama.
@@ -166,7 +166,7 @@ func TestSapuKursorDiTengah(t *testing.T) {
 //
 // Pengguna menempelkan segala macam ke baris perintah. Yang diuji di sini
 // bukan hasilnya, melainkan bahwa tidak ada masukan yang bisa menjatuhkan
-// proses uf di tengah pengetikan.
+// proses anjuran di tengah pengetikan.
 func TestSapuAcak(t *testing.T) {
 	eng, names := sweepEngine(t)
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))

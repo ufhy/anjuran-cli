@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Uji UX uf di dalam zsh sungguhan.
+"""Uji UX anjuran di dalam zsh sungguhan.
 
 Menjalankan skenario yang benar-benar diketik orang, lalu memeriksa apa yang
 TERLIHAT di layar. Uji Go memeriksa jawaban engine; berkas ini memeriksa
@@ -36,13 +36,13 @@ class Hasil:
 def siapkan_pemasangan():
     """Susun binary beserta spec-nya seperti hasil pemasangan sungguhan.
 
-    uf mencari spec relatif terhadap dirinya sendiri. Menjalankan bin/uf apa
+    anjuran mencari spec relatif terhadap dirinya sendiri. Menjalankan bin/anjuran apa
     adanya berarti tidak ada spec sama sekali — dan seluruh skenario akan gagal
     karena alasan yang tidak ada hubungannya dengan UX. Menyusunnya seperti
     paket rilis sekaligus menguji tata letak itu.
     """
-    d = tempfile.mkdtemp(prefix="uf-bin-")
-    shutil.copy2(os.path.join(REPO, "bin", "uf"), os.path.join(d, "uf"))
+    d = tempfile.mkdtemp(prefix="anjuran-bin-")
+    shutil.copy2(os.path.join(REPO, "bin", "anjuran"), os.path.join(d, "anjuran"))
     for nama in ("specs", "extra"):
         asal = os.path.join(REPO, nama)
         if os.path.isdir(asal):
@@ -56,13 +56,13 @@ def siapkan_sandbox():
     TIDAK PERNAH di dalam repo: sesi shell sungguhan menjalankan perintah
     sungguhan, dan Enter pada kandidat tunggal mengeksekusi barisnya.
     """
-    d = tempfile.mkdtemp(prefix="uf-ux-")
+    d = tempfile.mkdtemp(prefix="anjuran-ux-")
     os.makedirs(os.path.join(d, "berkas"), exist_ok=True)
     os.makedirs(os.path.join(d, "berkas-lain"), exist_ok=True)
     # Bertingkat, supaya menelusuri punya tempat untuk TERUS turun — itulah
     # yang dulu terjadi tanpa diminta.
     os.makedirs(os.path.join(d, "proyek", "dalam", "lebih"), exist_ok=True)
-    # Folder BERSPASI: namanya terpecah jadi dua kata oleh shell sebelum uf
+    # Folder BERSPASI: namanya terpecah jadi dua kata oleh shell sebelum anjuran
     # melihatnya, dan disisipkan terkutip sesudahnya.
     os.makedirs(os.path.join(d, "folder dengan spasi", "dalam sini"), exist_ok=True)
     open(os.path.join(d, "folder dengan spasi", "isi.txt"), "w").close()
@@ -89,7 +89,7 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         "PATH": bindir + ":" + os.environ["PATH"],
         # Cache diarahkan ke direktori sekali pakai supaya ingatan pilihan
         # milik pengguna tidak ikut berubah saat pengujian.
-        "UF_CACHE_DIR": cachedir,
+        "ANJURAN_CACHE_DIR": cachedir,
     }
     s = term.Sesi([ZSH, "-i", "-l"], cwd=sandbox, env=env)
     try:
@@ -97,10 +97,10 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         s.ketik('PROMPT="%% "\r', 0.6)
         env_awal = []
         if auto:
-            env_awal.append("UF_AUTO=1")
+            env_awal.append("ANJURAN_AUTO=1")
         if ghost:
-            env_awal.append("UF_GHOST=1")
-        s.ketik(" ".join(env_awal) + ' eval "$(uf init zsh)"\r', 1.5)
+            env_awal.append("ANJURAN_GHOST=1")
+        s.ketik(" ".join(env_awal) + ' eval "$(anjuran init zsh)"\r', 1.5)
         for baris in persiapan:
             s.ketik(baris + "\r", 0.8)
         s.bersihkan_layar()
@@ -163,7 +163,7 @@ SKENARIO = [
     # memakai karakter yang sama. Yang diperiksa adalah isinya.
     ("Esc menutup kotak", [b"git", b" ", b"\x1b[B", b"\x1b"], tanpa("commit", "archive")),
     # Nama berspasi hanya bisa diketik terkutip atau terlolos; tanpa itu shell
-    # sudah memecahnya menjadi dua kata sebelum uf melihatnya.
+    # sudah memecahnya menjadi dua kata sebelum anjuran melihatnya.
     ("berkas berspasi terkutip", [b"cat", b" ", b'"berkas d'], memuat("berkas dengan spasi.txt")),
     ("berkas berspasi terlolos", [b"cat", b" ", b"berkas\\ d"], memuat("berkas dengan spasi.txt")),
     ("direktori berakhir garis miring", [b"cd", b" ", b"berk"], memuat("berkas/")),
@@ -350,8 +350,8 @@ SKENARIO = [
 
 def main():
     saring = os.environ.get("SKENARIO", "")
-    if not os.path.exists(os.path.join(REPO, "bin", "uf")):
-        print("bin/uf belum ada; jalankan `make build` lebih dulu", file=sys.stderr)
+    if not os.path.exists(os.path.join(REPO, "bin", "anjuran")):
+        print("bin/anjuran belum ada; jalankan `make build` lebih dulu", file=sys.stderr)
         return 2
 
     bindir = siapkan_pemasangan()
@@ -365,7 +365,7 @@ def main():
         # Skenario bayangan dijalankan tanpa dropdown otomatis, supaya yang
         # diuji benar-benar mekanismenya dan bukan interaksi keduanya.
         auto = "tanpa mode otomatis" not in nama and "bayangan" not in nama
-        cachedir = tempfile.mkdtemp(prefix="uf-cache-")
+        cachedir = tempfile.mkdtemp(prefix="anjuran-cache-")
         ghost = "bayangan" in nama
         persiapan = PERSIAPAN.get(nama, ())
         alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir,
