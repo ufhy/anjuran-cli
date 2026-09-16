@@ -119,3 +119,48 @@ func TestJalurBukanNamaPerintah(t *testing.T) {
 		t.Errorf("rentang ganti = %d..%d, mau 0..5", res.ReplaceStart, res.ReplaceEnd)
 	}
 }
+
+// Perintah tanpa subcommand — cd, ls, cat — isinya adalah argumennya.
+//
+// Mengetik "cd" harus langsung menawarkan direktori; menunggu spasi lebih dulu
+// berarti pengetahuan itu tetap tersembunyi di balik satu tombol.
+func TestPerintahTanpaSubcommandMenawarkanArgumennya(t *testing.T) {
+	e := New(spec.NewRegistry("../testdata/specs"))
+
+	res, err := e.Complete("ssh", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Lead membawa nama perintahnya, karena yang diganti adalah kata "ssh"
+	// itu sendiri — bukan sesuatu sesudahnya.
+	if res.Lead != "ssh " {
+		t.Errorf("Lead = %q, mau %q", res.Lead, "ssh ")
+	}
+	// Dengan Lead terisi, kandidat template TIDAK disaring dengan "ssh";
+	// tanpa itu daftar host akan selalu kosong.
+	if res.TemplateQuery() != "" {
+		t.Errorf("TemplateQuery = %q, mau kosong", res.TemplateQuery())
+	}
+}
+
+// Tanpa Lead, penyaringan template tetap memakai Prefix seperti biasa.
+func TestTemplateQueryBawaan(t *testing.T) {
+	r := &Result{Prefix: "ber"}
+	if r.TemplateQuery() != "ber" {
+		t.Errorf("TemplateQuery = %q, mau %q", r.TemplateQuery(), "ber")
+	}
+}
+
+// Nama perintah yang sudah lengkap tidak lagi menawarkan nama perintah lain
+// yang kebetulan berawalan sama: katanya sudah selesai.
+func TestNamaLengkapTidakMenawarkanPerintahLain(t *testing.T) {
+	e := New(spec.NewRegistry("../testdata/specs"))
+
+	res, err := e.Complete("git", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if berkasAtau(res.Templates, "commands") {
+		t.Errorf("Templates = %v, tidak boleh memuat \"commands\"", res.Templates)
+	}
+}

@@ -156,6 +156,15 @@ PERSIAPAN = {
 
 SKENARIO = [
     # (nama, ketikan, pemeriksa)
+    # Nama perintah yang sudah lengkap langsung menawarkan ISINYA, termasuk
+    # perintah yang isinya berupa argumen dan bukan subcommand.
+    ("mengetik cd menawarkan direktori", [b"c", b"d"], memuat("proyek/")),
+    ("cd yang dipilih benar-benar mendarat",
+     [b"c", b"d", b"\x1b[B", b"\r", b"\r", b"pwd\r"], memuat("/berkas")),
+    # Tab pada baris KOSONG menawarkan perintah. Dijalankan tanpa mode otomatis
+    # supaya yang membuka kotak benar-benar Tab, bukan ketikan sesudahnya.
+    ("Tab pada baris kosong tanpa mode otomatis",
+     [b"\t", b"zs"], memuat("zsh")),
     # Mengetik nama perintah sudah cukup; tidak perlu spasi maupun Tab.
     ("mengetik nama perintah memunculkan isinya",
      [b"g", b"i", b"t"], memuat("checkout", "commit")),

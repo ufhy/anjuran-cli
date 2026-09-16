@@ -41,7 +41,7 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 		seen[name] = true
 		// Nama berkas berspasi harus dikutip; tanpa itu shell memecahnya
 		// menjadi dua kata dan perintahnya rusak begitu dipilih.
-		insert := engine.Quote(name)
+		insert := res.Lead + engine.Quote(name)
 		out = append(out, engine.Candidate{
 			Name:         name,
 			Insert:       insert,
@@ -54,7 +54,7 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 
 	// Template dikerjakan lebih dulu karena tidak menjalankan proses sama
 	// sekali, sehingga selalu tersedia bahkan saat generator dimatikan.
-	for _, name := range FromTemplates(res.Templates, res.Prefix, s.Dir, res.Command) {
+	for _, name := range FromTemplates(res.Templates, res.TemplateQuery(), s.Dir, res.Command) {
 		add(name, "")
 	}
 

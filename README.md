@@ -255,10 +255,26 @@ kubec        →  kubectl, kubectl.docker
 docker ps | gi  →  git, github, gitleaks
 ```
 
-Begitu namanya cocok persis dengan perintah yang punya spec, isinya langsung
-ditawarkan. Ditampilkan sebagai `add`, `commit` — bukan `git add` — sebagaimana
-editor menampilkan anggota tanpa mengulang nama objeknya; yang disisipkan tetap
-`git add`, karena yang diganti adalah kata perintahnya.
+Tab pada baris yang **masih kosong** menawarkan seluruhnya.
+
+Begitu namanya cocok persis dengan perintah yang punya spec, katanya dianggap
+selesai dan yang ditawarkan adalah **isi perintah itu** — bukan nama perintah
+lain yang kebetulan berawalan sama:
+
+```sh
+git          →  add, branch, checkout, commit, …   (subcommand)
+cd           →  berkas/, proyek/, …                (argumennya)
+ssh          →  host dari ~/.ssh/config
+```
+
+Perintah tanpa subcommand — `cd`, `ls`, `cat` — isinya adalah argumennya, dan
+itu tetap ditawarkan tanpa menunggu spasi. Yang tampil di layar adalah `add`
+dan `commit`, bukan `git add`, sebagaimana editor menampilkan anggota tanpa
+mengulang nama objeknya; yang disisipkan tetap `git add` karena yang diganti
+adalah kata perintahnya.
+
+Konsekuensinya: mengetik `git` tidak lagi menampilkan `github`. Nama yang sudah
+lengkap berarti kata itu selesai; untuk `github`, ketik satu huruf lagi.
 
 PATH dipindai sekali seumur proses, dan satu proses adalah satu interaksi.
 

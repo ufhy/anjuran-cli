@@ -52,6 +52,14 @@ type Candidate struct {
 // menyebut prioritasnya sendiri.
 const DefaultPriority = 50
 
+// TemplateQuery adalah teks yang dipakai menyaring kandidat template.
+func (r *Result) TemplateQuery() string {
+	if r.Lead != "" {
+		return ""
+	}
+	return r.Prefix
+}
+
 // Match mengembalikan teks yang dipakai menyaring kandidat.
 func (r *Result) Match() string {
 	if r.FilterPrefixSet {
@@ -183,6 +191,16 @@ type Result struct {
 	// sendiri dan tidak pernah menampilkan apa pun.
 	FilterPrefix    string `json:"filterPrefix,omitempty"`
 	FilterPrefixSet bool   `json:"-"`
+	// Lead adalah teks yang MENDAHULUI setiap kandidat dinamis saat
+	// disisipkan, dan sekaligus menandakan bahwa kandidat template tidak
+	// disaring dengan Prefix.
+	//
+	// Terisi saat nama perintah sudah lengkap tetapi spasinya belum diketik.
+	// Mengetik "cd" harus menawarkan isi direktori, dan yang disisipkan adalah
+	// "cd proyek/" — bukan "proyek/", karena yang diganti adalah kata "cd"
+	// itu sendiri. Tanpa penanda ini daftar foldernya akan disaring dengan
+	// "cd" dan selalu kosong.
+	Lead string `json:"lead,omitempty"`
 	// ReplaceStart dan ReplaceEnd adalah rentang byte pada baris asli yang
 	// harus digantikan saat sebuah kandidat dipilih.
 	ReplaceStart int         `json:"replaceStart"`
@@ -438,19 +456,28 @@ func min(a, b int) int {
 // apa" membuat pengetahuan 716 spec itu tersembunyi di balik satu tombol yang
 // harus ditebak.
 func (e *Engine) saranPerintah(res *Result, prefix string) {
-	res.Templates = append(res.Templates, "commands")
-
-	// Nama yang sudah lengkap: tawarkan sekalian subcommand-nya.
 	if prefix == "" {
+		res.Templates = append(res.Templates, "commands")
 		return
 	}
+
 	root, err := e.registry.Load(prefix)
 	if err != nil || root == nil {
+		// Nama yang belum lengkap, atau perintah tanpa spec: yang ditawarkan
+		// adalah nama perintah lain yang berawalan sama.
+		res.Templates = append(res.Templates, "commands")
 		return
 	}
 	if root, err = e.registry.Resolve(root); err != nil || root == nil {
+		res.Templates = append(res.Templates, "commands")
 		return
 	}
+
+	// Namanya cocok PERSIS dengan sebuah perintah yang dikenal, jadi kata itu
+	// sudah selesai: yang ditawarkan adalah isi perintah itu, bukan nama
+	// perintah lain yang kebetulan berawalan sama. Begitu pula editor —
+	// begitu sebuah nama terselesaikan, yang ditampilkan adalah isinya.
+	res.Lead = prefix + " "
 
 	// Nama perintahnya sudah selesai diketik, jadi tidak ada lagi yang perlu
 	// disaring: seluruh isinya ditampilkan. Tanpa ini kandidatnya disaring
@@ -482,6 +509,24 @@ func (e *Engine) saranPerintah(res *Result, prefix string) {
 			})
 			break
 		}
+	}
+
+	// Perintah tanpa subcommand — cd, ls, cat — isinya adalah argumennya.
+	// Mengetik "cd" harus langsung menawarkan direktori; menunggu spasi lebih
+	// dulu berarti pengetahuan itu tetap tersembunyi di balik satu tombol.
+	if len(res.Candidates) == 0 && len(root.Args) > 0 {
+		e.addArg(res, &root.Args[0], "", res.Lead)
+	}
+	if len(res.Candidates) == 0 && len(res.Templates) == 0 && len(res.Generators) == 0 {
+		// Tidak ada yang bisa ditawarkan dari perintah itu sendiri; kembali
+		// menawarkan nama perintah.
+		//
+		// Generator ikut dihitung: host ssh datang dari sana, bukan dari
+		// template maupun suggestion, dan melupakannya membuat "ssh" jatuh
+		// kembali ke daftar nama perintah padahal ada jawaban yang lebih baik.
+		res.Lead = ""
+		res.FilterPrefix, res.FilterPrefixSet = "", false
+		res.Templates = append(res.Templates, "commands")
 	}
 }
 
