@@ -221,6 +221,75 @@ SKENARIO = [
      [b"cd", b" ", b"proy", b"\t"],
      memuat("dalam")),
 
+    # ------------------------------------------------------------------
+    # Perilaku dasar yang harus selalu benar
+    # ------------------------------------------------------------------
+    ("baris tetap utuh setelah Esc", [b"git", b" ", b"comm", b"\x1b"], memuat("git comm")),
+    ("backspace menyaring ulang", [b"git", b" ", b"commi", b"\x7f", b"\x7f"], memuat("commit")),
+    # Menghapus sampai kosong TIDAK memunculkan kembali kotaknya: sesi sudah
+    # menutup saat kandidat habis, dan pemicu berikutnya harus diketik. Yang
+    # dijaga di sini adalah ketikannya tidak hilang.
+    ("backspace mempertahankan ketikan",
+     [b"git", b" ", b"zz", b"\x7f"], memuat("git z")),
+    ("mengetik yang tidak cocok menutup kotak",
+     [b"git", b" ", b"zzqq"], gabung(memuat("git zzqq"), tanpa("commit"))),
+    ("dua pemicu dalam satu baris",
+     [b"git", b" ", b"commit", b" ", b"--am"], memuat("--amend")),
+    # Sesudah pipa, posisinya adalah NAMA PERINTAH — dan melengkapi nama
+    # perintah dari PATH memang belum ada. Yang dijaga: barisnya tetap utuh.
+    ("pemicu sesudah pipa tidak merusak baris",
+     [b"echo hai", b" ", b"|", b" ", b"gre"], memuat("echo hai | gre")),
+    ("opsi panjang dengan sama dengan",
+     [b"kubectl", b" ", b"get", b" ", b"pods", b" ", b"--output", b"="], memuat("json")),
+
+    # ------------------------------------------------------------------
+    # cd dan jalur direktori
+    # ------------------------------------------------------------------
+    ("cd tidak menyisipkan saat dipicu", [b"cd", b" "],
+     gabung(memuat("berkas/"), tanpa("cd berkas/"), tanpa("cd proyek/"))),
+    ("cd menyaring lalu Enter menutup",
+     [b"cd", b" ", b"proy", b"\r"], memuat("cd proyek/")),
+    ("garis miring memicu isi direktori",
+     [b"ls", b" ", b"proyek", b"/"], memuat("dalam")),
+    ("path dua tingkat", [b"ls", b" ", b"proyek/dalam", b"/"], memuat("╭")),
+    ("path absolut", [b"cat", b" ", b"/etc/hos"], memuat("hosts")),
+
+    # ------------------------------------------------------------------
+    # Tombol yang bukan urusan dropdown harus tetap berfungsi
+    # ------------------------------------------------------------------
+    ("Ctrl-C membatalkan baris", [b"git", b" ", b"comm", b"\x03", b"echo lanjut\r"],
+     memuat("lanjut")),
+    ("panah kiri menutup dan menggerakkan kursor",
+     [b"git", b" ", b"comm", b"\x1b[D", b"X"], memuat("git comXm")),
+    ("Ctrl-U membersihkan baris", [b"git", b" ", b"comm", b"\x15", b"echo bersih\r"],
+     memuat("bersih")),
+
+    # ------------------------------------------------------------------
+    # Menjalankan perintah sungguhan lewat dropdown
+    # ------------------------------------------------------------------
+    ("perintah terpilih benar-benar jalan",
+     [b"echo", b" ", b"catat", b"\r", b"\r"], memuat("catatan.txt")),
+    ("Enter langsung tanpa memilih menjalankan apa adanya",
+     [b"echo halo", b"\r"], memuat("halo")),
+
+    # ------------------------------------------------------------------
+    # Ketikan berat
+    # ------------------------------------------------------------------
+    # Diperiksa lewat KELUARAN perintahnya, bukan tampilan: yang harus benar
+    # adalah isi buffer, dan tampilan bisa keliru karena hal lain.
+    ("baris panjang sekaligus benar-benar utuh",
+     [b"echo satu dua tiga empat lima enam tujuh delapan", b"\x1b", b"\r"],
+     memuat("satu dua tiga empat lima enam tujuh delapan")),
+    # Tempelan panjang pernah mengunci shell: setiap spasi di dalamnya membuka
+    # sesi yang menunggu tombol yang sudah berada di penyangga zsh.
+    ("shell tetap hidup setelah tempelan panjang",
+     [b"echo satu dua tiga empat lima enam tujuh delapan", b"\x1b", b"\r",
+      b"echo TANDA\r"],
+     memuat("TANDA")),
+    ("banyak pemicu beruntun tetap utuh",
+     [b"echo", b" ", b"a", b" ", b"b", b" ", b"c", b" ", b"d", b"\x1b", b"\r"],
+     memuat("a b c d")),
+
     ("bayangan hilang saat dropdown terbuka",
      [b"git", b" ", b"che"],
      tanpa("fitur-alpha")),

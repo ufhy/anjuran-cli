@@ -76,7 +76,7 @@ func Prepare(eng *engine.Engine, st State, dyn Dynamic, rec Recall) (*Preflight,
 	}
 
 	p := &Preflight{eng: eng, dyn: dyn, recall: rec, res: res, st: st}
-	p.rs = filter(res.Candidates, res.Prefix, p.preferred(res))
+	p.rs = filter(res.Candidates, res.Match(), p.preferred(res))
 	return p, nil
 }
 
@@ -281,10 +281,13 @@ func (s *Session) Run() (State, Outcome, error) {
 
 		switch key.Type {
 		case KeyEscape:
-			// Esc menutup dropdown dan berhenti di situ; itu artinya
-			// "batalkan saran", bukan "batalkan baris". Ketikan yang telanjur
-			// terbaca tetap dikembalikan.
-			return s.selesai(nil, s.st, Cancelled)
+			// Esc membatalkan SARAN, bukan ketikan.
+			//
+			// Karakter yang diketik pengguna di dalam sesi tetap miliknya;
+			// membuangnya berarti Esc menghapus pekerjaan yang baru saja
+			// dilakukan. Karena itu hasilnya dikembalikan sebagai Accepted
+			// dengan baris apa adanya — yang dibatalkan hanya kotaknya.
+			return s.selesai(nil, s.st, Accepted)
 
 		case KeyCtrlC, KeyCtrlD:
 			// Keduanya punya arti bagi shell — membatalkan baris, menutup
@@ -311,7 +314,7 @@ func (s *Session) Run() (State, Outcome, error) {
 			// "git commit" bila seluruh kandidat yang tersisa berawalan sama —
 			// itu perilaku Tab yang sudah dikenal orang dari shell mana pun,
 			// dan tanpanya Tab hanya terasa seperti panah bawah.
-			if ext := awalanBersama(rs, res.Prefix); ext != "" {
+			if ext := awalanBersama(rs, res.Match()); ext != "" {
 				s.st = apply(s.st, res, engine.Candidate{
 					Name: ext, Insert: ext, CursorOffset: len(ext), Kind: engine.KindArg,
 				})
@@ -358,31 +361,14 @@ func (s *Session) Run() (State, Outcome, error) {
 			selected = max(selected-s.rend.MaxRows(), 0)
 
 		case KeyRune:
-			if key.Rune == ' ' && !s.spasiLiteral() {
-				// Spasi menerima pilihan LALU MEMBUKA konteks berikutnya.
-				//
-				// Ini karakter pemicu: di shell, spasi mengakhiri satu kata
-				// dan memulai kata berikutnya — persis titik di mana ada
-				// sesuatu baru yang layak ditawarkan. Menutup dropdown di situ
-				// berarti pengguna harus memicunya lagi secara manual, padahal
-				// spasinya sudah dikonsumsi sesi dan tidak pernah sampai ke
-				// shell untuk memicu ulang.
-				s.ingat(res, rs[selected].cand)
-				s.st = apply(s.st, res, rs[selected].cand)
-				s.st.Line += " "
-				s.st.Cursor = len(s.st.Line)
+			// Spasi MENGETIK SPASI, bukan menerima pilihan.
+			//
+			// Sempat dibuat menerima kandidat yang sedang tersorot, dan itu
+			// mengejutkan: pengguna mengetik spasi untuk melanjutkan kalimat
+			// perintahnya, bukan untuk memilih sesuatu yang kebetulan berada di
+			// baris teratas. Menerima harus selalu berupa tindakan yang
+			// disengaja — Enter atau Tab.
 
-				if err := s.rend.EchoRune(' '); err != nil {
-					return s.st, Cancelled, err
-				}
-				if res, rs, selected, err = s.refresh(); err != nil {
-					return s.st, Cancelled, err
-				}
-				if len(rs) == 0 {
-					return s.selesai(nil, s.st, Accepted)
-				}
-				continue
-			}
 			if !s.typable {
 				return s.selesai(key.Raw, s.st, Accepted)
 			}
@@ -401,9 +387,10 @@ func (s *Session) Run() (State, Outcome, error) {
 
 			if res, rs, selected, err = s.refresh(); err != nil {
 				return s.st, Cancelled, err
-			} else if len(rs) == 0 {
-				// Tidak ada lagi yang cocok: tutup, tetapi pertahankan
-				// karakter yang sudah terlanjur diketik pengguna.
+			}
+			if len(rs) == 0 {
+				// Tidak ada lagi yang cocok. Sesi ditutup, tetapi karakter
+				// yang sudah diketik tetap dibawa — itu milik pengguna.
 				return s.selesai(nil, s.st, Accepted)
 			}
 
@@ -417,7 +404,8 @@ func (s *Session) Run() (State, Outcome, error) {
 			}
 			if res, rs, selected, err = s.refresh(); err != nil {
 				return s.st, Cancelled, err
-			} else if len(rs) == 0 {
+			}
+			if len(rs) == 0 {
 				return s.selesai(nil, s.st, Accepted)
 			}
 
@@ -525,7 +513,7 @@ func (s *Session) recompute() (*engine.Result, []ranked, error) {
 	if s.recall != nil {
 		preferred = s.recall.Preferred(recallKey(res))
 	}
-	return res, filter(res.Candidates, res.Prefix, preferred), nil
+	return res, filter(res.Candidates, res.Match(), preferred), nil
 }
 
 // ingat mencatat pilihan pengguna untuk konteks tempat ia memilihnya.

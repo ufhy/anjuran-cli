@@ -87,13 +87,19 @@ func TestPilihDenganPanahDanEnter(t *testing.T) {
 	}
 }
 
-func TestEscMembatalkan(t *testing.T) {
-	st, out := run(t, "git ", k(tty.KeyDown), k(tty.KeyEscape))
-	if out != Cancelled {
-		t.Fatalf("outcome = %v, mau Cancelled", out)
+// Esc membatalkan SARAN, bukan ketikan. Karakter yang diketik pengguna di
+// dalam sesi tetap miliknya; membuangnya berarti Esc menghapus pekerjaan yang
+// baru saja dilakukan.
+func TestEscMembatalkanSaranBukanKetikan(t *testing.T) {
+	st, _ := run(t, "git ", r('c'), r('o'), r('m'), k(tty.KeyEscape))
+	if st.Line != "git com" {
+		t.Errorf("Line = %q, mau ketikan tetap utuh", st.Line)
 	}
-	if st.Line != "git " {
-		t.Errorf("baris harus utuh saat dibatalkan, dapat %q", st.Line)
+
+	// Tanpa mengetik apa pun, barisnya juga tidak berubah.
+	st2, _ := run(t, "git ", k(tty.KeyDown), k(tty.KeyEscape))
+	if st2.Line != "git " {
+		t.Errorf("Line = %q, mau utuh", st2.Line)
 	}
 }
 
@@ -108,7 +114,7 @@ func TestMengetikMenyaringDaftar(t *testing.T) {
 	}
 }
 
-func TestBackspaceMengembalikanDaftar(t *testing.T) {
+func TestBackspaceMempertahankanKetikan(t *testing.T) {
 	// Ketik "z" hingga daftar kosong, lalu hapus; kandidat harus muncul lagi.
 	st, out := run(t, "git ", r('c'), r('o'), r('m'), r('z'))
 	if out != Accepted {
@@ -464,12 +470,11 @@ func TestTombolAsingDikembalikan(t *testing.T) {
 
 // Esc berarti "batalkan saran", bukan "batalkan baris", jadi ia berhenti di
 // sini dan tidak diteruskan.
+// Esc berhenti di dropdown: tombolnya tidak diteruskan ke shell.
 func TestEscTidakDikembalikan(t *testing.T) {
 	term := &fakeTerm{keys: []tty.Key{{Type: tty.KeyEscape, Raw: []byte{0x1b}}}}
 	s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
-	if _, out, _ := s.Run(); out != Cancelled {
-		t.Errorf("outcome = %v, mau Cancelled", out)
-	}
+	s.Run()
 	if len(s.Leftover()) != 0 {
 		t.Errorf("Esc seharusnya berhenti di dropdown, dapat %q", s.Leftover())
 	}
@@ -514,27 +519,24 @@ func TestHitungBackslash(t *testing.T) {
 	}
 }
 
-// Spasi menerima pilihan LALU membuka konteks berikutnya. Menutup dropdown di
-// situ berarti pengguna harus memicunya lagi secara manual — padahal spasinya
-// sudah dikonsumsi sesi dan tidak pernah sampai ke shell untuk memicu ulang.
-func TestSpasiMenerimaLaluLanjut(t *testing.T) {
+// Spasi MENGETIK SPASI, bukan menerima pilihan.
+//
+// Menerima kandidat yang kebetulan tersorot itu mengejutkan: pengguna mengetik
+// spasi untuk melanjutkan kalimat perintahnya. Menerima harus selalu berupa
+// tindakan yang disengaja — Enter atau Tab.
+func TestSpasiMengetikSpasi(t *testing.T) {
 	term := &fakeTerm{keys: []tty.Key{
-		r('c'), r('o'), r('m'), // saring ke commit
+		r('c'), r('o'), r('m'),
 		{Type: tty.KeyRune, Rune: ' ', Raw: []byte(" ")},
-		k(tty.KeyEscape),
 	}}
 	s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
-	st, out, err := s.Run()
+	s.manual = true
+	st, _, err := s.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Esc yang mengakhiri sesi, bukan spasinya: sesi tetap berjalan setelah
-	// spasi diterima.
-	if out != Cancelled {
-		t.Errorf("outcome = %v; sesi seharusnya lanjut setelah spasi", out)
-	}
-	if st.Line != "git commit " {
-		t.Errorf("Line = %q, mau %q", st.Line, "git commit ")
+	if st.Line != "git com " {
+		t.Errorf("Line = %q, mau %q", st.Line, "git com ")
 	}
 }
 

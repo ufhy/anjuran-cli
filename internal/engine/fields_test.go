@@ -298,3 +298,37 @@ func TestQuoteTidakMengubahYangAman(t *testing.T) {
 		}
 	}
 }
+
+// Token kursor bisa memuat lebih dari nilai yang sedang dilengkapi. Pada
+// "--output=", yang diketik adalah seluruh token, tetapi yang dicocokkan
+// dengan "json" hanyalah bagian sesudah tanda sama dengan — menyamakan
+// keduanya membuat seluruh kandidat tersaring habis.
+func TestFilterPrefixTerpisahDariPrefix(t *testing.T) {
+	e := engineFor(t, "t", `{"name":"t","options":[
+		{"name":"--output","args":[{"suggestions":[{"name":"json"},{"name":"yaml"}]}]}]}`)
+
+	res, _ := e.Complete("t --output=", 11)
+	if res.Prefix != "--output=" {
+		t.Errorf("Prefix = %q", res.Prefix)
+	}
+	if !res.FilterPrefixSet || res.FilterPrefix != "" {
+		t.Errorf("FilterPrefix = %q set=%v, mau kosong dan ditandai", res.FilterPrefix, res.FilterPrefixSet)
+	}
+	if res.Match() != "" {
+		t.Errorf("Match = %q, mau kosong", res.Match())
+	}
+	if len(res.Candidates) != 2 {
+		t.Errorf("kandidat = %d, mau 2", len(res.Candidates))
+	}
+
+	res2, _ := e.Complete("t --output=ya", 13)
+	if res2.Match() != "ya" {
+		t.Errorf("Match = %q, mau ya", res2.Match())
+	}
+
+	// Di posisi biasa, keduanya sama.
+	res3, _ := e.Complete("t --out", 7)
+	if res3.FilterPrefixSet || res3.Match() != "--out" {
+		t.Errorf("Match = %q set=%v", res3.Match(), res3.FilterPrefixSet)
+	}
+}

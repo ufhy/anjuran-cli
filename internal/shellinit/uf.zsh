@@ -117,9 +117,14 @@ _uf_widget() {
       fi
       ;;
     none)
-      # Tidak ada spec untuk perintah ini. Completion bawaan zsh masih jauh
-      # lebih baik daripada tidak ada apa-apa.
-      zle expand-or-complete
+      # Tidak ada yang bisa ditawarkan.
+      #
+      # Untuk Tab, completion bawaan zsh masih jauh lebih baik daripada tidak
+      # ada apa-apa. Untuk karakter pemicu TIDAK: mengetik spasi lalu tiba-tiba
+      # mendapat completion zsh mengubah baris perintah tanpa diminta.
+      if [[ $trigger == manual ]]; then
+        zle expand-or-complete
+      fi
       return
       ;;
     cancel|*)
@@ -193,6 +198,16 @@ if [[ -n ${UF_AUTO:-} ]]; then
     else
       zle .self-insert
     fi
+    # Jangan membuka kotak selagi masih ada ketikan yang menunggu dibaca.
+    #
+    # Menempel satu baris panjang mengirim seluruhnya sekaligus; zsh membacanya
+    # ke penyangganya sendiri lalu memprosesnya satu per satu. Tanpa penjagaan
+    # ini setiap spasi di dalam tempelan membuka sesi baru yang menunggu tombol
+    # yang tidak akan pernah datang — tombolnya sudah ada di penyangga zsh,
+    # bukan di terminal. Hasilnya shell terkunci. Sekaligus benar untuk
+    # mengetik cepat: kotak yang digambar dari baris yang sudah basi hanya
+    # mengganggu.
+    (( PENDING + KEYS_QUEUED_COUNT )) && return
     _uf_widget first auto
   }
 

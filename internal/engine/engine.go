@@ -52,6 +52,14 @@ type Candidate struct {
 // menyebut prioritasnya sendiri.
 const DefaultPriority = 50
 
+// Match mengembalikan teks yang dipakai menyaring kandidat.
+func (r *Result) Match() string {
+	if r.FilterPrefixSet {
+		return r.FilterPrefix
+	}
+	return r.Prefix
+}
+
 // Label mengembalikan teks yang seharusnya ditampilkan.
 func (c Candidate) Label() string {
 	if c.Display != "" {
@@ -150,6 +158,18 @@ type Result struct {
 	Command string `json:"command,omitempty"`
 	// Prefix adalah teks yang sudah diketik pada token kursor.
 	Prefix string `json:"prefix"`
+	// FilterPrefix adalah bagian dari Prefix yang dipakai MENYARING kandidat.
+	//
+	// Keduanya berbeda saat token kursor memuat lebih dari nilai yang sedang
+	// dilengkapi: pada "--output=", yang diketik adalah seluruh token itu,
+	// tetapi yang dicocokkan dengan "json" hanyalah bagian sesudah tanda sama
+	// dengan. Menyamakan keduanya membuat seluruh kandidat tersaring habis.
+	//
+	// FilterPrefixSet membedakan "belum ditentukan" dari "memang kosong".
+	// Tanpa itu, "--output=" tanpa nilai akan tersaring oleh nama opsinya
+	// sendiri dan tidak pernah menampilkan apa pun.
+	FilterPrefix    string `json:"filterPrefix,omitempty"`
+	FilterPrefixSet bool   `json:"-"`
 	// ReplaceStart dan ReplaceEnd adalah rentang byte pada baris asli yang
 	// harus digantikan saat sebuah kandidat dipilih.
 	ReplaceStart int         `json:"replaceStart"`
@@ -382,6 +402,7 @@ func (e *Engine) suggest(res *Result, st *state, prefix string) {
 	if eq := strings.IndexByte(prefix, '='); eq >= 0 && strings.HasPrefix(prefix, "-") {
 		optName, valPrefix := prefix[:eq], prefix[eq+1:]
 		if opt := st.lookupOption(optName); opt != nil && len(opt.Args) > 0 {
+			res.FilterPrefix, res.FilterPrefixSet = valPrefix, true
 			e.addArg(res, &opt.Args[0], valPrefix, optName+"=")
 		}
 		return
