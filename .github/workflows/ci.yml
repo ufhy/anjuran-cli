@@ -33,11 +33,15 @@ jobs:
       - name: uji asap
         shell: bash
         run: |
-          go build -o anjuran ./cmd/anjuran
-          ./anjuran init powershell > /dev/null
-          ./anjuran init bash > /dev/null
-          ./anjuran complete --line "git comm" --specs internal/testdata/specs | grep -q commit
-          ./anjuran widget --line "git stat" --cursor 8 --specs internal/testdata/specs < /dev/null | grep -q '^ok '
+          # Windows menolak menjalankan berkas tanpa akhiran .exe, dan
+          # `go build -o` tidak menambahkannya sendiri bila namanya ditentukan.
+          ext=""
+          if [ "$RUNNER_OS" = "Windows" ]; then ext=".exe"; fi
+          go build -o "anjuran$ext" ./cmd/anjuran
+          "./anjuran$ext" init powershell > /dev/null
+          "./anjuran$ext" init bash > /dev/null
+          "./anjuran$ext" complete --line "git comm" --specs internal/testdata/specs | grep -q commit
+          "./anjuran$ext" widget --line "git stat" --cursor 8 --specs internal/testdata/specs < /dev/null | grep -q '^ok '
 
   format:
     runs-on: ubuntu-latest
