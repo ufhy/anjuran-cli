@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -216,7 +217,15 @@ func TestBundledDirs(t *testing.T) {
 	})
 }
 
+// contains membandingkan memakai pemisah jalur milik platform.
+//
+// Harapannya ditulis dengan garis miring karena tata letak pemasangan yang
+// diuji memang POSIX — /usr/share, Caskroom Homebrew — sementara
+// bundledDirsFor memakai filepath dan di Windows mengembalikan backslash.
+// Tanpa penyesuaian ini seluruh subuji di sini gagal di Windows padahal
+// logikanya benar.
 func contains(hay []string, needle string) bool {
+	needle = filepath.FromSlash(needle)
 	for _, h := range hay {
 		if h == needle {
 			return true

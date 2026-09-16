@@ -7,10 +7,23 @@ import (
 	"time"
 )
 
+// cacheSementara mengarahkan cache ke direktori sekali pakai.
+//
+// Lewat ANJURAN_CACHE_DIR, bukan XDG_CACHE_HOME: di Windows lokasi cache
+// diambil dari %LocalAppData% dan XDG_CACHE_HOME tidak berpengaruh sama
+// sekali, sehingga seluruh uji di berkas ini dulu menulis ke cache SUNGGUHAN
+// milik pengguna — dan dua di antaranya gagal justru karena menemukan berkas
+// yang ditinggalkan uji sebelumnya.
+func cacheSementara(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv(EnvCacheDir, dir)
+	return dir
+}
+
 func storeUji(t *testing.T) *Store {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	cacheSementara(t)
 	return Open()
 }
 
@@ -54,9 +67,7 @@ func TestPilihanTerbaruMenggantikan(t *testing.T) {
 }
 
 func TestTersimpanAntarProses(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", dir)
-	t.Setenv("HOME", dir)
+	cacheSementara(t)
 
 	// anjuran adalah proses baru setiap kali; ingatan harus melewati batas proses.
 	a := Open()
@@ -70,9 +81,7 @@ func TestTersimpanAntarProses(t *testing.T) {
 }
 
 func TestTanpaPerubahanTidakMenulis(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", dir)
-	t.Setenv("HOME", dir)
+	cacheSementara(t)
 
 	s := Open()
 	s.Save()
@@ -87,9 +96,7 @@ func TestTanpaPerubahanTidakMenulis(t *testing.T) {
 // Yang paling lama tidak dipakai dibuang lebih dulu; berkasnya dibaca pada
 // setiap penekanan tombol pemicu, jadi ia harus tetap kecil.
 func TestIngatanDipangkas(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", dir)
-	t.Setenv("HOME", dir)
+	cacheSementara(t)
 
 	s := Open()
 	now := time.Now()
@@ -122,9 +129,7 @@ func TestMasukanKosongDiabaikan(t *testing.T) {
 // Berkas yang rusak tidak boleh menjatuhkan apa pun: ingatan yang hilang hanya
 // berarti urutan kembali ke bawaan.
 func TestBerkasRusakDiabaikan(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", dir)
-	t.Setenv("HOME", dir)
+	cacheSementara(t)
 
 	s := Open()
 	if s.path == "" {

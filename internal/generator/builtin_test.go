@@ -7,6 +7,20 @@ import (
 	"testing"
 )
 
+// rumahSementara mengarahkan direktori rumah ke direktori sekali pakai.
+//
+// HOME saja tidak cukup: di Windows os.UserHomeDir membaca %USERPROFILE%, dan
+// menyetel HOME di sana tidak berpengaruh sama sekali — uji ini akan membaca
+// ~/.ssh milik pengguna yang menjalankannya, lalu gagal karena tidak
+// menemukan host karangan yang dicarinya.
+func rumahSementara(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+	return dir
+}
+
 func tulis(t *testing.T, path, isi string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -18,8 +32,7 @@ func tulis(t *testing.T, path, isi string) {
 }
 
 func TestHostsDariConfig(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := rumahSementara(t)
 
 	tulis(t, filepath.Join(home, ".ssh", "config"), `
 # komentar
@@ -55,8 +68,7 @@ Host *
 }
 
 func TestHostsDariKnownHosts(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := rumahSementara(t)
 
 	tulis(t, filepath.Join(home, ".ssh", "known_hosts"), `
 web-01.internal ssh-ed25519 AAAA
@@ -84,8 +96,7 @@ alias-a,alias-b ssh-ed25519 CCCC
 }
 
 func TestHostsMengikutiInclude(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := rumahSementara(t)
 
 	tulis(t, filepath.Join(home, ".ssh", "config"), "Include conf.d/*.conf\nHost utama\n")
 	tulis(t, filepath.Join(home, ".ssh", "conf.d", "kerja.conf"), "Host kantor-01\n")
@@ -99,7 +110,7 @@ func TestHostsMengikutiInclude(t *testing.T) {
 }
 
 func TestHostsTanpaBerkasBukanError(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	rumahSementara(t)
 	if got := Hosts(); len(got) != 0 {
 		t.Errorf("mau kosong, dapat %v", got)
 	}
@@ -121,8 +132,7 @@ func TestEnv(t *testing.T) {
 // Template history dimaksudkan mengisi sebuah ARGUMEN. Mengembalikan baris
 // perintah utuh menghasilkan kandidat yang tidak mungkin dipakai.
 func TestHistoryArgsHanyaArgumen(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := rumahSementara(t)
 	hist := filepath.Join(home, "hist")
 	t.Setenv("HISTFILE", hist)
 
@@ -171,7 +181,7 @@ func TestHistoryArgsTanpaPerintahKosong(t *testing.T) {
 }
 
 func TestTemplateBawaanDikenali(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	rumahSementara(t)
 	t.Setenv("ANJURAN_UJI_TEMPLATE", "1")
 
 	got := FromTemplates([]string{TemplateEnv}, "", "", "")
