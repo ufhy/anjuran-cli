@@ -159,16 +159,20 @@ dan seterusnya.
 | 3 | Transpiler spec Fig → JSON, impor massal | selesai |
 | 4 | Integrasi bash + fish | selesai |
 | 5 | PowerShell / Windows Terminal | selesai |
-| 6 | Rilis: brew, deb/rpm, scoop/winget | selesai |
+| 6 | Rilis: brew, deb/rpm, scoop/winget | konfigurasi selesai, belum diterbitkan |
 
 ## Pasang
 
+**Belum ada rilis yang diterbitkan.** Untuk sekarang pasang dari sumber —
+lihat bagian di bawah. Perintah berikut baru akan bekerja setelah tag pertama
+dibuat beserta kedua repo tap-nya:
+
 ```sh
-brew install ufhy/tap/anjuran              # macOS, Linux
+brew install ufhy/tap/anjuran                 # macOS, Linux
 scoop bucket add anjuran https://github.com/ufhy/scoop-bucket
-scoop install anjuran                        # Windows
-sudo dpkg -i anjuran_*_linux_amd64.deb       # Debian, Ubuntu
-sudo rpm -i anjuran_*_linux_amd64.rpm        # Fedora, RHEL
+scoop install anjuran                         # Windows
+sudo dpkg -i anjuran_*_linux_amd64.deb        # Debian, Ubuntu
+sudo rpm -i anjuran_*_linux_amd64.rpm         # Fedora, RHEL
 ```
 
 Atau unduh arsip dari halaman rilis, letakkan `anjuran` di dalam PATH, dan biarkan
@@ -247,6 +251,9 @@ Bayangan disembunyikan selama dropdown terbuka — dua saran sekaligus hanya
 menambah kebisingan. Bila zsh-autosuggestions sudah terpasang, anjuran menyingkir
 dan memberi tahu: keduanya memperebutkan `POSTDISPLAY` yang sama.
 
+Warnanya diatur `ANJURAN_GHOST_STYLE`, memakai sintaks `region_highlight` zsh
+(bawaannya `fg=8`).
+
 ### Mengingat pilihanmu
 
 Kandidat yang pernah kamu pilih untuk sebuah awalan akan tersorot lebih dulu di
@@ -288,10 +295,16 @@ Alias yang dicari adalah kata pertama dari segmen terakhir, sehingga
 `docker ps | gst` memakai `gst`. Pemekarannya satu tingkat; alias yang menunjuk
 alias lain tidak ditelusuri.
 
-Kotak menghilang hanya pada dua keadaan: tidak ada yang cocok, atau yang tersisa
-tinggal satu dan teksnya sudah diketik penuh. Kandidat tunggal yang belum
-selesai diketik tetap ditampilkan — justru di situ kamu paling dekat dengan
-jawabannya.
+Kotak menghilang hanya bila tidak ada lagi yang cocok. Kandidat tunggal tetap
+ditampilkan, tidak disisipkan sendiri — justru di situ kamu paling dekat dengan
+jawabannya, dan mengubah baris perintah tanpa diminta membuat karakter yang
+diketik sesudahnya mendarat di tempat yang salah. Hanya Tab yang berarti
+"sisipkan yang itu".
+
+Menempel satu baris panjang tidak membuka kotak sama sekali. Tempelan tiba
+sekaligus dan dibaca zsh ke penyangganya sendiri; membuka sesi pada setiap spasi
+di dalamnya berarti menunggu tombol yang sudah tidak ada di terminal — dan shell
+terkunci. Selama masih ada ketikan yang menunggu dibaca, pemicunya diam.
 
 Pemicunya spasi, bukan setiap huruf. Sebelum sebuah kata selesai, isi dropdown
 hanya akan berganti-ganti mengikuti huruf yang belum tentu selesai — dan
@@ -308,12 +321,57 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 | Tombol | Aksi |
 |---|---|
 | ketik huruf | menyaring daftar secara langsung |
-| Tab | sisipkan awalan terpanjang yang sama; satu kandidat langsung disisipkan, dan direktori dibuka isinya |
-| Spasi | terima pilihan lalu buka konteks berikutnya |
+| Tab | sisipkan awalan terpanjang yang sama; bila tinggal satu kandidat, sisipkan kandidat itu |
+| panah kanan | masuk ke dalam folder yang tersorot |
+| Enter | sisipkan pilihan lalu tutup — tekan Enter lagi untuk menjalankan |
+| Enter, tanpa ada yang tersorot | pakai baris apa adanya lalu tutup |
 | panah bawah, Ctrl-N | turun |
 | Shift-Tab, panah atas, Ctrl-P | naik |
-| Enter | sisipkan pilihan lalu tutup — tekan Enter lagi untuk menjalankan |
-| Esc, Ctrl-C | batal, baris dibiarkan apa adanya |
+| Page Down, Page Up | lompat satu layar |
+| spasi | mengetik spasi, bukan memilih |
+| Esc | tutup kotaknya, ketikan di dalamnya tetap dibawa |
+| Ctrl-C | diteruskan ke shell, yang membatalkan barisnya |
+
+Spasi **mengetik spasi**. Sempat dibuat menerima kandidat yang sedang tersorot,
+dan itu mengejutkan: orang mengetik spasi untuk melanjutkan kalimat perintahnya,
+bukan untuk memilih sesuatu yang kebetulan berada di baris teratas. Menerima
+harus selalu tindakan yang disengaja — Tab atau Enter.
+
+Esc **tidak membuang ketikan**. Yang dibatalkan hanya sarannya; karakter yang
+sudah kamu ketik di dalam sesi tetap milikmu.
+
+Tombol yang tidak dikenali sesi — Ctrl-A, Home, panah kiri — dikembalikan ke
+zsh, bukan ditelan.
+
+### Folder
+
+Baris folder yang tersorot menunjukkan kedua tombolnya:
+
+```
+╭────────────────────╮
+│ ❯ berkas-lain/ → ⏎ │      → masuk ke dalamnya
+│   berkas/          │      ⏎ berhenti, pakai path ini
+│   cache/           │
+│   proyek/          │
+╰────────────── 1/4 ─╯
+```
+
+Menelusuri ke dalam folder membuka isinya **tanpa memilihkan apa pun**. Itulah
+cara berhenti: Enter di situ berarti "cukup, pakai path ini", sedangkan Tab atau
+panah kanan turun satu tingkat lagi. Sebelumnya isinya dibuka dengan anak pertama
+tersorot — sehingga Enter, satu-satunya cara berhenti, justru turun lagi; dan
+bila anaknya tunggal ia disisipkan lalu ditelusuri lagi, sampai dasar.
+
+Nama berspasi ditangani tanpa perlu kamu mengutipnya lebih dulu:
+
+```sh
+cd folder de<TAB>        →  cd 'folder dengan spasi/'
+```
+
+Shell sudah memecah `folder de` menjadi dua kata sebelum `anjuran` melihatnya,
+jadi prefix-nya disatukan kembali melintasi spasi — tetapi hanya bila gabungan
+itu benar-benar cocok dengan sesuatu di disk. `ls berkas catatan.txt` tetap dua
+argumen, dan `gzip folder -d` tetap sebuah opsi.
 
 Tombol pemicunya bisa diganti bila Tab ingin dibiarkan milik shell:
 
