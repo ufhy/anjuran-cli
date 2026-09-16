@@ -188,6 +188,27 @@ SKENARIO = [
     ("hapus sesudah menelusuri terlihat di baris",
      [b"cd", b" ", b"pro", b"\t", b"\x7f", b"\x7f", b"\x7f"],
      memuat("cd proy")),
+    # Menghapus perintah sampai habis harus MENUTUP kotaknya.
+    #
+    # Dibiarkan terbuka, yang ditawarkan adalah seluruh isi PATH dengan
+    # kandidat pertama menurut abjad tersorot — sesuatu yang tidak pernah
+    # diketik siapa pun. Enter berikutnya menyisipkannya, dan Enter sesudahnya
+    # MENJALANKANNYA.
+    # Diperiksa lewat perintah BERIKUTNYA, bukan lewat isi kotaknya: nama
+    # perintah mana yang tersorot bergantung pada isi PATH mesinnya, sedangkan
+    # akibatnya tidak. Bila kotak dibiarkan terbuka, Enter menyisipkan sebuah
+    # nama perintah, dan "echo" yang diketik sesudahnya menempel di belakangnya
+    # menjadi satu kata yang tidak ada — "command not found".
+    # Tab pada baris kosong menampilkan seluruh isi PATH, tetapi TIDAK
+    # menyorot apa pun: menekan Tab lalu Enter di sana pernah cukup untuk
+    # menjalankan biner asing — nama pertama menurut abjad.
+    ("Tab pada baris kosong tidak menyisipkan tanpa diminta",
+     [b"\t", b"\r", b"echo TANDA\r"],
+     gabung(memuat("TANDA"), tanpa("command not found"))),
+    ("hapus sampai habis lalu Enter tidak menyisipkan apa pun",
+     [b"c", b"d", b"\x7f", b"\x7f", b"\r", b"echo TANDA\r"],
+     gabung(memuat("TANDA"), tanpa("command not found"))),
+
     # Yang diketik harus TERLIHAT. Seluruh skenario lain memeriksa isi
     # kotaknya, sehingga satu huruf yang hilang dari baris masukan tidak pernah
     # ketahuan — padahal buffer-nya benar dan perintahnya tetap jalan.

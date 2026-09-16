@@ -57,13 +57,7 @@ func runWidget(args []string) int {
 	}
 	eng := engine.New(newRegistry(dirs, *specsDir)).InDir(generator.CurrentDir())
 
-	start := 0
-	switch *sel {
-	case "last":
-		start = -1
-	case "none":
-		start = ui.NoSelection
-	}
+	start := mulaiDari(*sel, *line)
 
 	// manual berarti "sisipkan kandidat tunggal tanpa bertanya". Menelusuri ke
 	// dalam direktori memakai --select none justru untuk BERHENTI menyisipkan
@@ -88,6 +82,29 @@ func runWidget(args []string) int {
 		emit("none", *line, byteCursor, *unit, sisa)
 	default:
 		emit("cancel", *line, byteCursor, *unit, sisa)
+	}
+	return 0
+}
+
+// mulaiDari menentukan baris mana yang tersorot saat kotak dibuka.
+//
+// Baris perintah yang masih KOSONG dibuka tanpa ada yang tersorot. Yang
+// ditawarkan di situ adalah seluruh isi PATH, dan yang tersorot akan menjadi
+// nama pertama menurut abjad — sesuatu yang tidak pernah diketik siapa pun.
+// Enter sesudahnya menyisipkannya, dan Enter berikutnya MENJALANKANNYA:
+// menekan Tab lalu Enter pada baris kosong sudah cukup untuk menjalankan biner
+// asing. Daftarnya tetap ditampilkan — itu memang gunanya Tab di sana —
+// tetapi memilih harus menjadi tindakan yang disengaja.
+func mulaiDari(sel, line string) int {
+	switch sel {
+	case "last":
+		// Dibuka dengan panah ATAS: yang diminta memang baris terakhir.
+		return -1
+	case "none":
+		return ui.NoSelection
+	}
+	if strings.TrimSpace(line) == "" {
+		return ui.NoSelection
 	}
 	return 0
 }

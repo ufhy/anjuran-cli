@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ufhy/anjuran-cli/internal/ui"
 )
 
 // Satuan posisi kursor berbeda antar shell: bash memakai byte, sisanya rune.
@@ -239,6 +241,25 @@ func assertDirs(t *testing.T, got, want []string) {
 	for _, w := range want {
 		if !contains(got, w) {
 			t.Errorf("mau memuat %q, dapat %v", w, got)
+		}
+	}
+}
+
+// Baris kosong dibuka tanpa ada yang tersorot: menekan Tab lalu Enter di sana
+// tidak boleh cukup untuk menjalankan biner asing.
+func TestMulaiDari(t *testing.T) {
+	for _, u := range []struct {
+		sel, line string
+		mau       int
+	}{
+		{"first", "git com", 0},
+		{"first", "", ui.NoSelection},
+		{"first", "   ", ui.NoSelection},
+		{"last", "", -1}, // panah atas memang meminta baris terakhir
+		{"none", "cd p", ui.NoSelection},
+	} {
+		if got := mulaiDari(u.sel, u.line); got != u.mau {
+			t.Errorf("mulaiDari(%q, %q) = %d, mau %d", u.sel, u.line, got, u.mau)
 		}
 	}
 }

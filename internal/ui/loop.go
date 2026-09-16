@@ -442,6 +442,22 @@ func (s *Session) Run() (State, Outcome, error) {
 			if len(s.st.Line) < len(s.awal) {
 				s.awal = s.st.Line
 			}
+
+			// Baris yang dihapus sampai HABIS berarti pengguna membatalkan
+			// seluruh perintahnya, dan kotaknya harus ikut menutup.
+			//
+			// Membiarkannya terbuka berbahaya, bukan sekadar mengganggu: di
+			// posisi perintah dengan awalan kosong, yang ditawarkan adalah
+			// SELURUH isi PATH, dan yang tersorot kandidat pertamanya menurut
+			// abjad — sesuatu yang tidak pernah diketik siapa pun. Enter
+			// berikutnya, yang dimaksudkan pengguna sebagai "jalankan baris
+			// kosong", menyisipkannya; Enter sesudahnya MENJALANKANNYA.
+			//
+			// Tab pada baris kosong tetap menampilkan daftar itu: di sana
+			// pengguna memang memintanya.
+			if s.st.Line == "" {
+				return s.selesai(nil, s.st, Accepted)
+			}
 			if err := s.rend.EchoBackspace(); err != nil {
 				return s.st, Cancelled, err
 			}

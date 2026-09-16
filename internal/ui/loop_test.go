@@ -839,3 +839,33 @@ func TestPanahKananBukanFolderDikembalikan(t *testing.T) {
 		t.Error("panah kanan tidak dikembalikan ke shell")
 	}
 }
+
+// Menghapus perintah sampai HABIS menutup kotaknya.
+//
+// Dibiarkan terbuka, yang ditawarkan di posisi perintah dengan awalan kosong
+// adalah seluruh isi PATH, dengan kandidat pertama tersorot — sesuatu yang
+// tidak pernah diketik siapa pun. Enter berikutnya menyisipkannya, dan Enter
+// sesudahnya menjalankannya.
+func TestHapusSampaiHabisMenutupKotak(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"aclocal", "aclocal-1.18", "adig"}}
+	term := &fakeTerm{keys: []tty.Key{
+		k(tty.KeyBackspace), k(tty.KeyBackspace), k(tty.KeyEnter),
+	}}
+
+	p, err := Prepare(newEngine(), State{Line: "ac", Cursor: 2}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, out, err := p.Session(term, discard()).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
+	}
+	// Enter TIDAK ikut terbaca: sesi sudah menutup sebelum tombol itu tiba.
+	// Bila ia terbaca, barisnya akan berisi salah satu nama perintah.
+	if st.Line != "" {
+		t.Errorf("Line = %q, mau kosong — tidak ada yang boleh disisipkan", st.Line)
+	}
+}
