@@ -291,6 +291,22 @@ SKENARIO = [
     # Menghapus sampai kosong TIDAK memunculkan kembali kotaknya: sesi sudah
     # menutup saat kandidat habis, dan pemicu berikutnya harus diketik. Yang
     # dijaga di sini adalah ketikannya tidak hilang.
+    # Sesudah salah ketiklah saran paling dibutuhkan: "git commitx" tidak
+    # cocok dengan apa pun dan kotaknya menutup; menghapus satu huruf harus
+    # menampilkannya lagi.
+    ("hapus huruf memunculkan kotak lagi",
+     [b"git", b" ", b"commitx", b"\x7f"],
+     memuat("Record changes to the repository")),
+    # Satu penekanan backspace harus satu penghapusan. Pembungkusnya sempat
+    # memakai status kembalian widget sebagai syarat, dan backward-delete-char
+    # mengembalikan status bukan-nol saat kursor di awal baris — di situ
+    # builtin-nya ikut dijalankan sesudahnya.
+    #
+    # Diperiksa lewat HASIL hitungannya: "50" tidak pernah diketik, jadi ia
+    # hanya bisa muncul bila barisnya terpotong tepat tiga huruf.
+    ("backspace menghapus tepat satu huruf",
+     [b"echo $((20+30))zzz", b"\x7f", b"\x7f", b"\x7f", b"\r"],
+     memuat("50")),
     ("backspace mempertahankan ketikan",
      [b"git", b" ", b"zz", b"\x7f"], memuat("git z")),
     ("mengetik yang tidak cocok menutup kotak",

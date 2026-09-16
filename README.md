@@ -230,6 +230,11 @@ yang layak ditawarkan: **mengetik nama perintah**, lalu **spasi**, **`/`**, dan
 **`=`**. Ini mengikuti cara IDE bekerja — VS Code menyebutnya *trigger
 characters*, dan di shell inilah padanannya.
 
+**Menghapus** huruf juga membukanya. `git commitx` tidak cocok dengan apa pun
+dan kotaknya menutup; menghapus satu huruf menampilkan `commit` lagi. Tanpa itu,
+sekali salah ketik berarti tidak ada saran sampai spasi berikutnya — padahal
+sesudah salah ketiklah saran paling dibutuhkan.
+
 Nyala secara bawaan. Matikan dengan:
 
 ```sh

@@ -95,6 +95,15 @@ class Layar:
                 self._turun()
             elif c == "\b":
                 self.col = max(0, self.col - 1)
+            elif c == "\x07":
+                # BEL berbunyi, tidak menggambar. Memperlakukannya sebagai
+                # karakter biasa menyisipkan \x07 ke tengah baris, dan
+                # kegagalan asersi yang diakibatkannya tampak seperti teka-teki
+                # — layarnya terlihat benar padahal tidak cocok.
+                pass
+            elif c in ("\x00", "\x0e", "\x0f"):
+                # NUL dan pemilih charset juga tidak menggambar apa pun.
+                pass
             else:
                 if self.col < self.cols:
                     self.grid[self.row][self.col] = c

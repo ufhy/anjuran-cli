@@ -42,8 +42,13 @@ specs:
 # ux menjalankan skenario yang benar-benar diketik orang di dalam zsh SUNGGUHAN,
 # dengan konfigurasi shell asli, lalu memeriksa apa yang terlihat di layar.
 # Uji Go memeriksa jawaban engine; ini memeriksa pengalamannya.
+#
+# -u supaya kemajuannya terlihat saat keluarannya diarahkan ke berkas. Tanpa
+# itu Python memblok-buffer stdout-nya dan tidak ada satu baris pun muncul
+# sampai seluruh 60-an skenario selesai — berkas hasil yang masih kosong lalu
+# tidak bisa dibedakan dari run yang mati.
 ux: build
-	python3 tools/uxtest/uxtest.py
+	python3 -u tools/uxtest/uxtest.py
 
 snapshot:
 	goreleaser release --snapshot --clean --skip=publish

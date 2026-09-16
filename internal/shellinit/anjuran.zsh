@@ -223,12 +223,7 @@ if [[ ${ANJURAN_AUTO:-1} != (0|no|off|false) ]]; then
   # _anjuran_pemicu menjalankan widget asli tombolnya, lalu membuka sesi.
   _anjuran_pemicu() {
     local nama=$1
-    local orig=${_anjuran_asli[$nama]}
-    if [[ -n $orig && $orig != $nama ]]; then
-      zle "$orig" 2>/dev/null || zle .self-insert
-    else
-      zle .self-insert
-    fi
+    _anjuran_asal $nama $nama .self-insert
     # Jangan membuka kotak selagi masih ada ketikan yang menunggu dibaca.
     #
     # Menempel satu baris panjang mengirim seluruhnya sekaligus; zsh membacanya
@@ -238,8 +233,9 @@ if [[ ${ANJURAN_AUTO:-1} != (0|no|off|false) ]]; then
     # bukan di terminal. Hasilnya shell terkunci. Sekaligus benar untuk
     # mengetik cepat: kotak yang digambar dari baris yang sudah basi hanya
     # mengganggu.
-    (( PENDING + KEYS_QUEUED_COUNT )) && return
+    (( PENDING + KEYS_QUEUED_COUNT == 0 )) || return 0
     _anjuran_widget first auto
+    return 0
   }
 
   _anjuran_spasi()      { _anjuran_pemicu _anjuran_spasi }
@@ -263,45 +259,83 @@ if [[ ${ANJURAN_AUTO:-1} != (0|no|off|false) ]]; then
   fi
 
   # -------------------------------------------------------------------------
-  # Mengetik kata juga membuka kotak
+  # Mengetik dan menghapus juga membuka kotak
   #
   # Tanpa ini, pengetahuan 716 spec tersembunyi di balik tombol yang harus
   # ditebak: mengetik "git" tidak memunculkan apa pun sampai spasi ditekan.
-  # Editor tidak begitu — mengetik nama sesuatu langsung menunjukkan daftarnya.
+  # Editor tidak begitu — mengetik nama sesuatu langsung menunjukkan daftarnya,
+  # dan menghapus kembali ke awalan yang masih punya jawaban menampilkannya
+  # lagi.
   #
   # Biayanya BUKAN satu proses per huruf. Sesi memegang seluruh ketikan sampai
   # kotaknya tertutup, jadi begitu terbuka, huruf-huruf berikutnya disaring di
   # dalam proses yang sama. Paling banyak satu proses per kata.
   #
-  # self-insert dibungkus sebagai WIDGET, bukan lewat bindkey per karakter:
-  # bindkey harus menyebut setiap karakter yang mungkin diketik satu per satu,
-  # dan akan meleset pada huruf beraksen serta tata letak papan ketik lain.
+  # Dibungkus sebagai WIDGET, bukan lewat bindkey per karakter: bindkey harus
+  # menyebut setiap karakter yang mungkin diketik satu per satu, dan akan
+  # meleset pada huruf beraksen serta tata letak papan ketik lain.
   typeset -gi _anjuran_ambang=${ANJURAN_AUTO_MIN:-2}
 
-  _anjuran_ketik() {
-    local orig=${_anjuran_asli[self-insert]}
-    if [[ -n $orig && $orig != _anjuran_ketik ]]; then
-      zle "$orig" 2>/dev/null || zle .self-insert
-    else
-      zle .self-insert
+  # _anjuran_asal menjalankan widget yang sudah terpasang, atau builtin-nya.
+  #
+  # Keputusannya berdasarkan ADA atau tidaknya widget itu, bukan berdasarkan
+  # status kembaliannya. backward-delete-char mengembalikan status bukan-nol
+  # saat kursor sudah di awal baris, dan memakai status sebagai syarat akan
+  # membuat builtin-nya ikut dijalankan sesudahnya — satu penekanan tombol,
+  # dua tindakan.
+  _anjuran_asal() {
+    local kunci=$1 diri=$2 bawaan=$3
+    local orig=${_anjuran_asli[$kunci]}
+    if [[ -n $orig && $orig != $diri && -n ${widgets[$orig]} ]]; then
+      zle "$orig"
+      return
     fi
+    zle "$bawaan"
+  }
 
+  # _anjuran_mungkin_buka membuka sesi bila keadaannya memang layak.
+  #
+  # SELALU mengembalikan 0. Widget yang mengembalikan status bukan-nol membuat
+  # zle membunyikan bel, dan "tidak ada yang perlu ditawarkan" bukanlah
+  # kegagalan — tanpa ini terminal berbunyi pada setiap huruf yang diketik di
+  # tengah baris, dan BEL-nya ikut tergambar di layar.
+  _anjuran_mungkin_buka() {
     # Hanya di ujung baris: menggemakan karakter di tengah baris akan
     # menggambar di kolom yang salah, karena baris prompt milik shell.
-    (( CURSOR == $#BUFFER )) || return
-    (( PENDING + KEYS_QUEUED_COUNT )) && return
+    (( CURSOR == $#BUFFER )) || return 0
+    (( PENDING + KEYS_QUEUED_COUNT == 0 )) || return 0
 
-    # Kata yang sedang diketik harus cukup panjang. Satu huruf cocok dengan
-    # ratusan biner di PATH — daftar sepanjang itu tidak menolong siapa pun,
-    # dan membuka sesi di huruf pertama setiap kata terasa seperti kotak yang
-    # muncul tanpa sebab.
+    # Kata di kursor harus cukup panjang. Satu huruf cocok dengan ratusan biner
+    # di PATH — daftar sepanjang itu tidak menolong siapa pun, dan membuka sesi
+    # di huruf pertama setiap kata terasa seperti kotak yang muncul tanpa sebab.
     local kata=${${BUFFER[1,CURSOR]}##*[[:space:]]}
-    (( $#kata >= _anjuran_ambang )) || return
+    (( $#kata >= _anjuran_ambang )) || return 0
     # Tanda kutip yang belum ditutup berarti kata ini belum utuh.
-    [[ $kata == [\'\"]* ]] && return
+    [[ $kata == [\'\"]* ]] && return 0
 
     _anjuran_widget first auto
+    return 0
   }
+
+  _anjuran_ketik() {
+    _anjuran_asal self-insert _anjuran_ketik .self-insert
+    _anjuran_mungkin_buka
+  }
+
+  # Menghapus huruf juga membuka kotak.
+  #
+  # "git zzz" tidak cocok dengan apa pun dan kotaknya menutup; menghapus
+  # kembali ke "git z" seharusnya menampilkan daftarnya lagi. Tanpa ini,
+  # sekali salah ketik berarti tidak ada saran lagi sampai spasi berikutnya —
+  # dan justru sesudah salah ketiklah saran paling dibutuhkan.
+  _anjuran_hapus() {
+    _anjuran_asal backward-delete-char _anjuran_hapus .backward-delete-char
+    _anjuran_mungkin_buka
+  }
+  zle -N _anjuran_hapus
+  _anjuran_simpan_asli_widget backward-delete-char
+  zle -N backward-delete-char _anjuran_hapus
+
   zle -N _anjuran_ketik
   _anjuran_simpan_asli_widget self-insert
   zle -N self-insert _anjuran_ketik

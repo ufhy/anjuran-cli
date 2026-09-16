@@ -101,7 +101,10 @@ func TestZshPemicu(t *testing.T) {
 		// di balik variabel yang harus diketahui namanya lebih dulu.
 		`${ANJURAN_AUTO:-1} != (0|no|off|false)`,
 		`zle -N self-insert _anjuran_ketik`, // mengetik kata juga membuka kotak
-		`bindkey " " _anjuran_spasi`,        // spasi
+		// Menghapus juga membukanya: sesudah salah ketiklah saran paling
+		// dibutuhkan.
+		`zle -N backward-delete-char _anjuran_hapus`,
+		`bindkey " " _anjuran_spasi`, // spasi
 		`bindkey "/" _anjuran_garismiring`,
 		`bindkey "=" _anjuran_samadengan`,
 		"viins", // mode vi memakai keymap terpisah
