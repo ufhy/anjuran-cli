@@ -179,6 +179,13 @@ type Session struct {
 	// arah tekanannya terasa sebagaimana mestinya.
 	start int
 
+	// awal adalah bagian baris yang TERAKHIR digambar shell.
+	//
+	// Sesi tidak memiliki baris prompt dan tidak bisa menggambar ulang
+	// seluruhnya; yang bisa dilakukannya hanyalah mengganti ekor sesudah
+	// bagian ini. Menyusut bila pengguna menghapus sampai melewatinya.
+	awal string
+
 	// leftover menampung tombol yang harus dikembalikan ke shell.
 	leftover Leftover
 
@@ -213,6 +220,7 @@ func (s *Session) StartAt(i int) *Session {
 func (p *Preflight) Session(term Terminal, rend *Renderer) *Session {
 	return &Session{
 		start:    0,
+		awal:     p.st.Line,
 		manual:   p.manual,
 		eng:      p.eng,
 		dyn:      p.dyn,
@@ -234,6 +242,7 @@ func NewSession(eng *engine.Engine, term Terminal, rend *Renderer, st State) *Se
 		term:    term,
 		rend:    rend,
 		st:      st,
+		awal:    st.Line,
 		typable: st.Cursor == len(st.Line),
 	}
 }
@@ -334,6 +343,9 @@ func (s *Session) Run() (State, Outcome, error) {
 				s.st = apply(s.st, res, engine.Candidate{
 					Name: ext, Insert: ext, CursorOffset: len(ext), Kind: engine.KindArg,
 				})
+				if err := s.gambarUlang(); err != nil {
+					return s.st, Cancelled, err
+				}
 				if res, rs, selected, err = s.refresh(); err != nil {
 					return s.st, Cancelled, err
 				}
@@ -348,6 +360,9 @@ func (s *Session) Run() (State, Outcome, error) {
 				cand := rs[0].cand
 				s.ingat(res, cand)
 				s.st = apply(s.st, res, cand)
+				if err := s.gambarUlang(); err != nil {
+					return s.st, Cancelled, err
+				}
 
 				// Direktori dibuka isinya: Tab memang berarti "lengkapi lagi",
 				// dan ini permintaan eksplisit — berbeda dari Enter, yang harus
@@ -422,6 +437,11 @@ func (s *Session) Run() (State, Outcome, error) {
 				return s.selesai(key.Raw, s.st, Accepted)
 			}
 			s.deleteBack()
+			// Menghapus bisa melewati bagian yang digambar shell; sejak itu
+			// bagian tersebut bukan lagi milik shell.
+			if len(s.st.Line) < len(s.awal) {
+				s.awal = s.st.Line
+			}
 			if err := s.rend.EchoBackspace(); err != nil {
 				return s.st, Cancelled, err
 			}
@@ -443,6 +463,9 @@ func (s *Session) Run() (State, Outcome, error) {
 				cand := rs[selected].cand
 				s.ingat(res, cand)
 				s.st = apply(s.st, res, cand)
+				if err := s.gambarUlang(); err != nil {
+					return s.st, Cancelled, err
+				}
 				if res, rs, err = s.recompute(); err != nil {
 					return s.st, Cancelled, err
 				}
@@ -466,6 +489,18 @@ func (s *Session) Run() (State, Outcome, error) {
 			return s.selesai(key.Raw, s.st, Accepted)
 		}
 	}
+}
+
+// gambarUlang menampilkan baris yang baru saja diubah SESI sendiri.
+//
+// Hanya ekor sesudah bagian yang terakhir digambar shell yang bisa diganti;
+// bila baris barunya tidak lagi berawalan itu, tidak ada yang bisa dikerjakan
+// tanpa menggambar ulang prompt — dan prompt itu milik shell.
+func (s *Session) gambarUlang() error {
+	if !s.typable || !strings.HasPrefix(s.st.Line, s.awal) {
+		return nil
+	}
+	return s.rend.EchoLine(s.st.Line[len(s.awal):])
 }
 
 // awalanBersama mencari awalan yang dimiliki SELURUH kandidat dan lebih

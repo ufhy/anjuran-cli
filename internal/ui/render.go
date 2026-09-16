@@ -257,6 +257,23 @@ func (r *Renderer) EchoBackspace() error {
 	return err
 }
 
+// EchoLine mengganti SELURUH ekor baris yang menjadi tanggung jawab sesi.
+//
+// Dipakai saat sesi mengubah baris sendiri — Tab yang menyisipkan kandidat,
+// panah kanan yang masuk ke dalam folder. Tanpa ini teks yang disisipkan tidak
+// pernah terlihat: shell tidak menggambar ulang selama widget-nya masih
+// berjalan, dan sesi hanya menggemakan huruf yang DIKETIK. Menekan Tab pada
+// "cd pro" mengubah buffer menjadi "cd proyek/" sementara layar tetap
+// menampilkan "cd pro" — benar isinya, bohong tampilannya.
+func (r *Renderer) EchoLine(tail string) error {
+	var b strings.Builder
+	b.WriteString(strings.Repeat("\b \b", r.echoed))
+	b.WriteString(tail)
+	r.echoed = textWidth(tail)
+	_, err := io.WriteString(r.w, b.String())
+	return err
+}
+
 // UnEcho menghapus seluruh karakter yang kita gemakan sendiri.
 //
 // Dipanggil sebelum sesi berakhir, supaya baris yang terlihat kembali persis

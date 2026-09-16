@@ -165,6 +165,17 @@ SKENARIO = [
     # supaya yang membuka kotak benar-benar Tab, bukan ketikan sesudahnya.
     ("Tab pada baris kosong tanpa mode otomatis",
      [b"\t", b"zs"], memuat("zsh")),
+    # Teks yang disisipkan SESI juga harus terlihat, bukan hanya yang diketik.
+    # Shell tidak menggambar ulang selama widget-nya berjalan, jadi Tab yang
+    # menyisipkan "yek/" meninggalkan layar menampilkan "cd pro" — benar
+    # isinya, bohong tampilannya.
+    ("Tab menelusuri terlihat di baris",
+     [b"cd", b" ", b"pro", b"\t"], memuat("cd proyek/")),
+    ("panah kanan masuk folder terlihat di baris",
+     [b"cd", b" ", b"pro", b"\x1b[C"], memuat("cd proyek/")),
+    ("hapus sesudah menelusuri terlihat di baris",
+     [b"cd", b" ", b"pro", b"\t", b"\x7f", b"\x7f", b"\x7f"],
+     memuat("cd proy")),
     # Yang diketik harus TERLIHAT. Seluruh skenario lain memeriksa isi
     # kotaknya, sehingga satu huruf yang hilang dari baris masukan tidak pernah
     # ketahuan — padahal buffer-nya benar dan perintahnya tetap jalan.
