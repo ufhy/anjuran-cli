@@ -71,13 +71,22 @@ _anjuran_widget() {
     _anjuran_ghost_hapus
   fi
 
-  # Baris digambar ulang LEBIH DULU.
+  # Baris digambar ulang LEBIH DULU, dan harus dengan `zle -R`.
   #
   # Karakter pemicu baru saja disisipkan ke buffer, tetapi zsh belum
-  # menampilkannya — ia menggambar setelah widget selesai. Tanpa ini anjuran mulai
-  # menggambar dari kolom yang salah, dan karakter pemicunya tidak pernah
+  # menampilkannya — ia menggambar setelah widget selesai. Tanpa ini anjuran
+  # mulai menggambar dari kolom yang salah, dan karakter pemicunya tidak pernah
   # terlihat.
-  zle redisplay
+  #
+  # `zle redisplay` TIDAK cukup, walaupun namanya menjanjikan begitu: ia
+  # menandai baris perlu digambar ulang, dan penggambarannya tetap menunggu
+  # widget selesai — padahal saat itu anjuran sudah terlanjur menggambar
+  # kotaknya. Akibatnya satu huruf hilang dari layar setiap kali kotak dibuka:
+  # mengetik "git" menampilkan "gt", dan "cd" menampilkan "c". Buffer-nya
+  # sendiri selalu benar, sehingga perintahnya tetap berjalan sebagaimana
+  # mestinya — itu pula yang membuat cacat ini bertahan lama. `zle -R`
+  # menggambar saat itu juga.
+  zle -R
 
   _anjuran_alias
   # Dropdown digambar anjuran langsung ke /dev/tty; stdout hanya membawa hasil.
@@ -122,7 +131,7 @@ _anjuran_widget() {
       # Tanpa ini folder berspasi tidak pernah bisa ditelusuri.
       local _anjuran_ekor=${BUFFER%[\'\"]}
       if [[ $trigger == manual && $_anjuran_ekor == */ && -z $sisa ]]; then
-        zle redisplay
+        zle -R
         _anjuran_widget none manual
         return
       fi
@@ -143,7 +152,7 @@ _anjuran_widget() {
       ;;
   esac
 
-  zle redisplay
+  zle -R
   _anjuran_kembalikan "$sisa"
 
   # Bayangan dihitung ulang untuk baris yang baru.

@@ -165,6 +165,12 @@ SKENARIO = [
     # supaya yang membuka kotak benar-benar Tab, bukan ketikan sesudahnya.
     ("Tab pada baris kosong tanpa mode otomatis",
      [b"\t", b"zs"], memuat("zsh")),
+    # Yang diketik harus TERLIHAT. Seluruh skenario lain memeriksa isi
+    # kotaknya, sehingga satu huruf yang hilang dari baris masukan tidak pernah
+    # ketahuan — padahal buffer-nya benar dan perintahnya tetap jalan.
+    ("ketikan terlihat saat kotak terbuka", [b"g", b"i", b"t"], memuat("git")),
+    ("ketikan terlihat pada pemicu spasi",
+     [b"git", b" ", b"co"], memuat("git co")),
     # Mengetik nama perintah sudah cukup; tidak perlu spasi maupun Tab.
     ("mengetik nama perintah memunculkan isinya",
      [b"g", b"i", b"t"], memuat("checkout", "commit")),
