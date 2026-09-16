@@ -278,6 +278,38 @@ lengkap berarti kata itu selesai; untuk `github`, ketik satu huruf lagi.
 
 PATH dipindai sekali seumur proses, dan satu proses adalah satu interaksi.
 
+### Perintah yang kamu tulis sendiri
+
+Skrip proyek ikut dilengkapi, beserta isi perintahnya sebagai keterangan:
+
+```
+❯ bun run
+╭───────────┬──────────────────────╮
+│ ❯ bangun  │ tsc && vite build    │
+│   dev     │ vite --port 3000     │
+╰───────────┴──────────────────────╯
+```
+
+| Perintah | Dibaca dari |
+|---|---|
+| `bun run`, `npm run`, `pnpm run`, `yarn run` | `package.json` → `scripts` |
+| `deno task` | `deno.json`, `deno.jsonc` → `tasks` |
+| `composer run-script` | `composer.json` → `scripts` |
+| `make` | `Makefile`, keterangan dari `## ` |
+| `just` | `justfile`, keterangan dari komentar di atasnya |
+
+Berkasnya dicari ke ATAS seperti npm, jadi `bun run dev` bekerja dari
+subdirektori mana pun di dalam proyek.
+
+Dibaca langsung, **bukan** dengan menjalankan npm atau make. Spec Fig
+melakukannya lewat `bash -c` yang menaiki direktori lalu membaca berkasnya, dan
+[kebijakan generator](#kebijakan) menolak seluruh interpreter — argumennya
+adalah kode, bukan data. Membacanya sendiri lebih cepat, tidak menjalankan apa
+pun, dan tetap bekerja saat generator dimatikan.
+
+`Taskfile.yml` belum didukung: ia memerlukan pustaka YAML, dan tebakan berbasis
+baris akan memberi saran yang salah.
+
 ### Satu sesi memegang seluruh interaksi
 
 Begitu dropdown terbuka, anjuran yang membaca ketikan: menyaring di tempat,

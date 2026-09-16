@@ -135,16 +135,16 @@ func mergeArgs(base, overlay []Arg) []Arg {
 		if o.Description != "" {
 			m.Description = o.Description
 		}
-		// Sumber kandidat diganti, bukan digabung: yang ada di dasar justru
-		// yang ingin diperbaiki oleh tambalan.
-		if len(o.Suggestions) > 0 {
-			m.Suggestions = o.Suggestions
-		}
-		if len(o.Generators) > 0 {
-			m.Generators = o.Generators
-		}
-		if len(o.Template) > 0 {
-			m.Template = o.Template
+		// Sumber kandidat diganti SELURUHNYA begitu tambalan menyebutkan
+		// salah satunya: yang ada di dasar justru yang ingin diperbaiki.
+		//
+		// Mengganti per bidang menyisakan sumber yang lama. "bun run" tetap
+		// membawa generator `bash -c ... cat package.json` milik spec Fig
+		// walaupun tambalannya sudah memberi template pengganti — dan
+		// generator itu lalu ditolak kebijakan pada setiap penekanan tombol,
+		// menghasilkan pekerjaan dan pesan yang tidak ada gunanya.
+		if len(o.Suggestions) > 0 || len(o.Generators) > 0 || len(o.Template) > 0 {
+			m.Suggestions, m.Generators, m.Template = o.Suggestions, o.Generators, o.Template
 		}
 		m.IsOptional = m.IsOptional || o.IsOptional
 		m.IsVariadic = m.IsVariadic || o.IsVariadic

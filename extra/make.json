@@ -1,0 +1,14 @@
+{
+  "name": "make",
+  "description": "Bangun target dari Makefile",
+  "args": [
+    {
+      "name": "target",
+      "template": [
+        "anjuran:target-make"
+      ],
+      "isOptional": true,
+      "isVariadic": true
+    }
+  ]
+}

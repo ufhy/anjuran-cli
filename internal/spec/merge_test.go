@@ -166,3 +166,34 @@ func TestGabunganTetapMenolakPathKeluar(t *testing.T) {
 		t.Error("path keluar direktori seharusnya ditolak")
 	}
 }
+
+// Tambalan yang menyebut satu sumber kandidat mengganti SELURUHNYA.
+//
+// Mengganti per bidang menyisakan sumber lama: "bun run" tetap membawa
+// generator `bash -c ... cat package.json` milik spec Fig walaupun tambalannya
+// sudah memberi template pengganti, dan generator itu lalu ditolak kebijakan
+// pada setiap penekanan tombol.
+func TestTambalanMenggantiSumberKandidatSeluruhnya(t *testing.T) {
+	base := &Subcommand{
+		Name: []string{"bun"},
+		Args: []Arg{{
+			Name:       "script",
+			Generators: []Generator{{Script: []string{"bash", "-c", "cat package.json"}}},
+		}},
+	}
+	overlay := &Subcommand{
+		Name: []string{"bun"},
+		Args: []Arg{{Name: "script", Template: []string{"anjuran:skrip-paket"}}},
+	}
+
+	got := merge(base, overlay)
+	if len(got.Args) != 1 {
+		t.Fatalf("Args = %+v", got.Args)
+	}
+	if len(got.Args[0].Generators) != 0 {
+		t.Errorf("generator lama masih terbawa: %+v", got.Args[0].Generators)
+	}
+	if len(got.Args[0].Template) != 1 || got.Args[0].Template[0] != "anjuran:skrip-paket" {
+		t.Errorf("Template = %v", got.Args[0].Template)
+	}
+}

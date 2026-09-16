@@ -1,0 +1,23 @@
+{
+  "name": "deno",
+  "subcommands": [
+    {
+      "name": "task",
+      "description": "Jalankan tugas dari deno.json",
+      "args": [
+        {
+          "name": "task",
+          "template": [
+            "anjuran:tugas-deno"
+          ],
+          "isOptional": false
+        },
+        {
+          "name": "args",
+          "isOptional": true,
+          "isVariadic": true
+        }
+      ]
+    }
+  ]
+}

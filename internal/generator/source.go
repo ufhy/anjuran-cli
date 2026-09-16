@@ -58,6 +58,19 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 		add(name, "")
 	}
 
+	// Perintah yang didefinisikan pengguna di berkas proyek ditangani terpisah
+	// dari template lain karena ia membawa KETERANGAN: isi perintahnya. "dev"
+	// tidak memberi tahu apa pun, sedangkan "vite --port 3000" langsung
+	// menjawab apa yang akan terjadi.
+	for _, t := range res.Templates {
+		if !AdaSumberSkrip(t) {
+			continue
+		}
+		for _, sk := range SkripDari(t, s.Dir) {
+			add(sk.Nama, sk.Perintah)
+		}
+	}
+
 	if len(res.Generators) == 0 {
 		return out
 	}

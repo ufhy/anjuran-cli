@@ -1,0 +1,37 @@
+{
+  "name": "yarn",
+  "subcommands": [
+    {
+      "name": "run",
+      "description": "Jalankan skrip package.json",
+      "args": [
+        {
+          "name": "script",
+          "template": [
+            "anjuran:skrip-paket"
+          ],
+          "isOptional": false
+        },
+        {
+          "name": "args",
+          "isOptional": true,
+          "isVariadic": true
+        }
+      ]
+    }
+  ],
+  "args": [
+    {
+      "name": "script",
+      "template": [
+        "anjuran:skrip-paket"
+      ],
+      "isOptional": false
+    },
+    {
+      "name": "args",
+      "isOptional": true,
+      "isVariadic": true
+    }
+  ]
+}

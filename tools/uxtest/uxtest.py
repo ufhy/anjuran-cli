@@ -71,6 +71,12 @@ def siapkan_sandbox():
     # mengurut paling belakang agar urutan skenario lain tidak berubah.
     for i in range(1, 7):
         os.makedirs(os.path.join(d, f"zz-{i}"), exist_ok=True)
+    # Berkas proyek: perintah yang didefinisikan pengguna sendiri, yang tidak
+    # mungkin diketahui spec mana pun.
+    with open(os.path.join(d, "package.json"), "w") as f:
+        f.write('{"scripts":{"dev":"vite --port 3000","bangun":"tsc && vite build"}}')
+    with open(os.path.join(d, "Makefile"), "w") as f:
+        f.write("pasang: ## pasang dependensi\n\tnpm ci\n\nbersihkan:\n\trm -rf bin\n")
     for f in ["README.md", "catatan.txt", "data.json", "berkas dengan spasi.txt"]:
         open(os.path.join(d, f), "w").close()
     # Direktori yang BERISI, supaya menelusuri ke dalamnya punya sesuatu untuk
@@ -208,6 +214,18 @@ SKENARIO = [
     ("hapus sampai habis lalu Enter tidak menyisipkan apa pun",
      [b"c", b"d", b"\x7f", b"\x7f", b"\r", b"echo TANDA\r"],
      gabung(memuat("TANDA"), tanpa("command not found"))),
+
+    # Perintah yang didefinisikan pengguna di berkas proyek. Spec Fig
+    # membacanya lewat `bash -c`, yang ditolak kebijakan generator; anjuran
+    # membaca berkasnya sendiri.
+    ("skrip package.json ditawarkan",
+     [b"bun", b" ", b"run", b" "], memuat("dev", "bangun")),
+    ("keterangan skrip adalah isi perintahnya",
+     [b"npm", b" ", b"run", b" "], memuat("vite --port 3000")),
+    ("target Makefile ditawarkan",
+     [b"make", b" "], memuat("pasang", "bersihkan")),
+    ("keterangan target diambil dari '##'",
+     [b"make", b" "], memuat("pasang dependensi")),
 
     # Yang diketik harus TERLIHAT. Seluruh skenario lain memeriksa isi
     # kotaknya, sehingga satu huruf yang hilang dari baris masukan tidak pernah

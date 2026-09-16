@@ -107,6 +107,10 @@ type Renderer struct {
 	// seperti saat sesi dibuka. Bila gema itu dibiarkan, penggambaran ulang
 	// milik shell dimulai dari kolom yang salah dan barisnya tampak berganda.
 	echoed int
+	// milikShell adalah lebar teks PERINTAH yang digambar shell dan masih ada
+	// di layar. Ia batas paling kiri yang boleh dihapus: di sebelah kirinya
+	// adalah prompt.
+	milikShell int
 }
 
 // NewRenderer membuat renderer. width dan height adalah ukuran terminal.
@@ -256,10 +260,27 @@ func (r *Renderer) EchoRune(c rune) error {
 	return err
 }
 
+// Milik memberi tahu renderer berapa lebar teks perintah yang sudah digambar
+// shell, sehingga ia tahu sampai mana boleh menghapus.
+func (r *Renderer) Milik(n int) { r.milikShell = n }
+
 // EchoBackspace menghapus satu karakter di baris prompt.
+//
+// Berhenti sendiri saat teks perintahnya habis. Di sebelah kiri teks itu ada
+// PROMPT, dan prompt tidak akan pernah digambar ulang — shell hanya menggambar
+// ulang buffer-nya. Satu penghapusan yang kelewat berarti "❯" lenyap dan tidak
+// kembali sampai perintah berikutnya dijalankan.
+//
+// Batas ini tidak menggantikan penjagaan di sisi sesi; ia ada supaya urutan
+// tombol apa pun, termasuk yang belum terpikirkan, tidak bisa menembusnya.
 func (r *Renderer) EchoBackspace() error {
-	if r.echoed > 0 {
+	switch {
+	case r.echoed > 0:
 		r.echoed--
+	case r.milikShell > 0:
+		r.milikShell--
+	default:
+		return nil
 	}
 	_, err := io.WriteString(r.w, "\b \b")
 	return err

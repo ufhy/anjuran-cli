@@ -269,6 +269,10 @@ func (s *Session) Run() (State, Outcome, error) {
 		return apply(s.st, res, rs[0].cand), Accepted, nil
 	}
 
+	// Renderer perlu tahu sampai mana ia boleh menghapus: sebatas teks
+	// perintah yang digambar shell, tidak sampai ke prompt.
+	s.rend.Milik(textWidth(s.awal))
+
 	selected := s.start
 	switch {
 	case s.start == NoSelection:

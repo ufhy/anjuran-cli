@@ -1,0 +1,14 @@
+{
+  "name": "just",
+  "description": "Jalankan resep dari justfile",
+  "args": [
+    {
+      "name": "resep",
+      "template": [
+        "anjuran:resep-just"
+      ],
+      "isOptional": true,
+      "isVariadic": true
+    }
+  ]
+}
