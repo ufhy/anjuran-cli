@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/uf-cli/uf/internal/recall"
 )
 
 // Cache menyimpan keluaran generator di disk.
@@ -26,11 +28,11 @@ type Cache struct {
 // bila lokasinya tidak tersedia; pemanggil memperlakukan nil sebagai
 // "jalan tanpa cache", bukan sebagai kegagalan.
 func NewCache() *Cache {
-	base, err := os.UserCacheDir()
-	if err != nil {
+	base := recall.CacheDir()
+	if base == "" {
 		return nil
 	}
-	dir := filepath.Join(base, "uf", "gen")
+	dir := filepath.Join(base, "gen")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil
 	}

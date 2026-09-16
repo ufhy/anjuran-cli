@@ -7,6 +7,7 @@ import (
 
 	"github.com/uf-cli/uf/internal/engine"
 	"github.com/uf-cli/uf/internal/parser"
+	"github.com/uf-cli/uf/internal/recall"
 )
 
 // Outcome membedakan tiga akhir sesi yang perlu ditangani shell secara
@@ -30,17 +31,36 @@ const (
 // lebih dulu berarti kasus-kasus itu tidak pernah masuk mode raw — pada sesi
 // SSH, itu beberapa round-trip yang tidak jadi terjadi setiap kali Tab.
 type Preflight struct {
-	eng *engine.Engine
-	dyn Dynamic
-	res *engine.Result
-	rs  []ranked
-	st  State
+	eng    *engine.Engine
+	dyn    Dynamic
+	recall Recall
+	res    *engine.Result
+	rs     []ranked
+	st     State
+}
+
+// Recall mengingat kandidat yang pernah dipilih pengguna.
+//
+// Interface, bukan tipe konkret, supaya seluruh pengujian sesi bisa berjalan
+// tanpa menyentuh disk — dan supaya lupa sama sekali tetap menjadi keadaan
+// yang sah, bukan kegagalan.
+type Recall interface {
+	Preferred(key string) string
+	Record(key, name string)
+}
+
+// recallKey merangkai kunci ingatan untuk sebuah hasil.
+func recallKey(res *engine.Result) string {
+	if res == nil {
+		return ""
+	}
+	return recall.Key(res.Command, res.Prefix)
 }
 
 // Prepare menghitung dan memeringkat kandidat untuk sebuah state.
 //
 // dyn boleh nil; tanpa itu hanya kandidat statis dari spec yang dipakai.
-func Prepare(eng *engine.Engine, st State, dyn Dynamic) (*Preflight, error) {
+func Prepare(eng *engine.Engine, st State, dyn Dynamic, rec Recall) (*Preflight, error) {
 	res, err := eng.Complete(st.Line, st.Cursor)
 	if err != nil {
 		return nil, err
@@ -54,7 +74,17 @@ func Prepare(eng *engine.Engine, st State, dyn Dynamic) (*Preflight, error) {
 		res.Candidates = append(res.Candidates, dyn.Candidates(res)...)
 	}
 
-	return &Preflight{eng: eng, dyn: dyn, res: res, rs: filter(res.Candidates, res.Prefix), st: st}, nil
+	p := &Preflight{eng: eng, dyn: dyn, recall: rec, res: res, st: st}
+	p.rs = filter(res.Candidates, res.Prefix, p.preferred(res))
+	return p, nil
+}
+
+// preferred mengembalikan kandidat yang terakhir dipilih untuk konteks ini.
+func (p *Preflight) preferred(res *engine.Result) string {
+	if p.recall == nil {
+		return ""
+	}
+	return p.recall.Preferred(recallKey(res))
 }
 
 // Candidates mengembalikan kandidat dalam urutan yang akan ditampilkan,
@@ -83,6 +113,9 @@ func (p *Preflight) Immediate() (State, Outcome, bool) {
 	case 0:
 		return p.st, NoCandidates, true
 	case 1:
+		if p.recall != nil {
+			p.recall.Record(recallKey(p.res), p.rs[0].cand.Name)
+		}
 		return apply(p.st, p.res, p.rs[0].cand), Accepted, true
 	}
 	return p.st, Cancelled, false
@@ -98,10 +131,11 @@ type Leftover []byte
 
 // Session menjalankan interaksi dropdown untuk satu penekanan tombol pelengkap.
 type Session struct {
-	eng  *engine.Engine
-	dyn  Dynamic
-	term Terminal
-	rend *Renderer
+	eng    *engine.Engine
+	dyn    Dynamic
+	recall Recall
+	term   Terminal
+	rend   *Renderer
 
 	st State
 	// typable menandakan gema karakter aman dilakukan. Sesi hanya bisa
@@ -141,6 +175,7 @@ func (p *Preflight) Session(term Terminal, rend *Renderer) *Session {
 		start:    0,
 		eng:      p.eng,
 		dyn:      p.dyn,
+		recall:   p.recall,
 		term:     term,
 		rend:     rend,
 		st:       p.st,
@@ -217,6 +252,7 @@ func (s *Session) Run() (State, Outcome, error) {
 
 		case KeyEnter:
 			cand := rs[selected].cand
+			s.ingat(res, cand)
 			s.st = apply(s.st, res, cand)
 
 			// Memilih sebuah DIREKTORI berarti pengguna sedang menelusuri,
@@ -276,6 +312,7 @@ func (s *Session) Run() (State, Outcome, error) {
 				// berarti pengguna harus memicunya lagi secara manual, padahal
 				// spasinya sudah dikonsumsi sesi dan tidak pernah sampai ke
 				// shell untuk memicu ulang.
+				s.ingat(res, rs[selected].cand)
 				s.st = apply(s.st, res, rs[selected].cand)
 				s.st.Line += " "
 				s.st.Cursor = len(s.st.Line)
@@ -439,7 +476,18 @@ func (s *Session) recompute() (*engine.Result, []ranked, error) {
 	if s.dyn != nil {
 		res.Candidates = append(res.Candidates, s.dyn.Candidates(res)...)
 	}
-	return res, filter(res.Candidates, res.Prefix), nil
+	preferred := ""
+	if s.recall != nil {
+		preferred = s.recall.Preferred(recallKey(res))
+	}
+	return res, filter(res.Candidates, res.Prefix, preferred), nil
+}
+
+// ingat mencatat pilihan pengguna untuk konteks tempat ia memilihnya.
+func (s *Session) ingat(res *engine.Result, c engine.Candidate) {
+	if s.recall != nil {
+		s.recall.Record(recallKey(res), c.Name)
+	}
 }
 
 // insert menyisipkan satu rune di posisi kursor.

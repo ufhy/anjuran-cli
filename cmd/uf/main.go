@@ -134,7 +134,7 @@ func runComplete(args []string) int {
 		dyn = src
 	}
 
-	pre, err := ui.Prepare(eng, ui.State{Line: *line, Cursor: *cursor}, dyn)
+	pre, err := ui.Prepare(eng, ui.State{Line: *line, Cursor: *cursor}, dyn, nil)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "uf:", err)
 		return 1

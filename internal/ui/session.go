@@ -55,7 +55,7 @@ type ranked struct {
 // Bobot gabungan sempat dicoba tetapi menghasilkan urutan yang sulit dinalar:
 // sebuah entri berprioritas tinggi bisa mengalahkan kecocokan awalan yang
 // jelas lebih tepat.
-func filter(cands []engine.Candidate, query string) []ranked {
+func filter(cands []engine.Candidate, query, preferred string) []ranked {
 	out := make([]ranked, 0, len(cands))
 	for _, c := range cands {
 		m := FuzzyMatch(c.Name, query)
@@ -84,6 +84,23 @@ func filter(cands []engine.Candidate, query string) []ranked {
 		return a.cand.Name < b.cand.Name
 	}
 	sort.SliceStable(out, less)
+
+	// Yang terakhir dipilih untuk awalan ini dinaikkan ke puncak.
+	//
+	// Dipindahkan, BUKAN diberi bobot: bobot membuat urutannya sulit dinalar,
+	// sementara memindahkan satu entri yang memang pernah dipilih pengguna
+	// selalu bisa dijelaskan. Relevansi tetap yang memilih isi daftarnya —
+	// ingatan hanya menentukan mana yang tersorot lebih dulu.
+	if preferred != "" {
+		for i := range out {
+			if out[i].cand.Name == preferred {
+				pilihan := out[i]
+				copy(out[1:i+1], out[:i])
+				out[0] = pilihan
+				break
+			}
+		}
+	}
 	return out
 }
 

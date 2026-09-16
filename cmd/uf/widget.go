@@ -10,6 +10,7 @@ import (
 
 	"github.com/uf-cli/uf/internal/engine"
 	"github.com/uf-cli/uf/internal/generator"
+	"github.com/uf-cli/uf/internal/recall"
 	"github.com/uf-cli/uf/internal/tty"
 	"github.com/uf-cli/uf/internal/ui"
 )
@@ -86,7 +87,12 @@ func runWidget(args []string) int {
 func interact(eng *engine.Engine, st ui.State, start int) (ui.State, ui.Outcome, ui.Leftover, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
-	pre, err := ui.Prepare(eng, st, newDynamic())
+	// Ingatan pilihan disimpan di disk: setiap penekanan tombol pemicu adalah
+	// proses uf yang baru, jadi ingatan dalam memori tidak akan pernah terpakai.
+	rec := recall.Open()
+	defer rec.Save()
+
+	pre, err := ui.Prepare(eng, st, newDynamic(), rec)
 	if err != nil {
 		return st, ui.Cancelled, nil, err
 	}

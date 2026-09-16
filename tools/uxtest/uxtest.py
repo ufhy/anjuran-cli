@@ -75,9 +75,14 @@ def siapkan_sandbox():
     return d
 
 
-def jalankan(nama, ketikan, periksa, sandbox, bindir, auto=True):
+def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True):
     """Jalankan satu skenario; periksa(teks_layar) mengembalikan None atau alasan gagal."""
-    env = {"PATH": bindir + ":" + os.environ["PATH"]}
+    env = {
+        "PATH": bindir + ":" + os.environ["PATH"],
+        # Cache diarahkan ke direktori sekali pakai supaya ingatan pilihan
+        # milik pengguna tidak ikut berubah saat pengujian.
+        "UF_CACHE_DIR": cachedir,
+    }
     s = term.Sesi([ZSH, "-i", "-l"], cwd=sandbox, env=env)
     try:
         s.tunggu(3.0)
@@ -145,6 +150,14 @@ SKENARIO = [
     # karakter yang sama. Yang diperiksa adalah isinya.
     ("tanpa kandidat tidak ada kotak", [b"git", b" ", b"zzzq"], tanpa("commit", "checkout")),
     ("Tab tetap jalan tanpa mode otomatis", [b"git", b" ", b"ch", b"\t"], memuat("checkout")),
+
+    # Yang pernah dipilih tersorot lebih dulu di kali berikutnya, alih-alih
+    # pengguna menekan panah ke entri yang sama setiap hari.
+    ("yang pernah dipilih tersorot duluan",
+     [b"git", b" ", b"che", b"\x1b[B", b"\x1b[B", b"\r",   # pilih kandidat kedua
+      b"\x15",                                             # Ctrl-U: bersihkan baris
+      b"git", b" ", b"che", b"\t"],                        # ulangi awalan yang sama
+     memuat("❯ cherry-pick")),
 ]
 
 
@@ -163,7 +176,8 @@ def main():
         if saring and saring not in nama:
             continue
         auto = "tanpa mode otomatis" not in nama
-        alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, auto=auto)
+        cachedir = tempfile.mkdtemp(prefix="uf-cache-")
+        alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=auto)
         if alasan is None:
             h.lulus += 1
             print(f"  lulus  {nama}")

@@ -176,7 +176,7 @@ func TestUrutanPrioritasSaatBelumMengetik(t *testing.T) {
 		{Name: "alpha", Kind: engine.KindSubcommand, Priority: 10},
 		{Name: "beta", Kind: engine.KindSubcommand, Priority: engine.DefaultPriority},
 	}
-	got := filter(cands, "")
+	got := filter(cands, "", "")
 	want := []string{"zebra", "beta", "alpha"}
 	for i := range want {
 		if got[i].cand.Name != want[i] {
@@ -192,7 +192,7 @@ func TestRelevansiMengalahkanPrioritasSaatMengetik(t *testing.T) {
 	}
 	// "al" adalah awalan alpha, jadi alpha harus menang meski prioritasnya
 	// jauh lebih rendah.
-	got := filter(cands, "al")
+	got := filter(cands, "al", "")
 	if len(got) == 0 || got[0].cand.Name != "alpha" {
 		t.Fatalf("urutan = %v, mau alpha di depan", candNames(got))
 	}
@@ -204,7 +204,7 @@ func TestPrioritasMemutusSeriSkorYangSama(t *testing.T) {
 		{Name: "config", Kind: engine.KindSubcommand, Priority: 90},
 	}
 	// Keduanya cocok "co" dengan skor identik; prioritas yang menentukan.
-	got := filter(cands, "co")
+	got := filter(cands, "co", "")
 	if got[0].cand.Name != "config" {
 		t.Fatalf("urutan = %v, mau config di depan", candNames(got))
 	}
@@ -238,7 +238,7 @@ func (f *fakeDynamic) Candidates(res *engine.Result) []engine.Candidate {
 
 func prepare(t *testing.T, line string, dyn Dynamic) *Preflight {
 	t.Helper()
-	p, err := Prepare(newEngine(), State{Line: line, Cursor: len(line)}, dyn)
+	p, err := Prepare(newEngine(), State{Line: line, Cursor: len(line)}, dyn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +324,7 @@ func TestMemilihDirektoriMelanjutkan(t *testing.T) {
 		k(tty.KeyEscape),
 	}}
 
-	p, err := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn)
+	p, err := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestMemilihBerkasMenutup(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"internal.txt"}}
 	term := &fakeTerm{keys: []tty.Key{k(tty.KeyEnter)}}
 
-	p, _ := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn)
+	p, _ := Prepare(newEngine(), State{Line: "git add int", Cursor: 11}, dyn, nil)
 	st, out, _ := p.Session(term, discard()).Run()
 
 	if out != Accepted {
@@ -366,7 +366,7 @@ func TestTabMenyisipkanAwalanBersama(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"fitur-alpha", "fitur-beta", "fitur-gamma"}}
 	term := &fakeTerm{keys: []tty.Key{k(tty.KeyTab), k(tty.KeyEscape)}}
 
-	p, err := Prepare(newEngine(), State{Line: "git add fit", Cursor: 11}, dyn)
+	p, err := Prepare(newEngine(), State{Line: "git add fit", Cursor: 11}, dyn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +385,7 @@ func TestTabBerpindahBilaTidakAdaAwalan(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"alpha", "beta"}}
 	term := &fakeTerm{keys: []tty.Key{k(tty.KeyTab), k(tty.KeyEnter)}}
 
-	p, _ := Prepare(newEngine(), State{Line: "git add ", Cursor: 8}, dyn)
+	p, _ := Prepare(newEngine(), State{Line: "git add ", Cursor: 8}, dyn, nil)
 	st, out, _ := p.Session(term, discard()).Run()
 
 	if out != Accepted {
@@ -529,5 +529,105 @@ func TestSpasiMenerimaLaluLanjut(t *testing.T) {
 	}
 	if st.Line != "git commit " {
 		t.Errorf("Line = %q, mau %q", st.Line, "git commit ")
+	}
+}
+
+// fakeRecall adalah ingatan dalam memori untuk pengujian, supaya sesi bisa
+// diuji tanpa menyentuh disk.
+type fakeRecall struct {
+	data    map[string]string
+	dicatat []string
+}
+
+func (f *fakeRecall) Preferred(key string) string { return f.data[key] }
+
+func (f *fakeRecall) Record(key, name string) {
+	if f.data == nil {
+		f.data = map[string]string{}
+	}
+	f.data[key] = name
+	f.dicatat = append(f.dicatat, key+"="+name)
+}
+
+// Yang pernah dipilih untuk sebuah awalan tersorot lebih dulu di kali
+// berikutnya, alih-alih pengguna menekan panah ke entri yang sama setiap hari.
+func TestYangPernahDipilihNaikKePuncak(t *testing.T) {
+	cands := []engine.Candidate{
+		{Name: "checkout", Kind: engine.KindSubcommand, Priority: 90},
+		{Name: "cherry-pick", Kind: engine.KindSubcommand, Priority: 50},
+		{Name: "commit", Kind: engine.KindSubcommand, Priority: 50},
+	}
+
+	// Tanpa ingatan, relevansi yang menentukan: nama terpendek menang.
+	dasar := filter(cands, "c", "")
+	if dasar[0].cand.Name != "commit" {
+		t.Fatalf("tanpa ingatan urutannya = %v", candNames(dasar))
+	}
+
+	// Dengan ingatan, yang pernah dipilih naik — sisanya tetap urut apa adanya.
+	got := filter(cands, "c", "cherry-pick")
+	if got[0].cand.Name != "cherry-pick" {
+		t.Errorf("urutan = %v, mau cherry-pick di puncak", candNames(got))
+	}
+	if len(got) != 3 {
+		t.Errorf("jumlah kandidat berubah menjadi %d", len(got))
+	}
+	// Yang lain hanya bergeser turun, urutannya relatif tidak berubah.
+	sisa := candNames(got[1:])
+	if sisa[0] != "commit" || sisa[1] != "checkout" {
+		t.Errorf("sisa urutan rusak: %v", sisa)
+	}
+}
+
+// Ingatan hanya memindahkan, tidak menambah: kandidat yang tidak lagi cocok
+// dengan yang diketik tidak boleh dimunculkan kembali.
+func TestIngatanTidakMemunculkanYangTidakCocok(t *testing.T) {
+	cands := []engine.Candidate{{Name: "commit", Kind: engine.KindSubcommand}}
+	got := filter(cands, "com", "checkout")
+	if len(got) != 1 || got[0].cand.Name != "commit" {
+		t.Errorf("urutan = %v, mau hanya commit", candNames(got))
+	}
+}
+
+func TestPilihanDicatat(t *testing.T) {
+	rec := &fakeRecall{}
+	dyn := &fakeDynamic{names: []string{"alpha", "beta"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyDown), k(tty.KeyEnter)}}
+
+	p, err := Prepare(newEngine(), State{Line: "git add ", Cursor: 8}, dyn, rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := p.Session(term, discard()).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.dicatat) == 0 {
+		t.Fatal("pilihan tidak dicatat")
+	}
+}
+
+// Kandidat tunggal disisipkan tanpa membuka dropdown, tetapi tetap dicatat:
+// itu tetap pilihan pengguna.
+func TestKandidatTunggalIkutDicatat(t *testing.T) {
+	rec := &fakeRecall{}
+	p, err := Prepare(newEngine(), State{Line: "git stat", Cursor: 8}, nil, rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, done := p.Immediate(); !done {
+		t.Fatal("kandidat tunggal seharusnya langsung disisipkan")
+	}
+	if len(rec.dicatat) != 1 {
+		t.Errorf("dicatat = %v, mau tepat satu", rec.dicatat)
+	}
+}
+
+func TestTanpaIngatanTetapBerjalan(t *testing.T) {
+	p, err := Prepare(newEngine(), State{Line: "git ", Cursor: 4}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Candidates()) == 0 {
+		t.Error("tanpa ingatan, kandidat tetap harus ada")
 	}
 }
