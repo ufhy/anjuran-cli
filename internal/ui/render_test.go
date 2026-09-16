@@ -305,11 +305,30 @@ func TestMaxRowsMengikutiTinggiTerminal(t *testing.T) {
 	if got := NewRenderer(nil, 80, 24, true).MaxRows(); got != 10 {
 		t.Errorf("terminal tinggi = %d baris, mau dibatasi 10", got)
 	}
-	if got := NewRenderer(nil, 80, 6, true).MaxRows(); got != 4 {
-		t.Errorf("terminal pendek = %d baris, mau 4", got)
+	// Tiga baris disisakan, bukan dua: baris perintah itu sendiri, dan dua
+	// baris bingkai kotak.
+	if got := NewRenderer(nil, 80, 6, true).MaxRows(); got != 3 {
+		t.Errorf("terminal pendek = %d baris, mau 3", got)
 	}
 	if got := NewRenderer(nil, 80, 1, true).MaxRows(); got < 1 {
 		t.Errorf("terminal sangat pendek tetap harus menyisakan 1 baris, dapat %d", got)
+	}
+}
+
+// Kotak tidak boleh menuntut ruang sebanyak tinggi layar.
+//
+// Bila ia menuntutnya, pemesanan ruang menggulung layar sampai baris perintah
+// terdorong keluar — dan `ESC [ nA` sesudahnya mentok di baris nol alih-alih
+// mengikuti isinya. Yang terlihat pengguna adalah prompt beserta awal
+// perintahnya lenyap, padahal perintahnya tetap berjalan dengan benar.
+func TestKotakTidakPernahSetinggiLayar(t *testing.T) {
+	for _, tinggi := range []int{4, 6, 8, 10, 14, 24, 60} {
+		r := NewRenderer(nil, 80, tinggi, false)
+		// Dua baris bingkai di atas baris kandidat.
+		if tingi := r.MaxRows() + 2; tingi > tinggi-1 {
+			t.Errorf("tinggi layar %d: kotak memakai %d baris, maksimal %d",
+				tinggi, tingi, tinggi-1)
+		}
 	}
 }
 

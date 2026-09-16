@@ -120,10 +120,18 @@ func NewRenderer(w io.Writer, width, height int, simple bool) *Renderer {
 	return &Renderer{w: w, width: width, height: height, simple: simple}
 }
 
-// MaxRows adalah jumlah baris kandidat yang muat, menyisakan ruang untuk
-// baris prompt itu sendiri dan satu baris status.
+// MaxRows adalah jumlah baris kandidat yang muat.
+//
+// Yang disisakan ADA TIGA: baris perintah itu sendiri, dan dua baris bingkai
+// kotak. Sebelumnya hanya dua yang disisakan, sehingga di terminal pendek
+// kotaknya menuntut ruang tepat sebanyak tinggi layar: `reserve` menggulung
+// layar sampai baris perintah terdorong keluar, dan `ESC [ nA` sesudahnya
+// mentok di baris nol alih-alih mengikuti isinya. Yang terlihat pengguna
+// adalah prompt beserta awal perintahnya lenyap — "cd Applications/" tampil
+// sebagai spasi lalu "Applications/" — padahal buffer-nya benar dan
+// perintahnya tetap berjalan.
 func (r *Renderer) MaxRows() int {
-	n := r.height - 2
+	n := r.height - 3
 	if n > 10 {
 		n = 10
 	}

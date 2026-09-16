@@ -66,6 +66,11 @@ def siapkan_sandbox():
     # melihatnya, dan disisipkan terkutip sesudahnya.
     os.makedirs(os.path.join(d, "folder dengan spasi", "dalam sini"), exist_ok=True)
     open(os.path.join(d, "folder dengan spasi", "isi.txt"), "w").close()
+    # Cukup banyak direktori supaya kotaknya setinggi layar pada terminal
+    # pendek — di sanalah ruang layarnya pernah habis. Namanya sengaja
+    # mengurut paling belakang agar urutan skenario lain tidak berubah.
+    for i in range(1, 7):
+        os.makedirs(os.path.join(d, f"zz-{i}"), exist_ok=True)
     for f in ["README.md", "catatan.txt", "data.json", "berkas dengan spasi.txt"]:
         open(os.path.join(d, f), "w").close()
     # Direktori yang BERISI, supaya menelusuri ke dalamnya punya sesuatu untuk
@@ -83,7 +88,7 @@ def siapkan_sandbox():
 
 
 def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost=False,
-             persiapan=()):
+             persiapan=(), rows=24):
     """Jalankan satu skenario; periksa(teks_layar) mengembalikan None atau alasan gagal."""
     env = {
         "PATH": bindir + ":" + os.environ["PATH"],
@@ -91,7 +96,7 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         # milik pengguna tidak ikut berubah saat pengujian.
         "ANJURAN_CACHE_DIR": cachedir,
     }
-    s = term.Sesi([ZSH, "-i", "-l"], cwd=sandbox, env=env)
+    s = term.Sesi([ZSH, "-i", "-l"], cwd=sandbox, env=env, rows=rows)
     try:
         s.tunggu(3.0)
         s.ketik('PROMPT="%% "\r', 0.6)
@@ -165,6 +170,13 @@ SKENARIO = [
     # supaya yang membuka kotak benar-benar Tab, bukan ketikan sesudahnya.
     ("Tab pada baris kosong tanpa mode otomatis",
      [b"\t", b"zs"], memuat("zsh")),
+    # Di terminal pendek, kotaknya pernah menuntut ruang tepat sebanyak tinggi
+    # layar: baris perintah terdorong keluar saat menggulung, dan prompt
+    # beserta awal perintahnya lenyap. Buffer-nya benar — perintahnya tetap
+    # berjalan — sehingga hanya tampilannya yang bohong.
+    ("terminal pendek tetap menampilkan barisnya",
+     [b"c", b"d", b"\r"], memuat("cd berkas-lain/")),
+
     # Teks yang disisipkan SESI juga harus terlihat, bukan hanya yang diketik.
     # Shell tidak menggambar ulang selama widget-nya berjalan, jadi Tab yang
     # menyisipkan "yek/" meninggalkan layar menampilkan "cd pro" — benar
@@ -435,8 +447,11 @@ def main():
         cachedir = tempfile.mkdtemp(prefix="anjuran-cache-")
         ghost = "bayangan" in nama
         persiapan = PERSIAPAN.get(nama, ())
+        # Terminal pendek adalah kasusnya sendiri: di sana kotaknya bisa
+        # menuntut ruang lebih banyak daripada yang tersedia.
+        rows = 10 if "terminal pendek" in nama else 24
         alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir,
-                          auto=auto, ghost=ghost, persiapan=persiapan)
+                          auto=auto, ghost=ghost, persiapan=persiapan, rows=rows)
         if alasan is None:
             h.lulus += 1
             print(f"  lulus  {nama}")
