@@ -96,8 +96,12 @@ func TestPwshAliasKePowershell(t *testing.T) {
 func TestZshPemicu(t *testing.T) {
 	s, _ := Script("zsh")
 	for _, want := range []string{
-		"ANJURAN_AUTO",               // pemicu otomatis harus opt-in
-		`bindkey " " _anjuran_spasi`, // spasi
+		// Nyala secara bawaan, dimatikan dengan ANJURAN_AUTO=0. Sempat harus
+		// dinyalakan sendiri, dan itu membuat mode utama alat ini tersembunyi
+		// di balik variabel yang harus diketahui namanya lebih dulu.
+		`${ANJURAN_AUTO:-1} != (0|no|off|false)`,
+		`zle -N self-insert _anjuran_ketik`, // mengetik kata juga membuka kotak
+		`bindkey " " _anjuran_spasi`,        // spasi
 		`bindkey "/" _anjuran_garismiring`,
 		`bindkey "=" _anjuran_samadengan`,
 		"viins", // mode vi memakai keymap terpisah

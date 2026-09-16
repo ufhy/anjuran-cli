@@ -1,7 +1,10 @@
 # anjuran
 
-Autocomplete gaya Fig untuk shell, jalan di **Linux, macOS, dan Windows** —
+Autocomplete **ala IDE** untuk shell, jalan di **Linux, macOS, dan Windows** —
 termasuk lewat SSH, tmux, `docker exec`, dan `kubectl exec`.
+
+Yang diambil dari Fig hanyalah **pengetahuan perintahnya** — 716 spec CLI
+berlisensi MIT. Cara kerjanya diambil dari tempat lain: dari editor.
 
 ## Kenapa ada
 
@@ -15,7 +18,15 @@ Windows Terminal bermasalah pada DPI serta compositing.
 zsh-autosuggestions. Konsekuensinya nol kode window-management per-OS — dan karena
 UI-nya berupa byte, dropdown-nya melewati pipa SSH sama seperti output perintah biasa.
 
-Spec CLI diambil ulang dari withfig/autocomplete yang berlisensi MIT.
+Model interaksinya juga bukan model Fig, melainkan model **IDE**: satu sesi
+mengambil daftar kandidat sekali lalu menyaringnya di tempat sambil kamu
+mengetik — satu proses per interaksi, bukan satu proses per huruf. Itu cara
+kerja LSP, dan bersamanya ikut hal-hal yang sudah matang di editor: *trigger
+characters*, `suggestSelection: recentlyUsedByPrefix`, dan *ghost text*. Masing-
+masing dijelaskan di bawah.
+
+Jadi pembagiannya: **datanya dari Fig, arsitekturnya dari editor.** Spec CLI
+diambil ulang dari withfig/autocomplete yang berlisensi MIT.
 
 ## Rilis
 
@@ -203,16 +214,48 @@ perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas
 
 ### Dropdown yang muncul sendiri
 
-```sh
-ANJURAN_AUTO=1 eval "$(anjuran init zsh)"
+Ketik `git` — dropdown muncul tanpa menekan apa pun, berisi seluruh subcommand
+git beserta keterangannya. Tidak perlu spasi, tidak perlu Tab.
+
+```
+╭───────────────┬───────────────────────────────────────────────╮
+│ ❯ add         │ Add file contents to the index                │
+│   branch      │ List, create, or delete branches              │
+│   checkout    │ Switch branches or restore working tree files │
+╰───────────────┴───────────────────────────────────── 1/48 ────╯
 ```
 
-Ketik `git` lalu **spasi** — dropdown muncul tanpa menekan apa pun.
-
 Pemicunya bukan satu tombol khusus, melainkan titik-titik di mana ada sesuatu
-yang layak ditawarkan: **spasi**, **`/`**, dan **`=`**. Ini mengikuti cara IDE
-bekerja — VS Code menyebutnya *trigger characters*, dan di shell inilah
-padanannya.
+yang layak ditawarkan: **mengetik nama perintah**, lalu **spasi**, **`/`**, dan
+**`=`**. Ini mengikuti cara IDE bekerja — VS Code menyebutnya *trigger
+characters*, dan di shell inilah padanannya.
+
+Nyala secara bawaan. Matikan dengan:
+
+```sh
+ANJURAN_AUTO=0 eval "$(anjuran init zsh)"
+```
+
+Ambang panjang kata sebelum kotak dibuka diatur `ANJURAN_AUTO_MIN` (bawaan 2).
+Satu huruf cocok dengan ratusan biner di PATH; daftar sepanjang itu tidak
+menolong siapa pun.
+
+### Nama perintah ikut dilengkapi
+
+Di posisi perintah — awal baris, dan juga sesudah `|` atau `;` — yang ditawarkan
+adalah biner di PATH:
+
+```sh
+kubec        →  kubectl, kubectl.docker
+docker ps | gi  →  git, github, gitleaks
+```
+
+Begitu namanya cocok persis dengan perintah yang punya spec, isinya langsung
+ditawarkan. Ditampilkan sebagai `add`, `commit` — bukan `git add` — sebagaimana
+editor menampilkan anggota tanpa mengulang nama objeknya; yang disisipkan tetap
+`git add`, karena yang diganti adalah kata perintahnya.
+
+PATH dipindai sekali seumur proses, dan satu proses adalah satu interaksi.
 
 ### Satu sesi memegang seluruh interaksi
 
@@ -235,7 +278,7 @@ sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 ### Saran dari riwayat
 
 ```sh
-ANJURAN_GHOST=1 ANJURAN_AUTO=1 eval "$(anjuran init zsh)"
+ANJURAN_GHOST=1 eval "$(anjuran init zsh)"
 ```
 
 Teks abu-abu yang melanjutkan ketikanmu berdasarkan perintah yang pernah
@@ -306,12 +349,16 @@ sekaligus dan dibaca zsh ke penyangganya sendiri; membuka sesi pada setiap spasi
 di dalamnya berarti menunggu tombol yang sudah tidak ada di terminal — dan shell
 terkunci. Selama masih ada ketikan yang menunggu dibaca, pemicunya diam.
 
-Pemicunya spasi, bukan setiap huruf. Sebelum sebuah kata selesai, isi dropdown
-hanya akan berganti-ganti mengikuti huruf yang belum tentu selesai — dan
-biayanya akan dibayar pada tombol yang paling sering ditekan. Satu penggambaran
-memakan 3,1 ms; di spasi itu tidak terasa, di setiap huruf akan terasa.
+Mengetik kata membuka kotak, tetapi biayanya **bukan** satu proses per huruf.
+Begitu sesi terbuka ia memegang seluruh ketikan sampai kotaknya tertutup, jadi
+huruf-huruf berikutnya disaring di dalam proses yang sama — paling banyak satu
+proses per kata, dan sering satu per baris perintah.
 
-Bawaannya mati. Hanya zsh yang punya hook per-ketikan yang layak: bash
+Pembungkusnya memanggil widget yang sudah terpasang lebih dulu. zsh-autosuggestions
+dan zsh-syntax-highlighting juga membungkus `self-insert`; memanggil
+`zle .self-insert` begitu saja akan mematikan keduanya tanpa pesan apa pun.
+
+Hanya zsh yang punya hook per-ketikan yang layak: bash
 memerlukan `bind -x` pada setiap karakter, yang merusak bracketed paste dan
 penanganan masukan readline; fish tidak punya hook itu; PSReadLine hanya
 menyediakan pendaftaran per-tombol satu per satu.

@@ -270,8 +270,9 @@ func (e *Engine) hitung(l *parser.Line) (*Result, error) {
 		res.Command = words[0].Value
 	}
 	if len(words) == 0 {
-		// Kursor berada di posisi nama perintah. Melengkapi biner di PATH
-		// adalah pekerjaan tahap lain; di sini kita berhenti.
+		// Kursor berada di posisi nama PERINTAH — di awal baris, atau sesudah
+		// pipa dan titik koma.
+		e.saranPerintah(res, l.Prefix)
 		return res, nil
 	}
 
@@ -425,6 +426,63 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// saranPerintah melengkapi nama perintah, lalu langsung menawarkan isi
+// perintah itu begitu namanya lengkap.
+//
+// Diam di posisi ini adalah perbedaan paling terasa antara alat ini dan sebuah
+// editor: di editor, mengetik nama fungsi langsung memunculkan daftarnya, dan
+// begitu namanya lengkap ia menunjukkan apa yang bisa dilakukan dengannya.
+// Mengharuskan pengguna menekan spasi lebih dulu hanya untuk melihat "git bisa
+// apa" membuat pengetahuan 716 spec itu tersembunyi di balik satu tombol yang
+// harus ditebak.
+func (e *Engine) saranPerintah(res *Result, prefix string) {
+	res.Templates = append(res.Templates, "commands")
+
+	// Nama yang sudah lengkap: tawarkan sekalian subcommand-nya.
+	if prefix == "" {
+		return
+	}
+	root, err := e.registry.Load(prefix)
+	if err != nil || root == nil {
+		return
+	}
+	if root, err = e.registry.Resolve(root); err != nil || root == nil {
+		return
+	}
+
+	// Nama perintahnya sudah selesai diketik, jadi tidak ada lagi yang perlu
+	// disaring: seluruh isinya ditampilkan. Tanpa ini kandidatnya disaring
+	// dengan "git", dan karena SETIAP subcommand ikut membawa awalan itu,
+	// panjang nama menjadi satu-satunya pembeda — "git mv" dan "git rm" naik
+	// ke puncak sementara "git commit" terlempar ke bawah.
+	res.FilterPrefix, res.FilterPrefixSet = "", true
+
+	for i := range root.Subcommands {
+		sub := &root.Subcommands[i]
+		if sub.Hidden || sub.Deprecated || !e.available(sub.WhenFile) {
+			continue
+		}
+		for _, name := range sub.Name {
+			// Ditampilkan sebagai "commit", disisipkan sebagai "git commit":
+			// yang diganti adalah kata perintahnya, jadi nama perintah harus
+			// ikut dibawa — tetapi mengulanginya di layar hanya kebisingan,
+			// sebagaimana editor menampilkan anggota tanpa mengulang nama
+			// objeknya.
+			insert := prefix + " " + name
+			res.Candidates = append(res.Candidates, Candidate{
+				Name:         name,
+				Insert:       insert,
+				CursorOffset: len(insert),
+				Description:  bersihkan(sub.Description),
+				Kind:         KindSubcommand,
+				Priority:     priorityOr(sub.Priority),
+				Dangerous:    sub.IsDangerous,
+			})
+			break
+		}
+	}
 }
 
 // state adalah posisi engine di dalam pohon spec setelah membaca seluruh

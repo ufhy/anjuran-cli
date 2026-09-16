@@ -178,14 +178,20 @@ zle -N _anjuran_widget
 # ---------------------------------------------------------------------------
 # Pemicu
 #
-# Tab selalu membuka sesi. Dengan ANJURAN_AUTO, karakter pemicu ikut membukanya —
-# mengikuti cara IDE: bukan satu tombol khusus, melainkan titik-titik di mana
-# ada sesuatu yang layak ditawarkan.
+# Tab selalu membuka sesi. Selain itu, kotak muncul sendiri di titik-titik yang
+# memang punya sesuatu untuk ditawarkan — mengetik nama perintah, spasi, "/",
+# dan "=" — mengikuti cara editor bekerja: bukan satu tombol khusus yang harus
+# ditebak, melainkan saran yang datang saat memang ada yang bisa disarankan.
+#
+# NYALA secara bawaan. Sempat harus dinyalakan sendiri, dan itu keliru: alat
+# yang mode utamanya tersembunyi di balik variabel lingkungan yang harus
+# diketahui namanya lebih dulu bukanlah alat yang bekerja seperti editor bagi
+# orang yang baru memasangnya. Matikan dengan ANJURAN_AUTO=0.
 # ---------------------------------------------------------------------------
 
 bindkey "${ANJURAN_KEY:-^I}" _anjuran_widget
 
-if [[ -n ${ANJURAN_AUTO:-} ]]; then
+if [[ ${ANJURAN_AUTO:-1} != (0|no|off|false) ]]; then
   # Widget asli yang terpasang pada sebuah tombol, supaya perilakunya tetap
   # utuh sebelum sesi dibuka. oh-my-zsh memetakan spasi ke magic-space, yang
   # memekarkan rujukan riwayat lebih dulu.
@@ -198,6 +204,20 @@ if [[ -n ${ANJURAN_AUTO:-} ]]; then
     if [[ -n $orig && $orig != undefined-key ]]; then
       _anjuran_asli[$nama]=$orig
     fi
+  }
+
+  # _anjuran_simpan_asli_widget menyimpan widget yang SUDAH terpasang di sebuah
+  # nama, supaya pembungkus milik plugin lain tetap dipanggil.
+  #
+  # zsh-autosuggestions dan zsh-syntax-highlighting juga membungkus self-insert.
+  # Memanggil `zle .self-insert` begitu saja akan melompati keduanya, dan
+  # keduanya berhenti bekerja tanpa pesan apa pun.
+  _anjuran_simpan_asli_widget() {
+    local nama=$1 w=${widgets[$1]}
+    case $w in
+      user:*)      _anjuran_asli[$nama]=${w#user:} ;;
+      builtin|'')  ;;
+    esac
   }
 
   # _anjuran_pemicu menjalankan widget asli tombolnya, lalu membuka sesi.
@@ -241,6 +261,50 @@ if [[ -n ${ANJURAN_AUTO:-} ]]; then
     bindkey -M viins "/" _anjuran_garismiring
     bindkey -M viins "=" _anjuran_samadengan
   fi
+
+  # -------------------------------------------------------------------------
+  # Mengetik kata juga membuka kotak
+  #
+  # Tanpa ini, pengetahuan 716 spec tersembunyi di balik tombol yang harus
+  # ditebak: mengetik "git" tidak memunculkan apa pun sampai spasi ditekan.
+  # Editor tidak begitu — mengetik nama sesuatu langsung menunjukkan daftarnya.
+  #
+  # Biayanya BUKAN satu proses per huruf. Sesi memegang seluruh ketikan sampai
+  # kotaknya tertutup, jadi begitu terbuka, huruf-huruf berikutnya disaring di
+  # dalam proses yang sama. Paling banyak satu proses per kata.
+  #
+  # self-insert dibungkus sebagai WIDGET, bukan lewat bindkey per karakter:
+  # bindkey harus menyebut setiap karakter yang mungkin diketik satu per satu,
+  # dan akan meleset pada huruf beraksen serta tata letak papan ketik lain.
+  typeset -gi _anjuran_ambang=${ANJURAN_AUTO_MIN:-2}
+
+  _anjuran_ketik() {
+    local orig=${_anjuran_asli[self-insert]}
+    if [[ -n $orig && $orig != _anjuran_ketik ]]; then
+      zle "$orig" 2>/dev/null || zle .self-insert
+    else
+      zle .self-insert
+    fi
+
+    # Hanya di ujung baris: menggemakan karakter di tengah baris akan
+    # menggambar di kolom yang salah, karena baris prompt milik shell.
+    (( CURSOR == $#BUFFER )) || return
+    (( PENDING + KEYS_QUEUED_COUNT )) && return
+
+    # Kata yang sedang diketik harus cukup panjang. Satu huruf cocok dengan
+    # ratusan biner di PATH — daftar sepanjang itu tidak menolong siapa pun,
+    # dan membuka sesi di huruf pertama setiap kata terasa seperti kotak yang
+    # muncul tanpa sebab.
+    local kata=${${BUFFER[1,CURSOR]}##*[[:space:]]}
+    (( $#kata >= _anjuran_ambang )) || return
+    # Tanda kutip yang belum ditutup berarti kata ini belum utuh.
+    [[ $kata == [\'\"]* ]] && return
+
+    _anjuran_widget first auto
+  }
+  zle -N _anjuran_ketik
+  _anjuran_simpan_asli_widget self-insert
+  zle -N self-insert _anjuran_ketik
 fi
 
 # ---------------------------------------------------------------------------

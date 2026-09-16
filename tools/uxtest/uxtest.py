@@ -96,8 +96,10 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         s.tunggu(3.0)
         s.ketik('PROMPT="%% "\r', 0.6)
         env_awal = []
-        if auto:
+        if auto is True:
             env_awal.append("ANJURAN_AUTO=1")
+        elif auto is False:
+            env_awal.append("ANJURAN_AUTO=0")
         if ghost:
             env_awal.append("ANJURAN_GHOST=1")
         s.ketik(" ".join(env_awal) + ' eval "$(anjuran init zsh)"\r', 1.5)
@@ -154,6 +156,14 @@ PERSIAPAN = {
 
 SKENARIO = [
     # (nama, ketikan, pemeriksa)
+    # Mengetik nama perintah sudah cukup; tidak perlu spasi maupun Tab.
+    ("mengetik nama perintah memunculkan isinya",
+     [b"g", b"i", b"t"], memuat("checkout", "commit")),
+    ("nama perintah dilengkapi dari PATH",
+     [b"k", b"u", b"b", b"e", b"c"], memuat("kubectl")),
+    # Bawaannya nyala: tanpa menyetel apa pun, kotaknya tetap muncul.
+    ("pemicu otomatis nyala tanpa disetel",
+     [b"git", b" "], memuat("commit")),
     ("spasi memunculkan kotak", [b"git", b" "], memuat("╭", "commit")),
     ("mengetik menyaring", [b"git", b" ", b"co"], gabung(memuat("commit"), tanpa("archive"))),
     ("kandidat tunggal tetap tampil", [b"git", b" ", b"stat"], memuat("status")),
@@ -287,10 +297,16 @@ SKENARIO = [
      [b"git", b" ", b"zzqq"], gabung(memuat("git zzqq"), tanpa("commit"))),
     ("dua pemicu dalam satu baris",
      [b"git", b" ", b"commit", b" ", b"--am"], memuat("--amend")),
-    # Sesudah pipa, posisinya adalah NAMA PERINTAH — dan melengkapi nama
-    # perintah dari PATH memang belum ada. Yang dijaga: barisnya tetap utuh.
+    # Sesudah pipa, posisinya adalah NAMA PERINTAH — dan nama perintah kini
+    # dilengkapi dari PATH.
+    ("pipa melengkapi nama perintah",
+     [b"echo hai", b" ", b"|", b" ", b"gre"], memuat("grep")),
+    # Keutuhan barisnya diperiksa dengan MENJALANKANNYA: "gre" yang dibiarkan
+    # apa adanya harus sampai ke shell sebagai satu perintah yang dicari, bukan
+    # terpotong atau tertukar oleh kotak yang sempat terbuka.
     ("pemicu sesudah pipa tidak merusak baris",
-     [b"echo hai", b" ", b"|", b" ", b"gre"], memuat("echo hai | gre")),
+     [b"echo hai", b" ", b"|", b" ", b"gre", b"\x1b", b"\r"],
+     memuat("command not found: gre")),
     ("opsi panjang dengan sama dengan",
      [b"kubectl", b" ", b"get", b" ", b"pods", b" ", b"--output", b"="], memuat("json")),
 
@@ -362,9 +378,18 @@ def main():
     for nama, ketikan, periksa in SKENARIO:
         if saring and saring not in nama:
             continue
-        # Skenario bayangan dijalankan tanpa dropdown otomatis, supaya yang
-        # diuji benar-benar mekanismenya dan bukan interaksi keduanya.
-        auto = "tanpa mode otomatis" not in nama and "bayangan" not in nama
+        # auto punya TIGA keadaan, dan nama skenario yang memilihnya:
+        #   "tanpa disetel"      -> tidak menyetel apa pun; menguji bawaannya
+        #   "tanpa mode otomatis"-> ANJURAN_AUTO=0; menguji Tab tetap bekerja
+        #   selainnya            -> ANJURAN_AUTO=1
+        # Skenario bayangan dimatikan otomatisnya supaya yang diuji benar-benar
+        # mekanismenya, bukan interaksi keduanya.
+        if "tanpa disetel" in nama:
+            auto = None
+        elif "tanpa mode otomatis" in nama or "bayangan" in nama:
+            auto = False
+        else:
+            auto = True
         cachedir = tempfile.mkdtemp(prefix="anjuran-cache-")
         ghost = "bayangan" in nama
         persiapan = PERSIAPAN.get(nama, ())

@@ -141,6 +141,8 @@ func FromTemplates(templates []string, prefix, workdir, command string) []string
 			got = Files(prefix, workdir, false)
 		case TemplateFolders:
 			got = Files(prefix, workdir, true)
+		case TemplateCommands:
+			got = Commands(prefix)
 		case TemplateHistory:
 			got = HistoryArgs(command)
 		case TemplateHosts:

@@ -63,7 +63,8 @@ Lingkungan:
   ANJURAN_SPECS      direktori spec
   ANJURAN_SIMPLE     bila diisi, matikan warna dan sorotan
   ANJURAN_KEY        tombol pemicu, dibaca oleh skrip init
-  ANJURAN_AUTO       bila diisi, dropdown muncul pada karakter pemicu
+  ANJURAN_AUTO       0 untuk mematikan dropdown yang muncul sendiri (bawaan: nyala)
+  ANJURAN_AUTO_MIN   panjang kata minimum sebelum kotak dibuka (bawaan: 2)
   ANJURAN_GHOST      bila diisi, tampilkan saran dari riwayat sebagai teks abu-abu
   ANJURAN_CACHE_DIR  lokasi cache generator dan ingatan pilihan
 
