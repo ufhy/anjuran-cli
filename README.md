@@ -228,6 +228,25 @@ seperti tidak pernah lewat uf.
 Widget yang sudah terpasang di spasi dan panah tetap dipanggil lebih dulu,
 sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 
+### Mengingat pilihanmu
+
+Kandidat yang pernah kamu pilih untuk sebuah awalan akan tersorot lebih dulu di
+kali berikutnya — VS Code menyebutnya `suggestSelection: recentlyUsedByPrefix`.
+Tanpa itu kamu menekan panah ke entri yang sama setiap hari.
+
+Ingatannya sengaja **sempit**: kuncinya mencakup perintah DAN awalan yang
+diketik. `git c` yang biasanya berakhir di `commit` tidak mengubah urutan
+`docker c`.
+
+Ia hanya **memindahkan**, tidak menambah: relevansi tetap yang memilih isi
+daftarnya, dan kandidat yang tidak lagi cocok dengan yang kamu ketik tidak akan
+dimunculkan kembali. Bobot sempat dicoba dan ditolak — bobot membuat urutannya
+sulit dinalar, sementara memindahkan satu entri yang memang pernah kamu pilih
+selalu bisa dijelaskan.
+
+Tersimpan di `$UF_CACHE_DIR` atau direktori cache bawaan sistem; hapus
+berkasnya untuk melupakan semuanya.
+
 ### Alias
 
 Alias dikenali. `gco ` menawarkan nama branch karena zsh memberi tahu uf bahwa

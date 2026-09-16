@@ -60,9 +60,11 @@ widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
 
 Lingkungan:
-  UF_SPECS  direktori spec
-  UF_SIMPLE bila diisi, matikan warna dan sorotan
-  UF_KEY    tombol pemicu, dibaca oleh skrip init
+  UF_SPECS      direktori spec
+  UF_SIMPLE     bila diisi, matikan warna dan sorotan
+  UF_KEY        tombol pemicu, dibaca oleh skrip init
+  UF_AUTO       bila diisi, dropdown muncul pada karakter pemicu
+  UF_CACHE_DIR  lokasi cache generator dan ingatan pilihan
 
 Generator menjalankan perintah sebagai efek samping mengetik, jadi
 kebijakannya ketat secara bawaan dan diatur lewat lingkungan:
