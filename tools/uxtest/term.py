@@ -198,12 +198,36 @@ class Sesi:
     # pengukuran layar jadi tidak bisa dipercaya.
     _sisa = ""
 
-    def tunggu(self, detik):
+    def tunggu(self, detik, diam=None, sampai=None):
+        """Baca keluaran sampai salah satu berhenti terjadi.
+
+        Tiga cara berhenti, dari yang paling pasti ke yang paling kasar:
+
+        - ``sampai``: teks itu muncul di layar. Dipakai bila ada penanda yang
+          benar-benar menjawab "sudah siap?" — jauh lebih baik daripada
+          menebak.
+        - ``diam``: keluarannya berhenti selama sekian detik. Dipakai saat
+          tidak ada penanda, misalnya sesudah satu ketikan.
+        - ``detik``: batas atas, jaring pengaman.
+
+        Sebelumnya hanya ada batas atas, dan ia SELALU ditunggu sampai habis
+        walaupun shell-nya sudah siap sejak seperlima detik pertama. Dua
+        pertiga waktu seluruh rangkaian uji habis di situ — bukan menguji,
+        melainkan tidur. Menunggu keadaan alih-alih angka juga lebih andal:
+        di mesin yang sedang sibuk ia otomatis menunggu lebih lama, sedangkan
+        angka tetap justru gagal persis di situ.
+        """
         akhir = time.time() + detik
+        terakhir = time.time()
         while time.time() < akhir:
-            r, _, _ = select.select([self.fd], [], [], 0.05)
+            if sampai is not None and sampai in self.layar.teks():
+                return
+            r, _, _ = select.select([self.fd], [], [], 0.02)
             if not r:
+                if diam is not None and time.time() - terakhir >= diam:
+                    return
                 continue
+            terakhir = time.time()
             try:
                 chunk = os.read(self.fd, 65536)
             except OSError:
@@ -217,9 +241,33 @@ class Sesi:
             if balas:
                 os.write(self.fd, balas)
 
-    def ketik(self, data, jeda=0.7):
+    def ketik(self, data, jeda=0.7, diam=0.35):
+        """Kirim ketikan, lalu tunggu sampai layarnya berhenti berubah.
+
+        diam dipilih longgar dengan sengaja: membuka kotak berarti menjalankan
+        proses anjuran yang baru — memindai PATH, memuat spec, menggambar — dan
+        jeda di tengah rangkaian itu tidak boleh disalahartikan sebagai
+        "sudah selesai".
+        """
         os.write(self.fd, data if isinstance(data, bytes) else data.encode())
-        self.tunggu(jeda)
+        self.tunggu(jeda, diam=diam)
+
+    def siap(self, batas=10.0):
+        """Tunggu sampai shell benar-benar siap menerima perintah.
+
+        Dijawab dengan penanda, bukan dengan tebakan: sebuah echo yang
+        keluarannya ditunggu. Itu satu-satunya cara yang benar-benar menjawab
+        "sudah siap?" — prompt bisa digambar berkali-kali oleh p10k, dan
+        instant prompt-nya muncul jauh sebelum konfigurasi selesai dimuat.
+        """
+        # Penandanya disusun agar HANYA cocok dengan keluarannya, tidak dengan
+        # gema ketikannya: yang diketik memuat tanda kutip, yang dicetak tidak.
+        # Tanpa pemisahan ini, penanda cocok begitu barisnya tergema — sebelum
+        # shell benar-benar mengerjakan apa pun.
+        tanda = "SIAP%d" % os.getpid()
+        os.write(self.fd, ('echo SIA""P%d\r' % os.getpid()).encode())
+        self.tunggu(batas, sampai=tanda)
+        self.bersihkan_layar()
 
     def bersihkan_layar(self):
         self.layar = Layar(self.rows, self.cols)

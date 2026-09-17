@@ -10,6 +10,12 @@ Dijalankan dengan konfigurasi shell ASLI pengguna, bukan zsh kosong: zsh kosong
 menyembunyikan seluruh kelas bug, karena di sana spasi terpasang ke self-insert
 sementara oh-my-zsh memetakannya ke magic-space.
 
+Menunggu KEADAAN, bukan angka: shell dinyatakan siap lewat penanda yang
+ditunggu keluarannya, dan sesudah tiap ketikan yang ditunggu adalah layar yang
+berhenti berubah. Sebelumnya semuanya berupa `sleep` dengan angka yang tidak
+pernah diukur — dua pertiga waktu rangkaian ini habis di situ, dan angka tetap
+justru gagal di mesin yang sedang sibuk. 11 menit 30 detik menjadi 5 menit 30.
+
     make ux                 jalankan semuanya
     make ux SKENARIO=alias  jalankan yang namanya memuat "alias"
 """
@@ -104,8 +110,8 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
     }
     s = term.Sesi([ZSH, "-i", "-l"], cwd=sandbox, env=env, rows=rows)
     try:
-        s.tunggu(3.0)
-        s.ketik('PROMPT="%% "\r', 0.6)
+        s.siap()
+        s.ketik('PROMPT="%% "\r')
         env_awal = []
         if auto is True:
             env_awal.append("ANJURAN_AUTO=1")
@@ -113,9 +119,10 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
             env_awal.append("ANJURAN_AUTO=0")
         if ghost:
             env_awal.append("ANJURAN_GHOST=1")
-        s.ketik(" ".join(env_awal) + ' eval "$(anjuran init zsh)"\r', 1.5)
+        s.ketik(" ".join(env_awal) + ' eval "$(anjuran init zsh)"\r')
+        s.siap()
         for baris in persiapan:
-            s.ketik(baris + "\r", 0.8)
+            s.ketik(baris + "\r")
         s.bersihkan_layar()
         for k in ketikan:
             s.ketik(k)
