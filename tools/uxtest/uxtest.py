@@ -16,12 +16,16 @@ berhenti berubah. Sebelumnya semuanya berupa `sleep` dengan angka yang tidak
 pernah diukur — dua pertiga waktu rangkaian ini habis di situ, dan angka tetap
 justru gagal di mesin yang sedang sibuk. 11 menit 30 detik menjadi 5 menit 30.
 
+Skenario dijalankan PARALEL sebanyak inti CPU; PARALEL=1 untuk berurutan.
+
     make ux                 jalankan semuanya
     make ux SKENARIO=alias  jalankan yang namanya memuat "alias"
 """
 
+import concurrent.futures
 import os
 import shutil
+import threading
 import subprocess
 import sys
 import tempfile
@@ -520,7 +524,24 @@ def main():
     sandbox = siapkan_sandbox()
     print(f"pemasangan: {bindir}\nsandbox   : {sandbox}\n")
 
-    h = Hasil()
+    # Skenario dijalankan PARALEL.
+    #
+    # Aman karena penantiannya berbasis keadaan, bukan angka: mesin yang sibuk
+    # membuat tiap skenario menunggu lebih lama dengan sendirinya. Dengan angka
+    # tetap, kontensi justru memotong kotak yang sedang digambar — dan itu
+    # persis kegagalan palsu yang pernah terjadi.
+    #
+    # Yang dijaga agar tidak bertabrakan: cache diarahkan ke direktori sendiri
+    # per skenario, dan sandbox-nya hanya dibaca, tidak ditulisi.
+    # Sebanyak inti CPU. Diukur: 86 skenario selesai dalam 5 menit 30 detik
+    # secara berurutan, 1 menit 27 dengan 4 pekerja, 51 detik dengan 8 pada
+    # mesin berinti 8 — dan 54 detik dengan 12, yang sudah lebih lambat karena
+    # saling berebut. Dibatasi 8 supaya mesin berinti sangat banyak tidak
+    # menyalakan puluhan zsh sekaligus tanpa imbalan yang sepadan.
+    bawaan = min(os.cpu_count() or 4, 8)
+    pekerja = int(os.environ.get("PARALEL", str(bawaan)))
+
+    tugas = []
     for nama, ketikan, periksa in SKENARIO:
         if saring and saring not in nama:
             continue
@@ -542,14 +563,25 @@ def main():
         # Terminal pendek adalah kasusnya sendiri: di sana kotaknya bisa
         # menuntut ruang lebih banyak daripada yang tersedia.
         rows = 10 if "terminal pendek" in nama else 24
+        tugas.append((nama, ketikan, periksa, cachedir, auto, ghost, persiapan, rows))
+
+    h = Hasil()
+    kunci = threading.Lock()
+
+    def kerjakan(t):
+        nama, ketikan, periksa, cachedir, auto, ghost, persiapan, rows = t
         alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir,
                           auto=auto, ghost=ghost, persiapan=persiapan, rows=rows)
-        if alasan is None:
-            h.lulus += 1
-            print(f"  lulus  {nama}")
-        else:
-            h.gagal.append((nama, alasan))
-            print(f"  GAGAL  {nama}")
+        with kunci:
+            if alasan is None:
+                h.lulus += 1
+                print(f"  lulus  {nama}")
+            else:
+                h.gagal.append((nama, alasan))
+                print(f"  GAGAL  {nama}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=pekerja) as kolam:
+        list(kolam.map(kerjakan, tugas))
 
     print(f"\n{h.lulus} lulus, {len(h.gagal)} gagal")
     for nama, alasan in h.gagal:

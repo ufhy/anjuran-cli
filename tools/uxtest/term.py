@@ -241,13 +241,19 @@ class Sesi:
             if balas:
                 os.write(self.fd, balas)
 
-    def ketik(self, data, jeda=0.7, diam=0.35):
+    def ketik(self, data, jeda=3.0, diam=0.35):
         """Kirim ketikan, lalu tunggu sampai layarnya berhenti berubah.
 
         diam dipilih longgar dengan sengaja: membuka kotak berarti menjalankan
         proses anjuran yang baru — memindai PATH, memuat spec, menggambar — dan
         jeda di tengah rangkaian itu tidak boleh disalahartikan sebagai
         "sudah selesai".
+
+        jeda hanyalah batas atas, dan sengaja dibuat besar. Ia tidak pernah
+        dibayar saat mesinnya lengang — yang menentukan adalah diam. Batas yang
+        ketat justru berbahaya: saat mesin sibuk, ia memotong kotak yang sedang
+        digambar dan menghasilkan kegagalan yang tidak ada hubungannya dengan
+        kode.
         """
         os.write(self.fd, data if isinstance(data, bytes) else data.encode())
         self.tunggu(jeda, diam=diam)
