@@ -9,16 +9,33 @@
 #     set -gx ANJURAN_KEY \cspace    # Ctrl-Spasi, Tab tetap milik fish
 
 function _anjuran_widget --description 'Dropdown completion anjuran'
+    set -l trigger manual
+    if test (count $argv) -gt 0
+        set trigger $argv[1]
+    end
+
+    set -l select_from first
+    if test (count $argv) -gt 1
+        set select_from $argv[2]
+    end
+
     set -l line (commandline)
     set -l pos (commandline -C)
+    set -l sebelum $line
+    set -l alias_exp (_anjuran_alias $line)
 
     # string collect menjaga baris keluaran tetap utuh; tanpa itu substitusi
     # perintah fish akan memecahnya menjadi daftar dan isi buffer yang memuat
     # newline ikut hancur.
-    set -l out (command anjuran widget --line "$line" --cursor $pos 2>/dev/null | string collect)
+    set -l out (command anjuran widget --line "$line" --cursor $pos --trigger $trigger --select $select_from --alias "$alias_exp" 2>/dev/null | string collect)
 
+    # Keluaran kosong berarti anjuran mati di tengah jalan. Menyerahkannya ke
+    # completion fish hanya benar bila pengguna memang MEMINTA penyisipan,
+    # yaitu saat ia menekan Tab. Pada pemicu otomatis, tidak ada yang muncul.
     if test -z "$out"
-        commandline -f complete
+        if test $trigger = manual
+            commandline -f complete
+        end
         return
     end
 
@@ -32,15 +49,36 @@ function _anjuran_widget --description 'Dropdown completion anjuran'
     set -l fields (string split ' ' -- $head)
     set -l anjuran_status $fields[1]
     set -l new_cursor $fields[2]
+    set -l sisa ''
+    if test (count $fields) -gt 2
+        set sisa $fields[3]
+    end
 
     switch $anjuran_status
         case ok
             commandline -r -- $body
             commandline -C $new_cursor
+
+            # Memilih sebuah direktori membuka isinya. Garis miring adalah
+            # karakter pemicu, sama seperti spasi — bahwa ia datang dari
+            # pilihan alih-alih diketik tidak mengubah apa pun.
+            #
+            # Dibuka TANPA ada yang tersorot, supaya Enter berarti "cukup,
+            # pakai path ini" dan penelusuran punya cara berhenti. Kutip
+            # penutup dilepas dulu: nama berspasi disisipkan terkutip.
+            set -l ekor (string trim -r -c '\'"' -- $body)
+            if test "$body" != "$sebelum" -a -z "$sisa"
+                if string match -q '*/' -- $ekor
+                    _anjuran_widget auto none
+                end
+            end
         case none
             # Tidak ada spec untuk perintah ini. Completion bawaan fish sudah
-            # sangat baik, jadi serahkan kembali kepadanya.
-            commandline -f complete
+            # sangat baik, jadi serahkan kembali kepadanya — tetapi hanya bila
+            # pengguna yang memintanya.
+            if test $trigger = manual
+                commandline -f complete
+            end
         case '*'
             # Dibatalkan: biarkan baris apa adanya.
     end
@@ -58,6 +96,77 @@ function _anjuran_bind --description 'Pasang tombol pemicu anjuran'
     if bind --help 2>/dev/null | string match -q '*-M*'
         bind -M insert $key _anjuran_widget 2>/dev/null
     end
+
+    # Pemicu otomatis: kotak muncul begitu sebuah kata selesai ditulis, bukan
+    # sambil mengetik. Sama persis dengan yang dipasang integrasi zsh dan bash
+    # — pemicu yang berbeda antar shell membuat alat yang sama terasa seperti
+    # dua alat berbeda begitu seseorang berpindah mesin.
+    #
+    # NYALA secara bawaan. Matikan dengan ANJURAN_AUTO=0.
+    if test "$ANJURAN_AUTO" = 0 -o "$ANJURAN_AUTO" = no -o "$ANJURAN_AUTO" = off -o "$ANJURAN_AUTO" = false
+        return
+    end
+    bind ' ' _anjuran_spasi
+    bind / _anjuran_garismiring
+    bind = _anjuran_samadengan
+    if bind --help 2>/dev/null | string match -q '*-M*'
+        bind -M insert ' ' _anjuran_spasi 2>/dev/null
+        bind -M insert / _anjuran_garismiring 2>/dev/null
+        bind -M insert = _anjuran_samadengan 2>/dev/null
+    end
+end
+
+# _anjuran_alias mencari arti alias untuk kata pertama segmen TERAKHIR.
+#
+# Alias hanya berlaku di posisi perintah, jadi "docker ps | gst" memakai gst,
+# bukan docker. Di fish sebuah alias adalah fungsi, jadi yang dibaca badan
+# fungsinya — bukan sebuah tabel seperti di zsh dan bash.
+function _anjuran_alias
+    set -l kata (string split ' ' -- $argv[1])
+    set -l pertama ''
+    for w in $kata
+        switch $w
+            case '|' '||' '&&' ';' '&'
+                set pertama ''
+            case ''
+                # lewati
+            case '*'
+                if test -z "$pertama"
+                    set pertama $w
+                end
+        end
+    end
+    test -n "$pertama"; or return
+
+    functions -q $pertama; or return
+    # Badan fungsi alias fish berbentuk "command git status $argv"; yang
+    # dibutuhkan hanya perintahnya, tanpa pembungkus dan tanpa $argv.
+    set -l badan (functions $pertama 2>/dev/null \
+        | string match -r '^\s+(?:command )?(\S.*)$' \
+        | string replace -r ' \$argv.*$' '' )
+    test (count $badan) -ge 2; or return
+    echo $badan[2]
+end
+
+# _anjuran_pemicu menyisipkan karakternya sendiri, lalu membuka sesi.
+#
+# Menyisipkan sendiri adalah keharusan, bukan pilihan: bind mengambil alih
+# tombolnya sepenuhnya, jadi tanpa ini karakter yang diketik pengguna hilang.
+function _anjuran_pemicu
+    commandline -i -- $argv[1]
+    _anjuran_widget auto
+end
+
+function _anjuran_spasi
+    _anjuran_pemicu ' '
+end
+
+function _anjuran_garismiring
+    _anjuran_pemicu /
+end
+
+function _anjuran_samadengan
+    _anjuran_pemicu =
 end
 
 _anjuran_bind

@@ -19,17 +19,60 @@ if [ -z "${BASH_VERSINFO:-}" ] || [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
   return 0
 fi
 
+# _anjuran_alias mencari arti alias untuk kata pertama segmen TERAKHIR.
+#
+# Alias hanya berlaku di posisi perintah, jadi "docker ps | gst" memakai gst,
+# bukan docker. Tanpa ini sebuah alias sama sekali tidak dikenali dan
+# completion untuk perintah di baliknya tidak pernah muncul.
+_anjuran_alias() {
+  _anjuran_alias_exp=""
+
+  local -a kata
+  read -r -a kata <<< "$READLINE_LINE"
+  [ ${#kata[@]} -eq 0 ] && return
+
+  local w pertama=""
+  for w in "${kata[@]}"; do
+    case $w in
+      '|'|'||'|'&&'|';'|'&') pertama=""; continue ;;
+    esac
+    [ -z "$pertama" ] && pertama=$w
+  done
+  [ -n "$pertama" ] || return
+
+  # `alias -p` mencetak "alias nama='isi'"; yang dibutuhkan hanya isinya.
+  local baris
+  baris=$(alias -p 2>/dev/null | command grep -m1 "^alias $pertama=") || return
+  baris=${baris#alias $pertama=}
+  # Lepas kutip pembungkusnya.
+  case $baris in
+    \'*\') baris=${baris#\'}; baris=${baris%\'} ;;
+    '"'*'"') baris=${baris#\"}; baris=${baris%\"} ;;
+  esac
+  _anjuran_alias_exp=$baris
+}
+
 _anjuran_widget() {
-  local out head body anjuran_status new_cursor
+  local trigger=${1:-manual}
+  local select_from=${2:-first}
+  local out head body anjuran_status new_cursor sisa
+  # Baris SEBELUM sesi dijalankan, untuk tahu apakah ada yang tersisip.
+  local sebelum=$READLINE_LINE
+  local _anjuran_alias_exp
+  _anjuran_alias
 
   # READLINE_POINT dihitung dalam BYTE, berbeda dari zsh dan fish yang
   # menghitung karakter. Salah satuan akan menyisipkan di tempat yang salah
   # begitu baris memuat huruf non-ASCII.
   out="$(command anjuran widget --line "$READLINE_LINE" --cursor "$READLINE_POINT" \
-    --cursor-unit byte 2>/dev/null)"
+    --cursor-unit byte --trigger "$trigger" --select "$select_from" \
+    --alias "$_anjuran_alias_exp" 2>/dev/null)"
 
+  # Keluaran kosong berarti anjuran mati di tengah jalan. Menyisipkan sesuatu
+  # sebagai gantinya hanya benar bila pengguna memang MEMINTA penyisipan, yaitu
+  # saat ia menekan Tab. Pada pemicu otomatis, tidak ada yang boleh muncul.
   if [ -z "$out" ]; then
-    _anjuran_fallback
+    [ "$trigger" = manual ] && _anjuran_fallback
     return
   fi
 
@@ -41,15 +84,32 @@ _anjuran_widget() {
   fi
 
   anjuran_status=${head%% *}
-  new_cursor=${head##* }
+  # head berbentuk "<status> <kursor> <sisa-heksadesimal>".
+  local _ekor=${head#* }
+  new_cursor=${_ekor%% *}
+  sisa=${_ekor##* }
 
   case $anjuran_status in
     ok)
       READLINE_LINE=$body
       READLINE_POINT=$new_cursor
+
+      # Memilih sebuah direktori membuka isinya.
+      #
+      # Garis miring adalah karakter pemicu, sama seperti spasi — dan yang
+      # baru saja disisipkan memang garis miring. Bahwa ia datang dari pilihan
+      # pengguna alih-alih diketik tidak mengubah apa pun.
+      #
+      # Dibuka TANPA ada yang tersorot, supaya Enter berarti "cukup, pakai
+      # path ini" dan penelusuran punya cara berhenti. Kutip penutup dilepas
+      # dulu, karena nama berspasi disisipkan terkutip.
+      local _ekor_baris=${READLINE_LINE%[\'\"]}
+      if [ "$READLINE_LINE" != "$sebelum" ] && [ "${_ekor_baris: -1}" = "/" ] && [ -z "$sisa" ]; then
+        _anjuran_widget "$trigger" none
+      fi
       ;;
     none)
-      _anjuran_fallback
+      [ "$trigger" = manual ] && _anjuran_fallback
       ;;
     *)
       # Dibatalkan: biarkan baris apa adanya.
@@ -94,3 +154,52 @@ _anjuran_fallback() {
 }
 
 bind -x "\"${ANJURAN_KEY:-\C-i}\": _anjuran_widget"
+
+# ---------------------------------------------------------------------------
+# Pemicu otomatis
+#
+# Kotak muncul begitu sebuah kata selesai ditulis, bukan sambil mengetik:
+# spasi menutup sebuah kata, / menutup sebuah komponen path, = menutup nama
+# sebuah opsi. Ketiganya sama persis dengan yang dipasang integrasi zsh —
+# pemicu yang berbeda antar shell membuat alat yang sama terasa seperti dua
+# alat berbeda begitu seseorang berpindah mesin.
+#
+# NYALA secara bawaan. Matikan dengan ANJURAN_AUTO=0.
+
+_anjuran_sisip() {
+  READLINE_LINE="${READLINE_LINE:0:$READLINE_POINT}$1${READLINE_LINE:$READLINE_POINT}"
+  READLINE_POINT=$((READLINE_POINT + ${#1}))
+}
+
+# _anjuran_pemicu menyisipkan karakternya sendiri, lalu membuka sesi.
+#
+# Menyisipkan sendiri adalah keharusan, bukan pilihan: `bind -x` mengambil alih
+# tombolnya sepenuhnya, jadi tanpa ini karakter yang diketik pengguna hilang.
+_anjuran_pemicu() {
+  _anjuran_sisip "$1"
+
+  # Jangan membuka kotak selagi masih ada ketikan yang menunggu dibaca.
+  #
+  # Menempel satu baris panjang mengirim seluruhnya sekaligus. Tanpa penjagaan
+  # ini setiap spasi di dalam tempelan membuka sesi baru yang menunggu tombol
+  # yang tidak akan pernah datang, dan shell terkunci. `read -t 0` menjawab
+  # "apakah ada masukan yang siap" tanpa mengambilnya.
+  if read -t 0 2>/dev/null; then
+    return 0
+  fi
+
+  _anjuran_widget auto
+}
+
+_anjuran_spasi()       { _anjuran_pemicu ' '; }
+_anjuran_garismiring() { _anjuran_pemicu '/'; }
+_anjuran_samadengan()  { _anjuran_pemicu '='; }
+
+case ${ANJURAN_AUTO:-1} in
+  0|no|off|false) ;;
+  *)
+    bind -x '" ": _anjuran_spasi'
+    bind -x '"/": _anjuran_garismiring'
+    bind -x '"=": _anjuran_samadengan'
+    ;;
+esac

@@ -154,12 +154,52 @@ func TestZshTidakMembungkusSelfInsert(t *testing.T) {
 	}
 }
 
-// Shell lain belum punya pemicu otomatis; mereka hanya memakai Tab.
-func TestShellLainTanpaPemicuOtomatis(t *testing.T) {
-	for _, sh := range []string{"bash", "fish", "powershell"} {
+// Pemicu otomatis harus sama di setiap shell yang punya integrasi.
+//
+// Pemicu yang berbeda antar shell membuat alat yang sama terasa seperti dua
+// alat berbeda begitu seseorang berpindah mesin — dan itu paling terasa lewat
+// SSH, tempat shell di seberang sering bukan shell yang dipakai sehari-hari.
+var pengikatan = map[string][]string{
+	"zsh":        {`bindkey " " _anjuran_spasi`, `bindkey "/" _anjuran_garismiring`, `bindkey "=" _anjuran_samadengan`},
+	"bash":       {`bind -x '" ": _anjuran_spasi'`, `bind -x '"/": _anjuran_garismiring'`, `bind -x '"=": _anjuran_samadengan'`},
+	"fish":       {`bind ' ' _anjuran_spasi`, `bind / _anjuran_garismiring`, `bind = _anjuran_samadengan`},
+	"powershell": {`@(' ', '/', '=')`, `::Insert('$karakter')`},
+}
+
+func TestPemicuOtomatisSamaDiSetiapShell(t *testing.T) {
+	for _, sh := range []string{"zsh", "bash", "fish", "powershell"} {
 		s, _ := Script(sh)
-		if strings.Contains(s, "ANJURAN_AUTO") {
-			t.Errorf("skrip %s seharusnya belum punya pemicu otomatis", sh)
+		if !strings.Contains(s, "ANJURAN_AUTO") {
+			t.Errorf("skrip %s harus menghormati ANJURAN_AUTO", sh)
+		}
+		// Yang diperiksa baris PENGIKATANNYA, bukan sekadar karakternya:
+		// spasi dan "=" muncul di mana-mana dalam skrip mana pun, sehingga
+		// mencarinya begitu saja adalah uji yang tidak pernah bisa gagal.
+		for _, ikat := range pengikatan[sh] {
+			if !strings.Contains(s, ikat) {
+				t.Errorf("skrip %s tidak memasang pemicu: %q", sh, ikat)
+			}
+		}
+	}
+}
+
+// Setiap pemicu otomatis harus menyisipkan karakternya sendiri.
+//
+// Di keempat shell, mengikat sebuah karakter berarti mengambil alih tombolnya
+// sepenuhnya. Lupa menyisipkannya kembali membuat karakter yang diketik
+// pengguna hilang — gejala yang tampak seperti keyboard rusak, bukan seperti
+// completion yang salah.
+func TestPemicuMenyisipkanKarakternya(t *testing.T) {
+	sisip := map[string]string{
+		"zsh":        ".self-insert",
+		"bash":       "_anjuran_sisip",
+		"fish":       "commandline -i",
+		"powershell": "::Insert(",
+	}
+	for sh, tanda := range sisip {
+		s, _ := Script(sh)
+		if !strings.Contains(s, tanda) {
+			t.Errorf("skrip %s tidak menyisipkan karakter pemicunya (%q)", sh, tanda)
 		}
 	}
 }
@@ -167,3 +207,27 @@ func TestShellLainTanpaPemicuOtomatis(t *testing.T) {
 // Spasi belum tentu terpasang ke self-insert: oh-my-zsh memetakannya ke
 // magic-space. Membungkus self-insert saja berarti fitur ini mati diam-diam
 // di konfigurasi yang justru paling banyak dipakai.
+
+// Turun ke dalam folder dan pemekaran alias harus ada di setiap shell.
+//
+// Keduanya tidak punya penghalang teknis di shell mana pun: yang pertama
+// hanyalah widget yang memanggil dirinya sendiri dengan --select none, yang
+// kedua hanyalah pertanyaan "apa arti kata ini" yang setiap shell bisa jawab.
+// Mendaratkannya di zsh saja adalah pekerjaan yang berhenti separuh jalan,
+// bukan batas yang dipaksakan shell.
+func TestTurunFolderDanAliasDiSetiapShell(t *testing.T) {
+	for _, sh := range []string{"zsh", "bash", "fish", "powershell"} {
+		s, _ := Script(sh)
+		if !strings.Contains(s, "--select") && !strings.Contains(s, "-Select") {
+			t.Errorf("skrip %s tidak pernah mengirim --select; turun folder tidak mungkin", sh)
+		}
+		if !strings.Contains(s, "--alias") && !strings.Contains(s, "-Alias") {
+			t.Errorf("skrip %s tidak pernah mengirim --alias", sh)
+		}
+		// Rekursinya harus dibuka TANPA sorotan, kalau tidak penelusuran
+		// tidak punya cara berhenti dan terus turun sampai dasar.
+		if !strings.Contains(s, "none") {
+			t.Errorf("skrip %s membuka isi folder dengan sorotan; tidak ada cara berhenti", sh)
+		}
+	}
+}
