@@ -14,12 +14,33 @@ import (
 	"golang.org/x/term"
 )
 
-// runBootstrap memasang anjuran di host lain lewat SSH.
+// runUp memasang anjuran di host lain, supaya completion ikut jalan saat
+// pengguna SSH ke sana.
 //
 // Ini bukan pembungkus ssh. anjuran tidak pernah menyisip di antara kamu dan
 // koneksimu; perintah ini dijalankan sekali, dengan sadar, lalu selesai.
-func runBootstrap(args []string) int {
-	fs := flag.NewFlagSet("bootstrap", flag.ExitOnError)
+// opsiAnjuranSalahTempat mencari opsi milik anjuran di antara argumen ssh.
+//
+// Daftarnya dibaca dari FlagSet-nya sendiri, bukan ditulis ulang: opsi baru
+// ikut terjaga tanpa ada yang perlu mengingat tempat kedua.
+func opsiAnjuranSalahTempat(fs *flag.FlagSet, args []string) string {
+	milikKami := map[string]bool{}
+	fs.VisitAll(func(f *flag.Flag) { milikKami[f.Name] = true })
+
+	for _, a := range args {
+		nama := strings.TrimLeft(a, "-")
+		if i := strings.IndexByte(nama, '='); i >= 0 {
+			nama = nama[:i]
+		}
+		if strings.HasPrefix(a, "-") && milikKami[nama] {
+			return a
+		}
+	}
+	return ""
+}
+
+func runUp(args []string) int {
+	fs := flag.NewFlagSet("up", flag.ExitOnError)
 	from := fs.String("from", "", "direktori sumber: berisi anjuran dan specs, atau arsip rilis")
 	base := fs.String("base", remote.RemoteBase, "direktori tujuan di host, relatif terhadap rumah pengguna")
 	force := fs.Bool("force", false, "pasang ulang meski versinya sudah sama")
@@ -32,10 +53,26 @@ func runBootstrap(args []string) int {
 
 	rest := fs.Args()
 	if len(rest) == 0 {
-		fmt.Fprintln(os.Stderr, "anjuran: sebutkan host tujuan, misalnya: anjuran bootstrap deploy@web-01")
+		fmt.Fprintln(os.Stderr, "anjuran: sebutkan host tujuan, misalnya: anjuran up deploy@web-01")
 		return 2
 	}
 	host, sshArgs := rest[0], rest[1:]
+
+	// Opsi anjuran yang tertulis SESUDAH nama host diteruskan ke ssh apa
+	// adanya — dan ssh menjawabnya dengan memuntahkan seluruh pesan
+	// penggunaannya, yang sama sekali tidak menjelaskan apa yang keliru.
+	//
+	// "anjuran bootstrap lab --dry-run" adalah bentuk yang paling wajar
+	// ditulis orang, jadi ia pantas dijawab dengan kalimat, bukan dengan
+	// halaman bantuan ssh.
+	if salah := opsiAnjuranSalahTempat(fs, sshArgs); salah != "" {
+		fmt.Fprintf(os.Stderr,
+			"anjuran: %s adalah opsi anjuran, bukan opsi ssh, dan harus ditulis SEBELUM nama host:\n\n"+
+				"  anjuran up %s %s\n\n"+
+				"Apa pun sesudah nama host diteruskan ke ssh apa adanya.\n",
+			salah, salah, host)
+		return 2
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()

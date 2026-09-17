@@ -185,11 +185,27 @@ func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (So
 // fromDir mencari sumber di dalam sebuah direktori.
 func fromDir(dir string, p Platform, noop func()) (Source, func(), error) {
 	// Bentuk pertama: direktori yang sudah berisi anjuran dan specs.
-	bin := filepath.Join(dir, "anjuran")
+	//
+	// Nama berakhiran platform ikut dikenali, karena itulah yang dihasilkan
+	// `make cross`: bin/anjuran-linux-arm64. Tanpa ini pengguna harus menyalin
+	// dan mengganti namanya sendiri hanya untuk memakai keluaran perintah
+	// build milik proyek ini sendiri.
+	ext := ""
 	if p.OS == "windows" {
-		bin = filepath.Join(dir, "anjuran.exe")
+		ext = ".exe"
 	}
-	if fi, err := os.Stat(bin); err == nil && !fi.IsDir() {
+	bin := ""
+	for _, nama := range []string{
+		"anjuran" + ext,
+		fmt.Sprintf("anjuran-%s-%s%s", p.OS, p.Arch, ext),
+	} {
+		kandidat := filepath.Join(dir, nama)
+		if fi, err := os.Stat(kandidat); err == nil && !fi.IsDir() {
+			bin = kandidat
+			break
+		}
+	}
+	if bin != "" {
 		return Source{
 			Binary: bin,
 			Specs:  subdirJikaAda(dir, "specs"),

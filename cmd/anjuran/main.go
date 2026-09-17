@@ -30,7 +30,7 @@ const usage = `anjuran - autocomplete lintas platform untuk shell
 
 Penggunaan:
   anjuran init      <zsh|bash|fish|powershell>
-  anjuran bootstrap [user@]host [--from <dir>] [--dry-run]
+  anjuran up        [user@]host [--from <dir>] [--dry-run]
   anjuran version
   anjuran complete --line <baris> [--cursor N] [--json]
   anjuran widget   --line <baris> --cursor <N>
@@ -51,7 +51,8 @@ berkas konfigurasi shell:
   bash  ~/.bashrc                    eval "$(anjuran init bash)"
   fish  ~/.config/fish/config.fish   anjuran init fish | source
 
-bootstrap memasang anjuran di host lain lewat SSH. Engine harus berjalan di sisi
+up memasang anjuran di host lain, supaya completion ikut jalan saat kamu
+SSH ke sana. Engine harus berjalan di sisi
 remote, karena generator seperti "kubectl get pods" hanya menjawab benar di
 tempat datanya berada. Perintah ini bukan pembungkus ssh: ia dijalankan sekali,
 dengan sadar, lalu selesai.
@@ -91,8 +92,11 @@ func main() {
 	switch os.Args[1] {
 	case "init":
 		os.Exit(runInit(os.Args[2:]))
-	case "bootstrap":
-		os.Exit(runBootstrap(os.Args[2:]))
+	// "bootstrap" tetap diterima: ia nama yang dipakai sebelum perintah ini
+	// berganti nama, dan perintah yang sudah terlanjur ditulis orang di skrip
+	// tidak pantas mendadak gagal.
+	case "up", "bootstrap":
+		os.Exit(runUp(os.Args[2:]))
 	case "complete":
 		os.Exit(runComplete(os.Args[2:]))
 	case "widget":
