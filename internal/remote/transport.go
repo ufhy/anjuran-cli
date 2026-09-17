@@ -15,6 +15,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // Transport menjalankan perintah di host tujuan.
@@ -43,6 +45,10 @@ type SSH struct {
 	Host string
 	// Args adalah opsi tambahan untuk ssh, dipakai pengujian dan kasus khusus.
 	Args []string
+
+	// Batch memaksa BatchMode walau ada terminal; dipakai pengujian dan
+	// pemanggilan dari skrip yang ingin gagal cepat.
+	Batch bool
 
 	controlPath string
 	masterOpen  bool
@@ -73,11 +79,34 @@ func (s *SSH) sshArgs(remoteCmd string) []string {
 		"-o", "ControlMaster=auto",
 		"-o", "ControlPath=" + s.controlPath,
 		"-o", "ControlPersist=60",
-		"-o", "BatchMode=yes",
+	}
+	// BatchMode mematikan SEMUA prompt, termasuk prompt password. Itu benar
+	// untuk skrip dan CI: lebih baik gagal cepat dengan pesan jelas daripada
+	// menggantung menunggu jawaban yang tidak akan pernah datang di tengah
+	// pemasangan yang sudah separuh jalan.
+	//
+	// Tetapi `anjuran up` dijalankan orang, di terminal, sekali jalan. Di
+	// sana memaksa BatchMode berarti host yang menerima password tetap tidak
+	// bisa dimasuki — kunci menjadi wajib bukan karena SSH memintanya,
+	// melainkan karena kita melarang satu-satunya alternatifnya. Jadi
+	// syaratnya dibalik: prompt hanya dilarang bila memang tidak ada orang
+	// yang bisa menjawabnya. ControlMaster membuat password cukup diketik
+	// sekali walau host dihubungi beberapa kali.
+	if !s.interactive() {
+		args = append(args, "-o", "BatchMode=yes")
 	}
 	args = append(args, s.Args...)
 	args = append(args, s.Host, remoteCmd)
 	return args
+}
+
+// interactive menjawab apakah ada orang yang bisa mengetikkan jawaban.
+//
+// Yang diperiksa stdin MILIK KITA, bukan stdin yang diberikan ke ssh: Send
+// mengganti stdin anaknya dengan arsip, sementara ssh sendiri membaca password
+// dari terminal kendali. Keduanya tidak bertabrakan.
+func (s *SSH) interactive() bool {
+	return !s.Batch && term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 func (s *SSH) Exec(ctx context.Context, cmd string) (string, error) {

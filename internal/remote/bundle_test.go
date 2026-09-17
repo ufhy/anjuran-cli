@@ -175,3 +175,57 @@ func TestBundleMembawaExtra(t *testing.T) {
 		t.Errorf("arsip tidak memuat %s/cd.json", RemoteExtra)
 	}
 }
+
+// Platform host yang berbeda tidak lagi langsung menjadi kegagalan: binary
+// yang sudah pernah dibangun harus ditemukan sendiri, tanpa --from.
+func TestResolveSourceMenemukanBinaryLintasSendiri(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(bin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "anjuran-linux-arm64"), []byte("biner"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	specs := filepath.Join(dir, "specs")
+	if err := os.MkdirAll(specs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	pindah(t, dir)
+
+	src, bersihkan, err := ResolveSource("", Platform{OS: "linux", Arch: "arm64"}, nil, nil)
+	if err != nil {
+		t.Fatalf("seharusnya ditemukan tanpa --from: %v", err)
+	}
+	defer bersihkan()
+	if filepath.Base(src.Binary) != "anjuran-linux-arm64" {
+		t.Errorf("binary = %q", src.Binary)
+	}
+}
+
+// Di luar pohon sumber anjuran tidak ada yang boleh dibangun, walau ada go.mod.
+func TestAkarSumberMenolakProyekLain(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module contoh/lain\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pindah(t, dir)
+
+	if akar := akarSumber(); akar != "" {
+		t.Errorf("akarSumber() = %q, mau kosong", akar)
+	}
+}
+
+// pindah memindahkan direktori kerja selama satu uji, lalu mengembalikannya.
+func pindah(t *testing.T, dir string) {
+	t.Helper()
+	asal, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(asal) })
+}

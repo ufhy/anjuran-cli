@@ -24,6 +24,8 @@ type Options struct {
 	Force bool
 	// DryRun hanya melaporkan rencana tanpa mengirim apa pun.
 	DryRun bool
+	// NoShell melewati penyuntingan berkas konfigurasi shell di host.
+	NoShell bool
 	// Version adalah versi anjuran lokal, dipakai membandingkan dengan yang terpasang.
 	Version string
 	// Out adalah tempat laporan ditulis.
@@ -85,7 +87,11 @@ func Prepare(ctx context.Context, t Transport, opt Options) (Plan, func(), error
 	}
 
 	plan.Installed = Installed(ctx, t, binPath)
-	if plan.Installed != "" && opt.Version != "" &&
+	// Versi "dev" berarti binary ini dibangun dari pohon kerja, dan isinya
+	// berubah setiap kali dikompilasi. Membandingkannya dengan versi di host
+	// selalu menghasilkan "sama" — sehingga justru selama pengembangan, saat
+	// perubahan paling sering, tidak ada yang pernah terkirim.
+	if plan.Installed != "" && opt.Version != "" && opt.Version != "dev" &&
 		strings.Contains(plan.Installed, opt.Version) && !opt.Force {
 		plan.UpToDate = true
 		return plan, noop, nil
@@ -150,7 +156,106 @@ func Install(ctx context.Context, t Transport, plan Plan, opt Options) error {
 			"biasanya karena home dipasang noexec", plan.BinPath, t.Target())
 	}
 	fmt.Fprintf(out, "  terpasang : %s\n", version)
+
+	if !opt.NoShell {
+		if rc, status, err := PasangShell(ctx, t, base); err != nil {
+			// Binary-nya sudah terpasang dan berguna; gagal menyunting berkas
+			// konfigurasi tidak pantas membatalkan itu. Cukup dilaporkan,
+			// supaya pengguna tahu langkah terakhirnya harus dikerjakan sendiri.
+			fmt.Fprintf(out, "  shell     : gagal disetel (%v)\n", err)
+		} else {
+			fmt.Fprintf(out, "  shell     : %s (%s)\n", rc, status)
+		}
+	}
 	return nil
+}
+
+// penandaShell mengapit blok yang ditulis anjuran.
+//
+// Ada supaya pemasangan kedua tidak menumpuk baris yang sama, dan supaya
+// pengguna bisa melihat persis bagian mana yang bukan tulisannya sendiri —
+// lalu menghapusnya tanpa menebak.
+const (
+	penandaAwal  = "# >>> anjuran >>>"
+	penandaAkhir = "# <<< anjuran <<<"
+)
+
+// PasangShell menambahkan baris integrasi ke berkas konfigurasi shell di host.
+//
+// Berkasnya dipilih dari shell login pengguna di sana, bukan dari shell yang
+// kebetulan dipakai di mesin ini: keduanya sering berbeda, dan menulis ke
+// berkas yang tidak pernah dibaca adalah cara paling halus untuk membuat
+// fiturnya tampak rusak.
+//
+// Penulisannya idempoten. Memasang dua kali tidak menambah apa-apa.
+func PasangShell(ctx context.Context, t Transport, base string) (rc, status string, err error) {
+	if base == "" {
+		base = RemoteBase
+	}
+
+	// getent lebih tepercaya daripada $SHELL: $SHELL milik sesi non-interaktif
+	// ini, sedangkan yang menentukan berkas mana yang dibaca adalah shell login
+	// yang tercatat di passwd.
+	keluaran, err := t.Exec(ctx, "getent passwd \"$(id -un)\" 2>/dev/null | cut -d: -f7 || echo \"$SHELL\"")
+	if err != nil {
+		return "", "", err
+	}
+	shell := path.Base(strings.TrimSpace(keluaran))
+
+	var berkas string
+	var baris []string
+	var hanyaPath string
+	binDir := path.Join("$HOME", base, "bin")
+	switch shell {
+	case "zsh":
+		berkas = "$HOME/.zshrc"
+		baris = []string{`export PATH="` + binDir + `:$PATH"`, `eval "$(anjuran init zsh)"`}
+	case "bash":
+		berkas = "$HOME/.bashrc"
+		baris = []string{`export PATH="` + binDir + `:$PATH"`, `eval "$(anjuran init bash)"`}
+	case "fish":
+		berkas = "$HOME/.config/fish/config.fish"
+		baris = []string{`set -gx PATH ` + binDir + ` $PATH`, `anjuran init fish | source`}
+	default:
+		// sh, ash, dash, ksh: tidak ada integrasi untuk dipasang di sana —
+		// anjuran hanya punya widget untuk zsh, bash, fish, dan PowerShell.
+		// PATH tetap disetel, karena tanpa itu binary yang barusan dikirim
+		// tidak bisa dipanggil sama sekali, bahkan untuk `anjuran complete`.
+		berkas = "$HOME/.profile"
+		baris = []string{`export PATH="` + binDir + `:$PATH"`}
+		hanyaPath = shell
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "rc=%s; ", berkas)
+	fmt.Fprintf(&b, "if grep -qF %s \"$rc\" 2>/dev/null; then echo sudah; else ", kutip(penandaAwal))
+	b.WriteString("mkdir -p \"$(dirname \"$rc\")\" && ")
+	b.WriteString("printf '%s\\n'")
+	for _, l := range append(append([]string{"", penandaAwal}, baris...), penandaAkhir) {
+		b.WriteString(" " + kutip(l))
+	}
+	b.WriteString(" >> \"$rc\" && echo ditambahkan; fi")
+
+	hasil, err := t.Exec(ctx, b.String())
+	if err != nil {
+		return "", "", err
+	}
+	keterangan := ""
+	if hanyaPath != "" {
+		keterangan = ", PATH saja: " + hanyaPath + " belum punya integrasi"
+	}
+	switch strings.TrimSpace(hasil) {
+	case "sudah":
+		return berkas, "sudah ada" + keterangan, nil
+	case "ditambahkan":
+		return berkas, "ditambahkan" + keterangan, nil
+	}
+	return berkas, "tidak jelas" + keterangan, nil
+}
+
+// kutip membungkus sebuah string menjadi satu argumen shell yang aman.
+func kutip(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // ShellHint adalah baris yang perlu ditambahkan pengguna di host.

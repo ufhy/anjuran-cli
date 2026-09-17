@@ -3,9 +3,11 @@ package remote
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -148,9 +150,20 @@ func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (So
 		return fromDir(from, p, noop)
 	}
 
-	// Tanpa asal yang disebut, satu-satunya yang bisa dipakai adalah binary
-	// yang sedang berjalan — dan itu hanya cocok bila platformnya sama.
+	// Platform host berbeda dari mesin ini, jadi binary yang sedang berjalan
+	// tidak bisa dipakai. Itu keadaan yang lumrah — memasang dari laptop macOS
+	// ke server Linux adalah kasus yang paling sering — jadi ia tidak pantas
+	// langsung menjadi kegagalan yang menyuruh orang membangun sendiri.
+	// Dicari dulu di tempat yang wajar, lalu dibangun kalau memang bisa.
 	if p.OS != runtime.GOOS || p.Arch != runtime.GOARCH {
+		if dir := cariBinaryLintas(p); dir != "" {
+			return fromDir(dir, p, noop)
+		}
+		if src, bersihkan, err := bangunLintas(p, localSpecs, localExtra); err == nil {
+			return src, bersihkan, nil
+		} else if !errors.Is(err, errTakBisaBangun) {
+			return Source{}, noop, err
+		}
 		return Source{}, noop, fmt.Errorf(
 			"host adalah %s sedangkan mesin ini %s/%s; bangun binary-nya lalu sebutkan dengan --from (misalnya `make cross` atau `make snapshot`)",
 			p, runtime.GOOS, runtime.GOARCH)
@@ -347,4 +360,134 @@ func untar(arc, dir string) error {
 			out.Close()
 		}
 	}
+}
+
+// errTakBisaBangun berarti mesin ini tidak punya bahan untuk membangun sendiri;
+// bukan kegagalan build, melainkan ketiadaan syaratnya.
+var errTakBisaBangun = errors.New("tidak ada pohon sumber atau toolchain Go")
+
+// cariBinaryLintas mencari binary yang sudah pernah dibangun untuk platform
+// lain di tempat-tempat yang wajar.
+//
+// Yang dicari nama berakhiran platform — anjuran-linux-arm64 — karena itulah
+// yang dihasilkan `make cross` dan goreleaser. Tanpa langkah ini pengguna
+// harus menyebut --from setiap kali, padahal berkasnya sudah ada di tempat
+// yang bisa ditebak.
+func cariBinaryLintas(p Platform) string {
+	ext := ""
+	if p.OS == "windows" {
+		ext = ".exe"
+	}
+	nama := fmt.Sprintf("anjuran-%s-%s%s", p.OS, p.Arch, ext)
+
+	kandidat := []string{"bin", "dist", "."}
+	if exe, err := os.Executable(); err == nil {
+		if real, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = real
+		}
+		kandidat = append(kandidat, filepath.Dir(exe))
+	}
+	if akar := akarSumber(); akar != "" {
+		kandidat = append(kandidat, filepath.Join(akar, "bin"), filepath.Join(akar, "dist"))
+	}
+
+	for _, d := range kandidat {
+		if fi, err := os.Stat(filepath.Join(d, nama)); err == nil && !fi.IsDir() {
+			return d
+		}
+	}
+	return ""
+}
+
+// bangunLintas membangun binary untuk platform tujuan dari pohon sumber.
+//
+// Hanya mungkin bila perintah ini memang dijalankan dari dalam pohon sumber
+// anjuran dan ada toolchain Go. Binary rilis di mesin orang lain tidak punya
+// keduanya, dan di sana pesan yang menyuruh memakai --from tetap benar.
+func bangunLintas(p Platform, localSpecs, localExtra []string) (Source, func(), error) {
+	noop := func() {}
+
+	// Hanya platform yang memang didukung anjuran yang dicoba. Tanpa batas ini
+	// sebuah host yang melaporkan dirinya plan9 akan menghasilkan kegagalan
+	// kompilasi yang membingungkan, menggantikan pesan yang sebenarnya
+	// menjelaskan jalan keluarnya.
+	switch p.OS {
+	case "linux", "darwin", "windows":
+	default:
+		return Source{}, noop, errTakBisaBangun
+	}
+
+	akar := akarSumber()
+	if akar == "" {
+		return Source{}, noop, errTakBisaBangun
+	}
+	if _, err := exec.LookPath("go"); err != nil {
+		return Source{}, noop, errTakBisaBangun
+	}
+
+	dir, err := os.MkdirTemp("", "anjuran-lintas-")
+	if err != nil {
+		return Source{}, noop, err
+	}
+	bersihkan := func() { os.RemoveAll(dir) }
+
+	ext := ""
+	if p.OS == "windows" {
+		ext = ".exe"
+	}
+	out := filepath.Join(dir, "anjuran"+ext)
+
+	cmd := exec.Command("go", "build", "-o", out, "./cmd/anjuran")
+	cmd.Dir = akar
+	// CGO dimatikan supaya hasilnya statis dan tidak menuntut toolchain silang
+	// milik OS tujuan — itulah yang membuat `go build` lintas platform berguna
+	// sama sekali.
+	cmd.Env = append(os.Environ(), "GOOS="+p.OS, "GOARCH="+p.Arch, "CGO_ENABLED=0")
+	if keluaran, err := cmd.CombinedOutput(); err != nil {
+		bersihkan()
+		// Jalan keluarnya tetap disebut: build yang gagal tidak boleh
+		// meninggalkan orang tanpa cara lain untuk maju.
+		return Source{}, noop, fmt.Errorf(
+			"membangun untuk %s gagal; bangun sendiri lalu sebutkan dengan --from: %w: %s",
+			p, err, strings.TrimSpace(string(keluaran)))
+	}
+
+	specs := pertamaYangAda(append([]string{filepath.Join(akar, "specs")}, localSpecs...))
+	if specs == "" {
+		bersihkan()
+		return Source{}, noop, fmt.Errorf("direktori spec tidak ditemukan di mesin ini; jalankan `make specs`")
+	}
+	return Source{
+		Binary: out,
+		Specs:  specs,
+		Extra:  pertamaYangAda(append([]string{filepath.Join(akar, "extra")}, localExtra...)),
+		Origin: "dibangun untuk " + p.String(),
+	}, bersihkan, nil
+}
+
+// akarSumber menaiki direktori sampai menemukan pohon sumber anjuran.
+//
+// Yang diperiksa isi go.mod, bukan sekadar keberadaannya: berada di dalam
+// proyek Go lain yang kebetulan mengandung direktori cmd/anjuran bukan alasan
+// untuk membangun apa pun.
+func akarSumber() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for i := 0; i < 40; i++ {
+		b, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+		if err == nil {
+			if strings.Contains(string(b), "module github.com/ufhy/anjuran-cli") {
+				return dir
+			}
+			return ""
+		}
+		induk := filepath.Dir(dir)
+		if induk == dir {
+			return ""
+		}
+		dir = induk
+	}
+	return ""
 }

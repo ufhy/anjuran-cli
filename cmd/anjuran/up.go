@@ -45,6 +45,7 @@ func runUp(args []string) int {
 	base := fs.String("base", remote.RemoteBase, "direktori tujuan di host, relatif terhadap rumah pengguna")
 	force := fs.Bool("force", false, "pasang ulang meski versinya sudah sama")
 	dryRun := fs.Bool("dry-run", false, "tampilkan rencananya tanpa mengirim apa pun")
+	noShell := fs.Bool("no-shell", false, "jangan sentuh berkas konfigurasi shell di host")
 	yes := fs.Bool("yes", false, "lanjutkan tanpa bertanya")
 	timeout := fs.Duration("timeout", 5*time.Minute, "batas waktu seluruh proses")
 	if err := fs.Parse(args); err != nil {
@@ -97,6 +98,7 @@ func runUp(args []string) int {
 		Base:       *base,
 		Force:      *force,
 		DryRun:     *dryRun,
+		NoShell:    *noShell,
 		Version:    version,
 		Out:        os.Stdout,
 	}
@@ -110,6 +112,15 @@ func runUp(args []string) int {
 
 	if plan.UpToDate {
 		fmt.Printf("%s sudah memakai %s; tidak ada yang perlu dikirim.\n", host, plan.Installed)
+		// Binary yang sudah mutakhir tidak berarti shell-nya sudah disetel.
+		// Keduanya urusan terpisah, dan yang belum selesai tetap diselesaikan.
+		if !*noShell {
+			if rc, status, err := remote.PasangShell(ctx, t, *base); err != nil {
+				fmt.Printf("  shell     : gagal disetel (%v)\n", err)
+			} else {
+				fmt.Printf("  shell     : %s (%s)\n", rc, status)
+			}
+		}
 		return 0
 	}
 
@@ -129,7 +140,12 @@ func runUp(args []string) int {
 		return 1
 	}
 
-	fmt.Printf("\n%s\n", remote.ShellHint(*base))
+	// Petunjuk manual hanya berguna bila memang tidak ada yang disetel sendiri.
+	if *noShell {
+		fmt.Printf("\n%s\n", remote.ShellHint(*base))
+	} else {
+		fmt.Printf("\nBuka sesi baru ke host itu, atau muat ulang konfigurasi shell-nya.\n")
+	}
 	return 0
 }
 
