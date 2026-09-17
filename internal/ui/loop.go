@@ -269,10 +269,6 @@ func (s *Session) Run() (State, Outcome, error) {
 		return apply(s.st, res, rs[0].cand), Accepted, nil
 	}
 
-	// Renderer perlu tahu sampai mana ia boleh menghapus: sebatas teks
-	// perintah yang digambar shell, tidak sampai ke prompt.
-	s.rend.Milik(textWidth(s.awal))
-
 	selected := s.start
 	switch {
 	case s.start == NoSelection:
@@ -437,40 +433,19 @@ func (s *Session) Run() (State, Outcome, error) {
 			}
 
 		case KeyBackspace:
-			if !s.typable || len(s.st.Line) == 0 {
-				return s.selesai(key.Raw, s.st, Accepted)
-			}
-			s.deleteBack()
-			// Menghapus bisa melewati bagian yang digambar shell; sejak itu
-			// bagian tersebut bukan lagi milik shell.
-			if len(s.st.Line) < len(s.awal) {
-				s.awal = s.st.Line
-			}
-
-			// Baris yang dihapus sampai HABIS berarti pengguna membatalkan
-			// seluruh perintahnya, dan kotaknya harus ikut menutup.
+			// Backspace MENUTUP kotaknya, lalu tombolnya dikembalikan ke shell.
 			//
-			// Membiarkannya terbuka berbahaya, bukan sekadar mengganggu: di
-			// posisi perintah dengan awalan kosong, yang ditawarkan adalah
-			// SELURUH isi PATH, dan yang tersorot kandidat pertamanya menurut
-			// abjad — sesuatu yang tidak pernah diketik siapa pun. Enter
-			// berikutnya, yang dimaksudkan pengguna sebagai "jalankan baris
-			// kosong", menyisipkannya; Enter sesudahnya MENJALANKANNYA.
+			// Menghapus adalah cara pengguna mundur dari apa yang sedang
+			// ditawarkan; menyaring ulang di situ menahan kotak tetap terbuka
+			// justru saat ia sedang berusaha menyingkirkannya. Kotaknya akan
+			// muncul lagi pada spasi berikutnya, atau dengan Tab.
 			//
-			// Tab pada baris kosong tetap menampilkan daftar itu: di sana
-			// pengguna memang memintanya.
-			if s.st.Line == "" {
-				return s.selesai(nil, s.st, Accepted)
-			}
-			if err := s.rend.EchoBackspace(); err != nil {
-				return s.st, Cancelled, err
-			}
-			if res, rs, selected, err = s.refresh(); err != nil {
-				return s.st, Cancelled, err
-			}
-			if len(rs) == 0 {
-				return s.selesai(nil, s.st, Accepted)
-			}
+			// Karakternya dihapus SHELL, bukan kami: shell yang memiliki baris
+			// prompt, sehingga ia menggambarnya ulang dengan benar tanpa kami
+			// perlu menghitung kolom sama sekali. Seluruh pembukuan gema untuk
+			// menghapus — berikut jaring pengaman agar tidak menembus prompt —
+			// menjadi tidak diperlukan bersama ini.
+			return s.selesai(key.Raw, s.st, Accepted)
 
 		case KeyRight:
 			// Panah kanan MASUK ke dalam folder yang sedang tersorot.

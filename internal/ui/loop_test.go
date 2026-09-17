@@ -840,32 +840,32 @@ func TestPanahKananBukanFolderDikembalikan(t *testing.T) {
 	}
 }
 
-// Menghapus perintah sampai HABIS menutup kotaknya.
+// Backspace MENUTUP kotaknya, dan tombolnya dikembalikan ke shell.
 //
-// Dibiarkan terbuka, yang ditawarkan di posisi perintah dengan awalan kosong
-// adalah seluruh isi PATH, dengan kandidat pertama tersorot — sesuatu yang
-// tidak pernah diketik siapa pun. Enter berikutnya menyisipkannya, dan Enter
-// sesudahnya menjalankannya.
-func TestHapusSampaiHabisMenutupKotak(t *testing.T) {
+// Menghapus adalah cara pengguna mundur dari apa yang sedang ditawarkan;
+// menyaring ulang di situ menahan kotak tetap terbuka justru saat ia sedang
+// berusaha menyingkirkannya. Karakternya dihapus shell, yang memang memiliki
+// baris prompt — sehingga baris di sini sengaja dibiarkan apa adanya.
+func TestBackspaceMenutupKotak(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"aclocal", "aclocal-1.18", "adig"}}
-	term := &fakeTerm{keys: []tty.Key{
-		k(tty.KeyBackspace), k(tty.KeyBackspace), k(tty.KeyEnter),
-	}}
+	term := &fakeTerm{keys: []tty.Key{{Type: tty.KeyBackspace, Raw: []byte{0x7f}}}}
 
 	p, err := Prepare(newEngine(), State{Line: "ac", Cursor: 2}, dyn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, out, err := p.Session(term, discard()).Run()
+	sesi := p.Session(term, discard())
+	st, out, err := sesi.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out != Accepted {
 		t.Errorf("outcome = %v, mau Accepted", out)
 	}
-	// Enter TIDAK ikut terbaca: sesi sudah menutup sebelum tombol itu tiba.
-	// Bila ia terbaca, barisnya akan berisi salah satu nama perintah.
-	if st.Line != "" {
-		t.Errorf("Line = %q, mau kosong — tidak ada yang boleh disisipkan", st.Line)
+	if st.Line != "ac" {
+		t.Errorf("Line = %q, mau dibiarkan apa adanya — shell yang menghapus", st.Line)
+	}
+	if len(sesi.Leftover()) == 0 {
+		t.Error("backspace tidak dikembalikan ke shell")
 	}
 }

@@ -369,7 +369,13 @@ SKENARIO = [
     # Perilaku dasar yang harus selalu benar
     # ------------------------------------------------------------------
     ("baris tetap utuh setelah Esc", [b"git", b" ", b"comm", b"\x1b"], memuat("git comm")),
-    ("backspace menyaring ulang", [b"git", b" ", b"commi", b"\x7f", b"\x7f"], memuat("commit")),
+    # Backspace MENUTUP kotaknya: menghapus adalah cara pengguna mundur dari
+    # apa yang sedang ditawarkan, dan menyaring ulang di situ menahan kotak
+    # tetap terbuka justru saat ia sedang berusaha menyingkirkannya.
+    ("backspace menutup kotak",
+     [b"git", b" ", b"commi", b"\x7f"], tanpa("commit", "checkout")),
+    ("spasi berikutnya memunculkannya lagi",
+     [b"git", b" ", b"\x7f", b" "], memuat("commit")),
     # Menghapus sampai kosong TIDAK memunculkan kembali kotaknya: sesi sudah
     # menutup saat kandidat habis, dan pemicu berikutnya harus diketik. Yang
     # dijaga di sini adalah ketikannya tidak hilang.

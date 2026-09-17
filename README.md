@@ -237,6 +237,10 @@ bukan perintah. Baris perintah bukan berkas kode; ia pendek, ditulis sekali, dan
 lebih sering diketik habis daripada dijelajahi. Menunggu spasi membuat saran
 datang tepat saat kamu berhenti, bukan sambil kamu mengetik.
 
+**Backspace menutup kotaknya.** Menghapus adalah cara kamu mundur dari apa yang
+sedang ditawarkan; menyaring ulang di situ menahan kotak tetap terbuka justru
+saat kamu berusaha menyingkirkannya. Tekan spasi lagi dan ia kembali.
+
 Nama perintah tetap bisa dilengkapi — dengan **Tab**, yang memang berarti
 "tolong lengkapi".
 
@@ -426,6 +430,7 @@ Tab kini membuka dropdown. Tombol di dalamnya:
 | Shift-Tab, panah atas, Ctrl-P | naik |
 | Page Down, Page Up | lompat satu layar |
 | spasi | mengetik spasi, bukan memilih |
+| Backspace | hapus satu huruf, kotaknya ikut tertutup |
 | Esc | tutup kotaknya, ketikan di dalamnya tetap dibawa |
 | Ctrl-C | diteruskan ke shell, yang membatalkan barisnya |
 
