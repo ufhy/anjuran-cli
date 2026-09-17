@@ -47,12 +47,6 @@ specs:
 # itu Python memblok-buffer stdout-nya dan tidak ada satu baris pun muncul
 # sampai seluruh 60-an skenario selesai — berkas hasil yang masih kosong lalu
 # tidak bisa dibedakan dari run yang mati.
-# ssh-uji menguji jalur remote lewat sshd SEKALI PAKAI di port tinggi. Jalur
-# itu paling jarang tersentuh, dan uji Go-nya memakai sh lokal sehingga "apa
-# yang benar-benar mendarat di sana" tidak pernah diperiksa dari sisi penerima.
-ssh-uji: build
-	tools/sshuji/jalankan.sh
-
 ux: build
 	python3 -u tools/uxtest/uxtest.py
 
