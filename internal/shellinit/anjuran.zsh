@@ -60,6 +60,8 @@ _anjuran_widget() {
   setopt local_options no_ksh_arrays
 
   local out head body status_word new_cursor sisa
+  # Baris SEBELUM sesi dijalankan, untuk tahu apakah ada yang tersisip.
+  local sebelum=$BUFFER
   local select_from=${1:-first}
   # Pemicu otomatis tidak pernah berarti "sisipkan yang ini"; hanya Tab yang
   # berarti begitu.
@@ -96,8 +98,16 @@ _anjuran_widget() {
 
   if [[ -z $out ]]; then
     # anjuran tidak bisa menjalankan sesi, misalnya karena bukan terminal
-    # interaktif. Serahkan ke completion bawaan zsh.
-    zle expand-or-complete
+    # interaktif — atau karena ia jatuh. Untuk Tab, completion bawaan zsh jauh
+    # lebih baik daripada tidak ada apa-apa.
+    #
+    # Untuk pemicu otomatis TIDAK: menekan spasi lalu tiba-tiba mendapat
+    # completion zsh mengubah baris perintah tanpa diminta. Bila anjuran jatuh,
+    # ia menyisipkan sesuatu yang tidak pernah dipilih siapa pun — dan
+    # kegagalan yang seharusnya tidak terlihat justru menjadi perubahan baris.
+    if [[ $trigger == manual ]]; then
+      zle expand-or-complete
+    fi
     return
   fi
 
@@ -116,9 +126,15 @@ _anjuran_widget() {
     ok)
       BUFFER=$body
       CURSOR=$new_cursor
-      # Tab yang menghasilkan sebuah direktori membuka isinya. Hanya untuk
-      # pemicu manual: Tab memang berarti "lengkapi lagi", sedangkan pemicu
-      # otomatis tidak boleh terus membuka kotak tanpa diminta.
+      # Memilih sebuah direktori membuka isinya.
+      #
+      # Garis miring adalah karakter pemicu, sama seperti spasi — dan yang
+      # baru saja disisipkan memang garis miring. Bahwa ia datang dari pilihan
+      # pengguna alih-alih diketik tidak mengubah apa pun: memilih folder
+      # jelas berarti "lanjutkan ke dalamnya". Sempat dibatasi hanya untuk
+      # Tab, dan akibatnya menelusuri path terasa canggung — sesudah memilih
+      # "Documents/" pengguna harus menghapus garis miringnya lalu
+      # mengetiknya lagi hanya untuk memunculkan daftar berikutnya.
       #
       # Dibuka TANPA ada yang tersorot. Sebelumnya isinya dibuka dengan anak
       # pertama terpilih, sehingga menelusuri satu direktori langsung menyeret
@@ -129,10 +145,16 @@ _anjuran_widget() {
       # Kutip penutup dilepas dulu: nama berspasi disisipkan terkutip, sehingga
       # "cd 'folder dengan spasi/'" berakhir dengan kutip, bukan garis miring.
       # Tanpa ini folder berspasi tidak pernah bisa ditelusuri.
+      # Hanya bila ada yang benar-benar TERSISIP.
+      #
+      # Enter di dalam kotak yang tidak menyorot apa pun berarti "cukup, pakai
+      # path ini" dan mengembalikan baris yang sama persis. Tanpa syarat ini,
+      # baris yang sudah berakhir garis miring akan membuka kotaknya lagi pada
+      # setiap Enter — dan tidak ada cara berhenti sama sekali.
       local _anjuran_ekor=${BUFFER%[\'\"]}
-      if [[ $trigger == manual && $_anjuran_ekor == */ && -z $sisa ]]; then
+      if [[ $BUFFER != $sebelum && $_anjuran_ekor == */ && -z $sisa ]]; then
         zle -R
-        _anjuran_widget none manual
+        _anjuran_widget none "$trigger"
         return
       fi
       ;;

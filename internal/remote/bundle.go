@@ -21,13 +21,19 @@ const (
 	RemoteBase  = ".local"
 	RemoteBin   = "bin/anjuran"
 	RemoteSpecs = "share/anjuran/specs"
+	// RemoteExtra menampung tambalan buatan tangan. Ia ikut dikirim karena di
+	// situlah pengetahuan yang TIDAK ada di korpus Fig: cd, ssh, docker,
+	// kubectl, serta daftar skrip proyek. Tanpa itu completion di host remote
+	// diam-diam lebih buruk daripada di mesin sendiri — dan yang paling
+	// terasa justru di host remote, tempat perintahnya paling tidak dihafal.
+	RemoteExtra = "share/anjuran/extra"
 )
 
 // Bundle menulis arsip tar.gz berisi binary dan spec.
 //
 // Arsip dialirkan langsung ke stdin perintah remote, tanpa pernah menjadi
 // berkas di mesin lokal: satu proses, satu koneksi, tanpa sisa.
-func Bundle(binPath, specsDir string, w io.Writer) (int64, error) {
+func Bundle(binPath, specsDir, extraDir string, w io.Writer) (int64, error) {
 	counter := &countingWriter{w: w}
 	zw := gzip.NewWriter(counter)
 	tw := tar.NewWriter(zw)
@@ -37,6 +43,11 @@ func Bundle(binPath, specsDir string, w io.Writer) (int64, error) {
 	}
 	if specsDir != "" {
 		if err := addTree(tw, specsDir, RemoteSpecs); err != nil {
+			return counter.n, err
+		}
+	}
+	if extraDir != "" {
+		if err := addTree(tw, extraDir, RemoteExtra); err != nil {
 			return counter.n, err
 		}
 	}
@@ -120,6 +131,8 @@ func (c *countingWriter) Write(p []byte) (int, error) {
 type Source struct {
 	Binary string
 	Specs  string
+	// Extra adalah tambalan buatan tangan; boleh kosong.
+	Extra string
 	// Origin menjelaskan asalnya untuk ditampilkan.
 	Origin string
 }
@@ -128,7 +141,7 @@ type Source struct {
 //
 // from boleh kosong, sebuah direktori berisi anjuran dan specs, atau direktori
 // hasil rilis yang memuat arsip goreleaser.
-func ResolveSource(from string, p Platform, localSpecs []string) (Source, func(), error) {
+func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (Source, func(), error) {
 	noop := func() {}
 
 	if from != "" {
@@ -161,7 +174,12 @@ func ResolveSource(from string, p Platform, localSpecs []string) (Source, func()
 	if specs == "" {
 		return Source{}, noop, fmt.Errorf("direktori spec tidak ditemukan di mesin ini; jalankan `make specs`")
 	}
-	return Source{Binary: exe, Specs: specs, Origin: "binary anjuran yang sedang berjalan"}, noop, nil
+	return Source{
+		Binary: exe,
+		Specs:  specs,
+		Extra:  pertamaYangAda(localExtra),
+		Origin: "binary anjuran yang sedang berjalan",
+	}, noop, nil
 }
 
 // fromDir mencari sumber di dalam sebuah direktori.
@@ -172,11 +190,12 @@ func fromDir(dir string, p Platform, noop func()) (Source, func(), error) {
 		bin = filepath.Join(dir, "anjuran.exe")
 	}
 	if fi, err := os.Stat(bin); err == nil && !fi.IsDir() {
-		specs := filepath.Join(dir, "specs")
-		if fi, err := os.Stat(specs); err != nil || !fi.IsDir() {
-			specs = ""
-		}
-		return Source{Binary: bin, Specs: specs, Origin: dir}, noop, nil
+		return Source{
+			Binary: bin,
+			Specs:  subdirJikaAda(dir, "specs"),
+			Extra:  subdirJikaAda(dir, "extra"),
+			Origin: dir,
+		}, noop, nil
 	}
 
 	// Bentuk kedua: direktori hasil rilis berisi arsip per platform.
@@ -186,6 +205,25 @@ func fromDir(dir string, p Platform, noop func()) (Source, func(), error) {
 
 	return Source{}, noop, fmt.Errorf(
 		"tidak menemukan anjuran untuk %s di %s; isinya harus berupa anjuran dan specs, atau arsip rilis", p, dir)
+}
+
+// pertamaYangAda mengembalikan direktori pertama yang benar-benar ada.
+func pertamaYangAda(dirs []string) string {
+	for _, d := range dirs {
+		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
+			return d
+		}
+	}
+	return ""
+}
+
+// subdirJikaAda mengembalikan subdirektori bila ia ada, atau string kosong.
+func subdirJikaAda(dir, nama string) string {
+	p := filepath.Join(dir, nama)
+	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		return p
+	}
+	return ""
 }
 
 // findArchive mencari arsip goreleaser untuk sebuah platform.

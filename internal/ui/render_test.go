@@ -548,3 +548,21 @@ func TestSemuaBarisSamaLebarDiLayar(t *testing.T) {
 		}
 	}
 }
+
+// Kandidat yang ditawarkan UI sendiri tidak berasal dari penyaringan, sehingga
+// tidak punya posisi cocok.
+//
+// Sempat membuat anjuran panik di tengah menggambar. Akibatnya jauh lebih
+// buruk daripada kotak yang tidak muncul: prosesnya mati tanpa keluaran, dan
+// shell menganggapnya "tidak ada jawaban" lalu menyisipkan hasil completion-nya
+// sendiri — perubahan baris yang tidak pernah dipilih siapa pun.
+func TestItemsTanpaMatchTidakPanik(t *testing.T) {
+	rs := []ranked{{cand: engine.Candidate{Name: "\u23ce", Kind: engine.KindBerhenti}}}
+	got := items(rs, IkonAman)
+	if len(got) != 1 || got[0].Name != "\u23ce" {
+		t.Fatalf("items = %+v", got)
+	}
+	if got[0].Hint != "" {
+		t.Errorf("Hint = %q, mau kosong — ikonnya sudah menjadi namanya", got[0].Hint)
+	}
+}

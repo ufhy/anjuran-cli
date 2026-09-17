@@ -23,6 +23,9 @@ const (
 	KindSubcommand Kind = "subcommand"
 	KindOption     Kind = "option"
 	KindArg        Kind = "arg"
+	// KindBerhenti adalah baris "cukup, pakai yang sudah ada" — bukan kandidat
+	// yang berasal dari spec, melainkan tindakan yang ditawarkan UI sendiri.
+	KindBerhenti Kind = "berhenti"
 )
 
 // Candidate adalah satu entri yang ditawarkan ke pengguna.

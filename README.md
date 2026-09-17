@@ -445,6 +445,33 @@ sudah kamu ketik di dalam sesi tetap milikmu.
 Tombol yang tidak dikenali sesi — Ctrl-A, Home, panah kiri — dikembalikan ke
 zsh, bukan ditelan.
 
+### Ikon per baris
+
+Setiap baris ditandai jenisnya:
+
+```
+╭──────────────┬──────────────────────────────────╮
+│ ❯ ▪ commit   │ Record changes to the repository │
+│   ▫ --amend  │ Replace the tip of the branch    │
+│   ▸ proyek/  │                                  │
+│   · catatan  │                                  │
+╰──────────────┴──────────────────────────── 1/4 ─╯
+```
+
+Padat berarti perintah, berongga berarti pengubahnya, panah berarti bisa
+ditelusuri, titik berarti sesuatu yang diam.
+
+Bentuk geometris dipakai sebagai bawaan karena **font tidak bisa ditanya**:
+glyph yang tidak dimiliki sebuah font tergambar sebagai kotak kosong, dan
+lebarnya bisa meleset — satu kolom saja sudah cukup mematahkan bingkainya.
+
+Punya Nerd Font? Ikonnya jauh lebih terbaca:
+
+```sh
+ANJURAN_IKON=nerd eval "$(anjuran init zsh)"    #    
+ANJURAN_IKON=0    eval "$(anjuran init zsh)"    # tanpa ikon
+```
+
 ### Folder
 
 Baris folder yang tersorot menunjukkan kedua tombolnya:
@@ -458,9 +485,21 @@ Baris folder yang tersorot menunjukkan kedua tombolnya:
 ╰────────────── 1/4 ─╯
 ```
 
-Menelusuri ke dalam folder membuka isinya **tanpa memilihkan apa pun**. Itulah
-cara berhenti: Enter di situ berarti "cukup, pakai path ini", sedangkan Tab atau
-panah kanan turun satu tingkat lagi. Sebelumnya isinya dibuka dengan anak pertama
+Memilih sebuah folder langsung membuka isinya, dengan baris **berhenti** di
+paling atas:
+
+```
+❯ cd proyek/
+╭─────────────────────╮
+│ ❯ ⏎                 │   Enter: cukup, berhenti di sini
+│   proyek/dalam/      │   panah bawah lalu Enter: turun
+╰─────────────── 1/2 ─╯
+```
+
+Garis miring adalah karakter pemicu, dan yang baru disisipkan memang garis
+miring — bahwa ia datang dari pilihanmu alih-alih diketik tidak mengubah apa
+pun. Jadi menelusuri path tidak perlu menghapus lalu mengetik ulang garis
+miringnya. Sebelumnya isinya dibuka dengan anak pertama
 tersorot — sehingga Enter, satu-satunya cara berhenti, justru turun lagi; dan
 bila anaknya tunggal ia disisipkan lalu ditelusuri lagi, sampai dasar.
 

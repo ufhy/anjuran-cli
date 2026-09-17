@@ -869,3 +869,63 @@ func TestBackspaceMenutupKotak(t *testing.T) {
 		t.Error("backspace tidak dikembalikan ke shell")
 	}
 }
+
+// Sesudah menelusuri direktori, "berhenti" ditawarkan sebagai baris yang bisa
+// DILIHAT, bukan sekadar keadaan tanpa sorotan.
+//
+// Berhenti memang selalu bisa — Enter tanpa sorotan menerima baris apa adanya —
+// tetapi tidak ada apa pun di layar yang mengatakannya.
+func TestBarisBerhentiDitawarkanSaatMenelusuri(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek/dalam/"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyEnter)}}
+
+	p, err := Prepare(newEngine(), State{Line: "cd proyek/", Cursor: 10}, dyn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, out, err := p.Session(term, discard()).StartAt(NoSelection).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != Accepted {
+		t.Errorf("outcome = %v, mau Accepted", out)
+	}
+	// Baris teratas tersorot adalah "berhenti"; memilihnya tidak mengubah apa
+	// pun, karena yang disisipkannya adalah teks yang memang sudah ada.
+	if st.Line != "cd proyek/" {
+		t.Errorf("Line = %q, mau tetap %q", st.Line, "cd proyek/")
+	}
+}
+
+// Baris berikutnya tetap bisa dipilih: satu panah bawah melewati baris
+// "berhenti" dan mendarat di isi direktorinya.
+func TestPanahBawahMelewatiBarisBerhenti(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"proyek/dalam/"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyDown), k(tty.KeyEnter)}}
+
+	p, _ := Prepare(newEngine(), State{Line: "cd proyek/", Cursor: 10}, dyn, nil)
+	st, _, err := p.Session(term, discard()).StartAt(NoSelection).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Line != "cd proyek/dalam/" {
+		t.Errorf("Line = %q, mau %q", st.Line, "cd proyek/dalam/")
+	}
+}
+
+// Baris kosong TIDAK mendapat baris "berhenti": tidak ada path yang bisa
+// dipakai, dan Tab di sana memang untuk melihat daftar perintah.
+func TestBarisKosongTanpaBarisBerhenti(t *testing.T) {
+	dyn := &fakeDynamic{names: []string{"awk", "cat"}}
+	term := &fakeTerm{keys: []tty.Key{k(tty.KeyDown), k(tty.KeyEnter)}}
+
+	p, _ := Prepare(newEngine(), State{Line: "", Cursor: 0}, dyn, nil)
+	st, _, err := p.Session(term, discard()).StartAt(NoSelection).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Tanpa baris berhenti, satu panah bawah mendarat di kandidat PERTAMA.
+	if st.Line != "awk" {
+		t.Errorf("Line = %q, mau %q", st.Line, "awk")
+	}
+}

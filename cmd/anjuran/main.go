@@ -62,6 +62,7 @@ ke /dev/tty dan hasilnya dikembalikan lewat stdout.
 Lingkungan:
   ANJURAN_SPECS      direktori spec
   ANJURAN_SIMPLE     bila diisi, matikan warna dan sorotan
+  ANJURAN_IKON       gaya ikon per baris: nerd, atau 0 untuk mematikan
   ANJURAN_KEY        tombol pemicu, dibaca oleh skrip init
   ANJURAN_AUTO       0 untuk mematikan dropdown yang muncul sendiri (bawaan: nyala)
   ANJURAN_LOG        rekam byte yang digambar ke terminal, untuk menyelidiki

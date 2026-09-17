@@ -116,15 +116,22 @@ func apply(st State, res *engine.Result, c engine.Candidate) State {
 }
 
 // items mengubah kandidat berperingkat menjadi baris yang bisa digambar.
-func items(rs []ranked) []Item {
+func items(rs []ranked, ikon string) []Item {
 	out := make([]Item, len(rs))
 	for i, r := range rs {
+		// match boleh nil: baris yang ditawarkan UI sendiri — baris "berhenti" —
+		// tidak berasal dari penyaringan, jadi tidak punya posisi cocok.
+		var sorot []int
+		if r.match != nil {
+			sorot = r.match.Positions
+		}
 		out[i] = Item{
 			Name:        r.cand.Label(),
 			Description: r.cand.Description,
 			Kind:        string(r.cand.Kind),
 			Dangerous:   r.cand.Dangerous,
-			Highlight:   r.match.Positions,
+			Highlight:   sorot,
+			Icon:        ikonUntuk(r.cand, ikon),
 			Hint:        petunjuk(r.cand),
 		}
 	}
@@ -137,6 +144,9 @@ func items(rs []ranked) []Item {
 // apa adanya — dan keduanya tombol yang berbeda. Menampilkan hanya satu ikon
 // di situ sama saja menyembunyikan setengah dari yang bisa dilakukan.
 func petunjuk(c engine.Candidate) string {
+	if c.Kind == engine.KindBerhenti {
+		return ""
+	}
 	if c.IsDir() {
 		return "\u2192 \u23ce"
 	}

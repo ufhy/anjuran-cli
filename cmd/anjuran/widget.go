@@ -109,6 +109,26 @@ func mulaiDari(sel, line string) int {
 	return 0
 }
 
+// EnvIkon memilih gaya ikon per baris.
+const EnvIkon = "ANJURAN_IKON"
+
+// modeIkon membaca gaya ikon dari lingkungan.
+//
+// Bawaannya bentuk geometris yang ada di hampir semua font. Glyph Nerd Font
+// jauh lebih terbaca, tetapi harus diminta: font tidak bisa ditanya, dan glyph
+// yang tidak dimiliki tergambar sebagai kotak kosong dengan lebar yang bisa
+// meleset — cukup untuk mematahkan bingkai kotaknya.
+func modeIkon() string {
+	switch strings.ToLower(os.Getenv(EnvIkon)) {
+	case "nerd":
+		return ui.IkonNerd
+	case "0", "no", "off", "false", "mati":
+		return ui.IkonMati
+	default:
+		return ui.IkonAman
+	}
+}
+
 // interact membuka terminal, menjalankan sesi, lalu memulihkan mode terminal.
 func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State, ui.Outcome, ui.Leftover, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
@@ -138,6 +158,7 @@ func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State
 	gambar, tutupRekaman := rekam(term.Out())
 	defer tutupRekaman()
 	rend := ui.NewRenderer(gambar, w, h, simpleMode())
+	rend.Ikon(modeIkon())
 
 	sesi := pre.Session(term, rend).StartAt(start)
 	st2, outcome, err := sesi.Run()

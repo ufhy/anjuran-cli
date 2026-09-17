@@ -21,7 +21,7 @@ func TestBundleIsi(t *testing.T) {
 	os.WriteFile(filepath.Join(specs, "aws", "s3.json"), []byte("{}"), 0o644)
 
 	var buf bytes.Buffer
-	n, err := Bundle(bin, specs, &buf)
+	n, err := Bundle(bin, specs, "", &buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestBundleTanpaSpec(t *testing.T) {
 	os.WriteFile(bin, []byte("BINARY"), 0o755)
 
 	var buf bytes.Buffer
-	if _, err := Bundle(bin, "", &buf); err != nil {
+	if _, err := Bundle(bin, "", "", &buf); err != nil {
 		t.Fatalf("spec kosong bukan kondisi kesalahan: %v", err)
 	}
 	if buf.Len() == 0 {
@@ -75,7 +75,7 @@ func TestBundleTanpaSpec(t *testing.T) {
 
 func TestBundleBinaryTidakAda(t *testing.T) {
 	var buf bytes.Buffer
-	if _, err := Bundle(filepath.Join(t.TempDir(), "tidak-ada"), "", &buf); err == nil {
+	if _, err := Bundle(filepath.Join(t.TempDir(), "tidak-ada"), "", "", &buf); err == nil {
 		t.Error("mau error untuk binary yang tidak ada")
 	}
 }
@@ -130,4 +130,48 @@ func keys(m map[string]int64) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// Tambalan buatan tangan ikut dikirim.
+//
+// Di situlah pengetahuan yang TIDAK ada di korpus Fig: cd, ssh, docker,
+// kubectl, serta daftar skrip proyek. Tanpa itu completion di host remote
+// diam-diam lebih buruk daripada di mesin sendiri — dan yang paling terasa
+// justru di host remote, tempat perintahnya paling tidak dihafal.
+func TestBundleMembawaExtra(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "anjuran")
+	if err := os.WriteFile(bin, []byte("biner"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	extra := filepath.Join(dir, "extra")
+	if err := os.MkdirAll(extra, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(extra, "cd.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := Bundle(bin, "", extra, &buf); err != nil {
+		t.Fatal(err)
+	}
+	zr, _ := gzip.NewReader(&buf)
+	tr := tar.NewReader(zr)
+	ada := false
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Name == RemoteExtra+"/cd.json" {
+			ada = true
+		}
+	}
+	if !ada {
+		t.Errorf("arsip tidak memuat %s/cd.json", RemoteExtra)
+	}
 }

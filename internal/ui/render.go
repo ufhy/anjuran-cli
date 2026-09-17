@@ -18,6 +18,8 @@ type Item struct {
 	Dangerous bool
 	// Highlight adalah indeks rune pada Name yang cocok dengan kueri.
 	Highlight []int
+	// Icon digambar sebelum nama, menandai jenis kandidatnya.
+	Icon string
 	// Hint adalah petunjuk tombol yang digambar di tepi kanan baris, hanya
 	// pada baris yang sedang terpilih.
 	//
@@ -80,6 +82,9 @@ func colorFor(kind string, dangerous bool) string {
 		return escCyan
 	case "option":
 		return escBlue
+	case "berhenti":
+		// Redup: ia bukan salah satu isi direktori, melainkan jalan keluar.
+		return escDim
 	default:
 		return escGreen
 	}
@@ -96,6 +101,8 @@ type Renderer struct {
 	height int
 	// simple mematikan warna dan sorotan untuk terminal terbatas.
 	simple bool
+	// ikon menentukan gaya ikon per baris: aman, nerd, atau mati.
+	ikon string
 
 	// prev menyimpan baris yang sedang tampil di layar.
 	prev []string
@@ -117,8 +124,15 @@ func NewRenderer(w io.Writer, width, height int, simple bool) *Renderer {
 	if height < 3 {
 		height = 3
 	}
-	return &Renderer{w: w, width: width, height: height, simple: simple}
+	return &Renderer{w: w, width: width, height: height, simple: simple, ikon: IkonAman}
 }
+
+// Ikon memilih gaya ikon per baris.
+//
+// Dipasang lewat setter, bukan lewat parameter NewRenderer: ia pilihan
+// tampilan yang hanya diketahui lapisan perintah, dan seluruh pemanggil lain
+// tidak perlu ikut memikirkannya.
+func (r *Renderer) Ikon(mode string) { r.ikon = mode }
 
 // MaxRows adalah jumlah baris kandidat yang muat.
 //
@@ -372,10 +386,13 @@ func (c layout) bottomBorder(position, total int) string {
 // columns menghitung lebar kedua kolom agar muat di lebar terminal.
 func (r *Renderer) columns(items []Item) layout {
 	var c layout
-	hintW := 0
+	hintW, ikonW := 0, 0
 	for _, it := range items {
 		if n := textWidth(it.Name); n > c.nameW {
 			c.nameW = n
+		}
+		if n := textWidth(it.Icon); n > ikonW {
+			ikonW = n
 		}
 		if n := textWidth(it.Description); n > c.descW {
 			c.descW = n
@@ -387,6 +404,12 @@ func (r *Renderer) columns(items []Item) layout {
 	// Kolom nama tidak boleh melahap seluruh lebar terminal.
 	if max := r.width / 2; c.nameW > max {
 		c.nameW = max
+	}
+
+	// Ikon plus satu spasi pemisahnya ikut dihitung sebagai bagian kolom nama,
+	// sehingga nama terpanjang tetap muat utuh.
+	if ikonW > 0 {
+		c.nameW += ikonW + 1
 	}
 
 	c.split = c.descW > 0
@@ -436,8 +459,14 @@ func rowCells(it Item, c layout, selected bool) (left, right string) {
 	if selected {
 		marker = "❯ "
 	}
-	name := truncateWidth(it.Name, c.nameW)
-	left = " " + marker + name + strings.Repeat(" ", max(0, c.nameW-textWidth(name))) + " "
+	ikon := ""
+	if it.Icon != "" {
+		ikon = it.Icon + " "
+	}
+	lebarNama := c.nameW - textWidth(ikon)
+	name := truncateWidth(it.Name, lebarNama)
+	left = " " + marker + ikon + name +
+		strings.Repeat(" ", max(0, lebarNama-textWidth(name))) + " "
 
 	if !c.split {
 		if selected {

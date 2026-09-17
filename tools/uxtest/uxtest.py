@@ -170,8 +170,10 @@ SKENARIO = [
     # Nama perintah yang sudah lengkap langsung menawarkan ISINYA, termasuk
     # perintah yang isinya berupa argumen dan bukan subcommand.
     ("Tab pada cd menawarkan direktori", [b"cd", b"\t"], memuat("proyek/")),
+    # Tiga Enter: yang pertama memilih folder dan membuka isinya, yang kedua
+    # berhenti di situ, yang ketiga menjalankan barisnya.
     ("cd yang dipilih benar-benar mendarat",
-     [b"cd", b"\t", b"\x1b[B", b"\r", b"\r", b"pwd\r"], memuat("/berkas")),
+     [b"cd", b"\t", b"\x1b[B", b"\r", b"\r", b"\r", b"pwd\r"], memuat("/berkas")),
     # Tab pada baris KOSONG menawarkan perintah. Dijalankan tanpa mode otomatis
     # supaya yang membuka kotak benar-benar Tab, bukan ketikan sesudahnya.
     ("Tab pada baris kosong tanpa mode otomatis",
@@ -271,15 +273,52 @@ SKENARIO = [
     # Diperiksa lewat tempat mendaratnya, bukan tampilan: bila pengutipannya
     # salah, cd memecah namanya jadi dua argumen dan gagal sama sekali.
     ("Tab pada folder berspasi mengutipnya",
-     [b"cd", b" ", b"folder de", b"\t", b"\x1b", b"\r", b"pwd\r"],
+     [b"cd", b" ", b"folder de", b"\t", b"\x1b", b"\r", b"\r", b"pwd\r"],
      gabung(memuat("/folder dengan spasi"),
             tanpa("/folder dengan spasi/dalam sini"))),
     ("folder berspasi bisa ditelusuri",
-     [b"cd", b" ", b"folder de", b"\t", b"\t", b"\r", b"\r", b"pwd\r"],
+     [b"cd", b" ", b"folder de", b"\t", b"\t", b"\r", b"\r", b"\r", b"pwd\r"],
      memuat("/folder dengan spasi/dalam sini")),
     ("dua argumen terpisah tidak ikut disatukan",
      [b"ls", b" ", b"berkas cat"],
      gabung(memuat("catatan.txt"), tanpa("berkas/"))),
+
+    # Memilih folder langsung membuka isinya. Garis miring adalah karakter
+    # pemicu, dan yang baru disisipkan memang garis miring — bahwa ia datang
+    # dari pilihan alih-alih diketik tidak mengubah apa pun. Sempat dibatasi
+    # hanya untuk Tab, sehingga menelusuri path terasa canggung: sesudah
+    # memilih "Documents/" pengguna harus menghapus garis miringnya lalu
+    # mengetiknya lagi hanya untuk memunculkan daftar berikutnya.
+    ("memilih folder membuka isinya",
+     [b"cd", b" ", b"pro", b"\r"], memuat("proyek/dalam/")),
+    # "Berhenti" ditawarkan sebagai baris yang bisa DILIHAT, lengkap dengan
+    # ikon tombolnya. Sebelumnya berhenti memang bisa — Enter tanpa sorotan
+    # menerima baris apa adanya — tetapi tidak ada apa pun di layar yang
+    # mengatakannya.
+    ("baris berhenti tampak saat menelusuri",
+     [b"cd", b" ", b"pro", b"\r"], memuat("\u23ce")),
+    ("panah bawah melewati baris berhenti",
+     [b"cd", b" ", b"pro", b"\r", b"\x1b[B", b"\r", b"\r", b"\r", b"pwd\r"],
+     memuat("/proyek/dalam")),
+    # Enter berikutnya BERHENTI. Tanpa syarat "ada yang tersisip", baris yang
+    # sudah berakhir garis miring akan membuka kotaknya lagi pada setiap Enter,
+    # dan tidak ada cara berhenti sama sekali.
+    ("Enter sesudah memilih folder berhenti di situ",
+     [b"cd", b" ", b"pro", b"\r", b"\r", b"\r", b"pwd\r"],
+     gabung(memuat("/proyek"), tanpa("/proyek/dalam"))),
+    ("menelusuri dua tingkat tanpa mengetik ulang garis miring",
+     [b"cd", b" ", b"pro", b"\r", b"dal", b"\r", b"\r", b"\r", b"pwd\r"],
+     memuat("/proyek/dalam")),
+
+    # Ikon per baris menandai jenis kandidatnya. Bentuk geometris dasar
+    # dipakai karena font tidak bisa ditanya: glyph yang tidak dimiliki font
+    # tergambar sebagai kotak kosong dengan lebar yang bisa meleset — cukup
+    # untuk mematahkan bingkainya.
+    ("direktori bertanda panah", [b"cd", b" "], memuat("\u25b8 proyek/")),
+    ("subcommand bertanda kotak padat",
+     [b"git", b" ", b"comm"], memuat("\u25aa commit")),
+    ("opsi bertanda kotak berongga",
+     [b"git", b" ", b"commit", b" ", b"--am"], memuat("\u25ab --amend")),
 
     # Folder punya dua tindakan; ikon di tepi kanan baris terpilih memberi
     # tahu keduanya ada, dan panah kanan benar-benar melakukannya.
@@ -290,7 +329,7 @@ SKENARIO = [
      [b"git", b" ", b"comm"],
      gabung(memuat("commit"), tanpa("\u23ce"))),
     ("panah kanan masuk ke folder",
-     [b"cd", b" ", b"pro", b"\x1b[B", b"\x1b[C", b"\r", b"\r", b"pwd\r"],
+     [b"cd", b" ", b"pro", b"\x1b[B", b"\x1b[C", b"\r", b"\r", b"\r", b"pwd\r"],
      gabung(memuat("/proyek"), tanpa("/proyek/dalam"))),
 
     # Menelusuri direktori dulu menyeret turun tanpa henti: isinya dibuka
@@ -299,12 +338,12 @@ SKENARIO = [
     # dipilihkan, sehingga Enter berarti "cukup, pakai path ini".
     ("isi direktori tampil tanpa dipilihkan",
      [b"cd", b" ", b"pro", b"\t"],
-     gabung(memuat("proyek/dalam/"), tanpa("\u276f proyek/dalam/"))),
+     gabung(memuat("proyek/dalam/"), tanpa("\u276f \u25b8 proyek/dalam/"))),
     ("Enter berhenti di direktori yang sudah dipilih",
-     [b"cd", b" ", b"pro", b"\t", b"\r", b"\r", b"pwd\r"],
+     [b"cd", b" ", b"pro", b"\t", b"\r", b"\r", b"\r", b"pwd\r"],
      gabung(memuat("/proyek"), tanpa("/proyek/dalam"))),
     ("Tab turun satu tingkat tiap tekan",
-     [b"cd", b" ", b"pro", b"\t", b"\t", b"\r", b"\r", b"pwd\r"],
+     [b"cd", b" ", b"pro", b"\t", b"\t", b"\r", b"\r", b"\r", b"pwd\r"],
      gabung(memuat("/proyek/dalam"), tanpa("/proyek/dalam/lebih"))),
     ("branch git sungguhan", [b"git", b" ", b"checkout", b" "], memuat("fitur-alpha")),
     ("Tab menyisipkan awalan bersama", [b"git", b" ", b"checkout", b" ", b"fit", b"\t"],
@@ -322,7 +361,7 @@ SKENARIO = [
      [b"git", b" ", b"che", b"\x1b[B", b"\x1b[B", b"\r",   # pilih kandidat kedua
       b"\x15",                                             # Ctrl-U: bersihkan baris
       b"git", b" ", b"che", b"\t"],                        # ulangi awalan yang sama
-     memuat("❯ cherry-pick")),
+     memuat("❯ \u25aa cherry-pick")),
 
     # Teks abu-abu yang melanjutkan ketikan dari perintah yang pernah
     # dijalankan. Untuk perintah panjang yang diulang setiap hari, ini lebih
@@ -350,8 +389,10 @@ SKENARIO = [
 
     # Enter harus MENERIMA lalu menutup, kalau tidak perintahnya tidak pernah
     # bisa dijalankan: setiap Enter hanya turun satu tingkat lagi.
+    # Tiga Enter: memilih folder membuka isinya, Enter kedua berhenti di situ,
+    # Enter ketiga menjalankan barisnya.
     ("cd bisa dijalankan",
-     [b"cd", b" ", b"proy", b"\r", b"\r", b"pwd\r"],
+     [b"cd", b" ", b"proy", b"\r", b"\r", b"\r", b"pwd\r"],
      memuat("/proyek")),
 
     # Pemicu otomatis tidak boleh menyisipkan sendiri, meski kandidatnya

@@ -48,9 +48,15 @@ func runBootstrap(args []string) int {
 	defer t.Close()
 
 	specsDirs, _ := resolveSpecsDirs("")
+	// Tambalan buatan tangan ikut dikirim: di situlah pengetahuan yang tidak
+	// ada di korpus Fig. Spec milik pengguna di ~/.config TIDAK ikut — itu
+	// miliknya sendiri, dan menyalinnya ke mesin orang lain tanpa diminta
+	// bukan keputusan yang boleh diambil alat ini.
+	extraDirs := append([]string{"extra"}, bundledDirs("extra")...)
 	opt := remote.Options{
 		From:       *from,
 		LocalSpecs: specsDirs,
+		LocalExtra: extraDirs,
 		Base:       *base,
 		Force:      *force,
 		DryRun:     *dryRun,

@@ -269,6 +269,36 @@ func (s *Session) Run() (State, Outcome, error) {
 		return apply(s.st, res, rs[0].cand), Accepted, nil
 	}
 
+	// Baris "berhenti" ditawarkan secara TERLIHAT saat kotak dibuka tanpa
+	// sorotan sesudah menelusuri sebuah direktori.
+	//
+	// Sebelumnya berhenti memang bisa — Enter tanpa sorotan menerima baris apa
+	// adanya — tetapi tidak ada apa pun di layar yang mengatakannya. Yang
+	// terlihat pengguna hanyalah daftar isi direktori tanpa penanda, dan tidak
+	// ada cara menduga bahwa Enter berarti "cukup". Kini ia sebuah baris yang
+	// bisa dilihat dan dipilih, lengkap dengan ikon tombolnya.
+	//
+	// Yang disisipkannya adalah teks yang MEMANG SUDAH ADA di posisi itu,
+	// sehingga memilihnya benar-benar tidak mengubah apa pun — dan seluruh
+	// jalur Enter, Tab, serta penyisipan lain bekerja tanpa perlakuan khusus.
+	if s.start == NoSelection && strings.TrimSpace(s.st.Line) != "" && len(rs) > 0 {
+		teks := ""
+		if res.ReplaceStart >= 0 && res.ReplaceEnd <= len(s.st.Line) && res.ReplaceStart <= res.ReplaceEnd {
+			teks = s.st.Line[res.ReplaceStart:res.ReplaceEnd]
+		}
+		rs = append([]ranked{{cand: engine.Candidate{
+			// Ikon saja, tanpa kalimat: kolom ini milik isi direktori, dan
+			// satu baris teks penjelas di tengahnya justru mengganggu
+			// pembacaan daftar. Tombolnya sendiri sudah menjelaskan
+			// tindakannya, sebagaimana "→ ⏎" pada baris folder.
+			Name:         "\u23ce",
+			Insert:       teks,
+			CursorOffset: len(teks),
+			Kind:         engine.KindBerhenti,
+		}}}, rs...)
+		s.start = 0
+	}
+
 	selected := s.start
 	switch {
 	case s.start == NoSelection:
@@ -592,6 +622,11 @@ func (s *Session) recompute() (*engine.Result, []ranked, error) {
 
 // ingat mencatat pilihan pengguna untuk konteks tempat ia memilihnya.
 func (s *Session) ingat(res *engine.Result, c engine.Candidate) {
+	// Baris "berhenti" bukan pilihan yang layak diingat: ia tindakan UI, bukan
+	// kandidat yang berasal dari spec.
+	if c.Kind == engine.KindBerhenti {
+		return
+	}
 	if s.recall != nil {
 		s.recall.Record(recallKey(res), c.Name)
 	}
@@ -628,7 +663,7 @@ func (s *Session) draw(rs []ranked, selected int) error {
 	}
 	end := min(start+rows, len(rs))
 	// rel menyorot baris di layar; selected+1 melaporkan posisi sebenarnya.
-	return s.rend.Render(items(rs[start:end]), rel, selected+1, len(rs))
+	return s.rend.Render(items(rs[start:end], s.rend.ikon), rel, selected+1, len(rs))
 }
 
 func min(a, b int) int {

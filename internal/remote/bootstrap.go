@@ -16,6 +16,8 @@ type Options struct {
 	From string
 	// LocalSpecs adalah urutan direktori spec di mesin ini.
 	LocalSpecs []string
+	// LocalExtra adalah urutan direktori tambalan buatan tangan di mesin ini.
+	LocalExtra []string
 	// Base adalah direktori tujuan di host, relatif terhadap rumah pengguna.
 	Base string
 	// Force memasang ulang meski versinya sudah sama.
@@ -89,7 +91,7 @@ func Prepare(ctx context.Context, t Transport, opt Options) (Plan, func(), error
 		return plan, noop, nil
 	}
 
-	src, cleanup, err := ResolveSource(opt.From, plat, opt.LocalSpecs)
+	src, cleanup, err := ResolveSource(opt.From, plat, opt.LocalSpecs, opt.LocalExtra)
 	if err != nil {
 		return Plan{}, noop, err
 	}
@@ -129,7 +131,7 @@ func Install(ctx context.Context, t Transport, plan Plan, opt Options) error {
 	pr, pw := io.Pipe()
 	var sent int64
 	go func() {
-		n, err := Bundle(plan.Source.Binary, plan.Source.Specs, pw)
+		n, err := Bundle(plan.Source.Binary, plan.Source.Specs, plan.Source.Extra, pw)
 		sent = n
 		pw.CloseWithError(err)
 	}()
