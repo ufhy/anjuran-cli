@@ -545,6 +545,25 @@ Bash 4.0 ke atas dibutuhkan, karena `READLINE_LINE` dan `READLINE_POINT` baru
 ada sejak versi itu. Bash 3.2 bawaan macOS tidak didukung; pasang lewat
 `brew install bash`.
 
+## Menguji jalur SSH
+
+```sh
+make ssh-uji
+```
+
+Menyalakan sshd **sekali pakai** di 127.0.0.1 port tinggi sebagai pengguna
+biasa, mem-bootstrap ke sana, memeriksa apa yang benar-benar mendarat, lalu
+membereskan semuanya. Sekitar 5 detik. Tanpa `sudo`, tanpa menyentuh
+konfigurasi mesin, dan **tanpa menyalakan Remote Login** — itu mengekspos mesin
+ke jaringan, sedangkan ini hanya mendengar di localhost dengan autentikasi
+kunci.
+
+Ada karena uji Go untuk jalur remote memakai `sh` lokal dengan `$HOME`
+dialihkan: jaringannya tidak pernah ikut, sehingga *apa yang benar-benar
+mendarat di sana* tidak pernah diperiksa dari sisi penerima. Cacat pertama yang
+ditemukannya persis itu — `extra/` tidak ikut terkirim, dan seluruh tambalan
+buatan tangan hilang di host remote.
+
 ## Coba tanpa memasang
 
 ```sh
