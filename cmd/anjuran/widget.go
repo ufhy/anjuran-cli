@@ -155,9 +155,9 @@ func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State
 	defer term.Close()
 
 	w, h := term.Size()
-	gambar, tutupRekaman := rekam(term.Out())
-	defer tutupRekaman()
-	rend := ui.NewRenderer(gambar, w, h, simpleMode())
+	draw, closeLog := record(term.Out())
+	defer closeLog()
+	rend := ui.NewRenderer(draw, w, h, simpleMode())
 	rend.Ikon(modeIkon())
 
 	sesi := pre.Session(term, rend).StartAt(start)
