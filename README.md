@@ -214,8 +214,8 @@ perlu diingat — dan memasang di host remote cukup berarti menyalin satu berkas
 
 ### Dropdown yang muncul sendiri
 
-Ketik `git` — dropdown muncul tanpa menekan apa pun, berisi seluruh subcommand
-git beserta keterangannya. Tidak perlu spasi, tidak perlu Tab.
+Ketik `git` lalu **spasi** — dropdown muncul, berisi seluruh subcommand git
+beserta keterangannya. Tidak perlu menekan Tab.
 
 ```
 ╭───────────────┬───────────────────────────────────────────────╮
@@ -225,15 +225,20 @@ git beserta keterangannya. Tidak perlu spasi, tidak perlu Tab.
 ╰───────────────┴───────────────────────────────────── 1/48 ────╯
 ```
 
-Pemicunya bukan satu tombol khusus, melainkan titik-titik di mana ada sesuatu
-yang layak ditawarkan: **mengetik nama perintah**, lalu **spasi**, **`/`**, dan
-**`=`**. Ini mengikuti cara IDE bekerja — VS Code menyebutnya *trigger
-characters*, dan di shell inilah padanannya.
+Pemicunya bukan satu tombol khusus, melainkan karakter yang **mengakhiri sebuah
+kata**: **spasi**, **`/`**, dan **`=`**. Di situlah katanya selesai dan ada
+sesuatu yang bisa ditawarkan untuk berikutnya. VS Code menyebutnya *trigger
+characters*; di shell inilah padanannya.
 
-**Menghapus** huruf juga membukanya. `git commitx` tidak cocok dengan apa pun
-dan kotaknya menutup; menghapus satu huruf menampilkan `commit` lagi. Tanpa itu,
-sekali salah ketik berarti tidak ada saran sampai spasi berikutnya — padahal
-sesudah salah ketiklah saran paling dibutuhkan.
+**Mengetik huruf tidak membuka kotak.** Sempat dibuat begitu — meniru editor
+yang memunculkan daftar sambil nama diketik — dan di shell itu terasa
+mengganggu: kotak berkedip pada hampir setiap kata, termasuk kata yang jelas
+bukan perintah. Baris perintah bukan berkas kode; ia pendek, ditulis sekali, dan
+lebih sering diketik habis daripada dijelajahi. Menunggu spasi membuat saran
+datang tepat saat kamu berhenti, bukan sambil kamu mengetik.
+
+Nama perintah tetap bisa dilengkapi — dengan **Tab**, yang memang berarti
+"tolong lengkapi".
 
 Nyala secara bawaan. Matikan dengan:
 
@@ -241,9 +246,7 @@ Nyala secara bawaan. Matikan dengan:
 ANJURAN_AUTO=0 eval "$(anjuran init zsh)"
 ```
 
-Ambang panjang kata sebelum kotak dibuka diatur `ANJURAN_AUTO_MIN` (bawaan 2).
-Satu huruf cocok dengan ratusan biner di PATH; daftar sepanjang itu tidak
-menolong siapa pun.
+Tab tetap bekerja di mana pun, dengan atau tanpa mode ini.
 
 ### Nama perintah ikut dilengkapi
 
@@ -251,8 +254,8 @@ Di posisi perintah — awal baris, dan juga sesudah `|` atau `;` — yang ditawa
 adalah biner di PATH:
 
 ```sh
-kubec        →  kubectl, kubectl.docker
-docker ps | gi  →  git, github, gitleaks
+kubec<TAB>          →  kubectl, kubectl.docker
+docker ps | gi<TAB> →  git, github, gitleaks
 ```
 
 Tab pada baris yang **masih kosong** menawarkan seluruhnya.
@@ -402,14 +405,8 @@ sekaligus dan dibaca zsh ke penyangganya sendiri; membuka sesi pada setiap spasi
 di dalamnya berarti menunggu tombol yang sudah tidak ada di terminal — dan shell
 terkunci. Selama masih ada ketikan yang menunggu dibaca, pemicunya diam.
 
-Mengetik kata membuka kotak, tetapi biayanya **bukan** satu proses per huruf.
-Begitu sesi terbuka ia memegang seluruh ketikan sampai kotaknya tertutup, jadi
-huruf-huruf berikutnya disaring di dalam proses yang sama — paling banyak satu
-proses per kata, dan sering satu per baris perintah.
-
-Pembungkusnya memanggil widget yang sudah terpasang lebih dulu. zsh-autosuggestions
-dan zsh-syntax-highlighting juga membungkus `self-insert`; memanggil
-`zle .self-insert` begitu saja akan mematikan keduanya tanpa pesan apa pun.
+Pemicunya memanggil widget yang sudah terpasang pada tombol itu lebih dulu,
+sehingga `magic-space` milik oh-my-zsh dan pencarian riwayat tetap bekerja.
 
 Hanya zsh yang punya hook per-ketikan yang layak: bash
 memerlukan `bind -x` pada setiap karakter, yang merusak bracketed paste dan

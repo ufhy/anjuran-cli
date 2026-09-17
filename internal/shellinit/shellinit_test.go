@@ -100,10 +100,7 @@ func TestZshPemicu(t *testing.T) {
 		// dinyalakan sendiri, dan itu membuat mode utama alat ini tersembunyi
 		// di balik variabel yang harus diketahui namanya lebih dulu.
 		`${ANJURAN_AUTO:-1} != (0|no|off|false)`,
-		`zle -N self-insert _anjuran_ketik`, // mengetik kata juga membuka kotak
-		// Menghapus juga membukanya: sesudah salah ketiklah saran paling
-		// dibutuhkan.
-		`zle -N backward-delete-char _anjuran_hapus`,
+
 		`bindkey " " _anjuran_spasi`, // spasi
 		`bindkey "/" _anjuran_garismiring`,
 		`bindkey "=" _anjuran_samadengan`,
@@ -133,6 +130,26 @@ func TestZshMengembalikanTombolSisa(t *testing.T) {
 	for _, want := range []string{"zle -U", "_anjuran_kembalikan"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("skrip zsh tidak memuat %q", want)
+		}
+	}
+}
+
+// Mengetik huruf TIDAK membuka kotak.
+//
+// Sempat dibuat begitu, meniru editor yang memunculkan daftar sambil nama
+// diketik, dan di shell itu terasa mengganggu: kotak berkedip pada hampir
+// setiap kata. Yang membuka kotak hanyalah karakter yang MENGAKHIRI kata.
+func TestZshTidakMembungkusSelfInsert(t *testing.T) {
+	s, _ := Script("zsh")
+	for _, larang := range []string{"zle -N self-insert", "zle -N backward-delete-char"} {
+		// Bayangan riwayat memasang keduanya untuk keperluannya sendiri;
+		// yang diperiksa di sini adalah blok pemicu.
+		pemicu := s
+		if i := strings.Index(s, "Saran dari riwayat"); i > 0 {
+			pemicu = s[:i]
+		}
+		if strings.Contains(pemicu, larang) {
+			t.Errorf("blok pemicu tidak boleh memuat %q", larang)
 		}
 	}
 }

@@ -169,9 +169,9 @@ SKENARIO = [
     # (nama, ketikan, pemeriksa)
     # Nama perintah yang sudah lengkap langsung menawarkan ISINYA, termasuk
     # perintah yang isinya berupa argumen dan bukan subcommand.
-    ("mengetik cd menawarkan direktori", [b"c", b"d"], memuat("proyek/")),
+    ("Tab pada cd menawarkan direktori", [b"cd", b"\t"], memuat("proyek/")),
     ("cd yang dipilih benar-benar mendarat",
-     [b"c", b"d", b"\x1b[B", b"\r", b"\r", b"pwd\r"], memuat("/berkas")),
+     [b"cd", b"\t", b"\x1b[B", b"\r", b"\r", b"pwd\r"], memuat("/berkas")),
     # Tab pada baris KOSONG menawarkan perintah. Dijalankan tanpa mode otomatis
     # supaya yang membuka kotak benar-benar Tab, bukan ketikan sesudahnya.
     ("Tab pada baris kosong tanpa mode otomatis",
@@ -181,7 +181,7 @@ SKENARIO = [
     # beserta awal perintahnya lenyap. Buffer-nya benar — perintahnya tetap
     # berjalan — sehingga hanya tampilannya yang bohong.
     ("terminal pendek tetap menampilkan barisnya",
-     [b"c", b"d", b"\r"], memuat("cd berkas-lain/")),
+     [b"cd", b" ", b"\r"], memuat("cd berkas-lain/")),
 
     # Teks yang disisipkan SESI juga harus terlihat, bukan hanya yang diketik.
     # Shell tidak menggambar ulang selama widget-nya berjalan, jadi Tab yang
@@ -212,7 +212,7 @@ SKENARIO = [
      [b"\t", b"\r", b"echo TANDA\r"],
      gabung(memuat("TANDA"), tanpa("command not found"))),
     ("hapus sampai habis lalu Enter tidak menyisipkan apa pun",
-     [b"c", b"d", b"\x7f", b"\x7f", b"\r", b"echo TANDA\r"],
+     [b"cd", b" ", b"\x7f", b"\x7f", b"\x7f", b"\r", b"echo TANDA\r"],
      gabung(memuat("TANDA"), tanpa("command not found"))),
 
     # Perintah yang didefinisikan pengguna di berkas proyek. Spec Fig
@@ -230,14 +230,19 @@ SKENARIO = [
     # Yang diketik harus TERLIHAT. Seluruh skenario lain memeriksa isi
     # kotaknya, sehingga satu huruf yang hilang dari baris masukan tidak pernah
     # ketahuan — padahal buffer-nya benar dan perintahnya tetap jalan.
-    ("ketikan terlihat saat kotak terbuka", [b"g", b"i", b"t"], memuat("git")),
+    ("ketikan terlihat saat kotak terbuka", [b"git", b"\t"], memuat("git")),
     ("ketikan terlihat pada pemicu spasi",
      [b"git", b" ", b"co"], memuat("git co")),
     # Mengetik nama perintah sudah cukup; tidak perlu spasi maupun Tab.
-    ("mengetik nama perintah memunculkan isinya",
-     [b"g", b"i", b"t"], memuat("checkout", "commit")),
-    ("nama perintah dilengkapi dari PATH",
-     [b"k", b"u", b"b", b"e", b"c"], memuat("kubectl")),
+    # Mengetik huruf TIDAK membuka kotak: yang membukanya adalah karakter yang
+    # mengakhiri kata. Nama perintah tetap bisa dilengkapi — dengan Tab, yang
+    # memang berarti "tolong lengkapi".
+    ("mengetik huruf tidak membuka kotak",
+     [b"g", b"i", b"t"], tanpa("commit", "checkout")),
+    ("Tab pada nama perintah memunculkan isinya",
+     [b"git", b"\t"], memuat("checkout", "commit")),
+    ("Tab melengkapi nama perintah dari PATH",
+     [b"kubec", b"\t"], memuat("kubectl")),
     # Bawaannya nyala: tanpa menyetel apa pun, kotaknya tetap muncul.
     ("pemicu otomatis nyala tanpa disetel",
      [b"git", b" "], memuat("commit")),
@@ -368,12 +373,6 @@ SKENARIO = [
     # Menghapus sampai kosong TIDAK memunculkan kembali kotaknya: sesi sudah
     # menutup saat kandidat habis, dan pemicu berikutnya harus diketik. Yang
     # dijaga di sini adalah ketikannya tidak hilang.
-    # Sesudah salah ketiklah saran paling dibutuhkan: "git commitx" tidak
-    # cocok dengan apa pun dan kotaknya menutup; menghapus satu huruf harus
-    # menampilkannya lagi.
-    ("hapus huruf memunculkan kotak lagi",
-     [b"git", b" ", b"commitx", b"\x7f"],
-     memuat("Record changes to the repository")),
     # Satu penekanan backspace harus satu penghapusan. Pembungkusnya sempat
     # memakai status kembalian widget sebagai syarat, dan backward-delete-char
     # mengembalikan status bukan-nol saat kursor di awal baris — di situ
