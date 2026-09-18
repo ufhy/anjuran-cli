@@ -79,7 +79,15 @@ _anjuran_gambar_baris() {
     prompt=${prompt//$'\001'/}
     prompt=${prompt//$'\002'/}
   fi
-  printf '\r%s%s' "$prompt" "$READLINE_LINE" > /dev/tty 2>/dev/null
+  # Baris DIHAPUS dulu, bukan sekadar ditimpa.
+  #
+  # Widget ini bisa berjalan dua kali untuk satu penekanan tombol: memilih
+  # sebuah folder menyisipkan namanya, lalu membuka isinya dengan memanggil
+  # widget sekali lagi. Tanpa penghapusan, gambar kedua mendarat di sebelah
+  # gambar pertama dan barisnya terbaca ganda:
+  #
+  #   bash-5.3# cd home/bash-5.3# cd home/
+  printf '\r\033[K%s%s' "$prompt" "$READLINE_LINE" > /dev/tty 2>/dev/null
 }
 
 _anjuran_widget() {
