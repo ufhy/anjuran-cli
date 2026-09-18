@@ -220,7 +220,25 @@ _anjuran_fallback() {
   READLINE_POINT=$((${#prefix} + ${#insert}))
 }
 
-bind -x "\"${ANJURAN_KEY:-\C-i}\": _anjuran_widget"
+# _anjuran_ikat memasang satu tombol di SETIAP keymap yang mungkin aktif.
+#
+# `bind -x` mendaftarkan tombol hanya ke keymap yang sedang aktif — emacs, bila
+# belum ada yang mengubahnya. Pengguna yang menulis `set -o vi` di dekat akhir
+# .bashrc, urutan yang lumrah, akan memuat integrasi ini lebih dulu lalu
+# berpindah keymap sesudahnya: seluruh binding tertinggal di emacs dan tidak
+# pernah tersentuh lagi.
+#
+# Gejalanya bukan fitur yang berkurang melainkan anjuran yang MATI TOTAL, tanpa
+# satu pun pesan. Diperiksa langsung: sesudah `set -o vi`, jumlah binding
+# anjuran yang aktif turun dari empat menjadi nol.
+_anjuran_ikat() {
+  local tombol=$1 fungsi=$2 km
+  for km in emacs vi-insert; do
+    bind -m "$km" -x "\"$tombol\": $fungsi" 2>/dev/null
+  done
+}
+
+_anjuran_ikat "${ANJURAN_KEY:-\C-i}" _anjuran_widget
 
 # ---------------------------------------------------------------------------
 # Pemicu otomatis
@@ -265,9 +283,9 @@ _anjuran_samadengan()  { _anjuran_pemicu '='; }
 case ${ANJURAN_AUTO:-1} in
   0|no|off|false) ;;
   *)
-    bind -x '" ": _anjuran_spasi'
-    bind -x '"/": _anjuran_garismiring'
-    bind -x '"=": _anjuran_samadengan'
+    _anjuran_ikat " " _anjuran_spasi
+    _anjuran_ikat "/" _anjuran_garismiring
+    _anjuran_ikat "=" _anjuran_samadengan
     ;;
 esac
 

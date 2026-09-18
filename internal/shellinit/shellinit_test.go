@@ -186,6 +186,38 @@ func TestPemicuOtomatisSamaDiSetiapShell(t *testing.T) {
 	}
 }
 
+// Mode vi tidak boleh membuat anjuran hilang sama sekali.
+//
+// `bind -x` di bash mendaftarkan tombol hanya ke keymap yang sedang aktif.
+// Pengguna yang menulis `set -o vi` di dekat akhir .bashrc — urutan yang
+// lumrah — memuat integrasi ini lebih dulu lalu berpindah keymap sesudahnya,
+// dan seluruh binding tertinggal di emacs. Diperiksa langsung di Git Bash
+// 5.3: sesudah `set -o vi`, jumlah binding anjuran yang aktif turun dari
+// empat menjadi NOL.
+//
+// Gejalanya bukan fitur yang berkurang melainkan alat yang mati tanpa pesan.
+func TestModeViTidakMematikanBinding(t *testing.T) {
+	b, _ := Script("bash")
+	if !strings.Contains(b, "vi-insert") {
+		t.Error("skrip bash tidak memasang binding di keymap vi-insert")
+	}
+	if !strings.Contains(b, "_anjuran_ikat") {
+		t.Error("skrip bash memasang tombol tanpa melalui pembungkus keymap")
+	}
+
+	// PSReadLine menolak mendaftarkan tombol untuk mode yang belum aktif, jadi
+	// yang bisa dilakukan hanyalah memasangnya bila mode vi MEMANG sudah
+	// dipilih — dan tidak memanggilnya sama sekali bila belum, supaya tidak
+	// ada peringatan di setiap shell start.
+	p, _ := Script("powershell")
+	if !strings.Contains(p, "-ViMode Insert") {
+		t.Error("skrip powershell tidak memasang binding untuk mode vi")
+	}
+	if !strings.Contains(p, `(Get-PSReadLineOption).EditMode -eq 'Vi'`) {
+		t.Error("skrip powershell memanggil -ViMode tanpa memeriksa mode aktif")
+	}
+}
+
 // Setiap pemicu otomatis harus menyisipkan karakternya sendiri.
 //
 // Di keempat shell, mengikat sebuah karakter berarti mengambil alih tombolnya

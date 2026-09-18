@@ -17,6 +17,38 @@ Import-Module PSReadLine -ErrorAction SilentlyContinue
 
 $script:UfKey = if ($env:ANJURAN_KEY) { $env:ANJURAN_KEY } else { 'Tab' }
 
+# Set-AnjuranKey memasang satu tombol untuk mode edit apa pun.
+#
+# PSReadLine menyimpan tabel tombol terpisah untuk mode vi. Pengguna yang
+# menulis `Set-PSReadLineOption -EditMode Vi` di profilnya — biasanya sesudah
+# memuat integrasi ini — akan mendapati seluruh tombol anjuran tidak ada di
+# sana. Gejalanya bukan fitur yang berkurang melainkan anjuran yang mati
+# total, tanpa satu pun pesan.
+#
+# -ViMode baru ada di PSReadLine 2.x; kegagalannya ditelan supaya versi lama
+# tetap mendapat binding biasa.
+function Set-AnjuranKey {
+    param([string]$Key, [scriptblock]$Aksi, [string]$Keterangan)
+
+    Set-PSReadLineKeyHandler -Key $Key -BriefDescription $Keterangan -ScriptBlock $Aksi
+
+    # -ViMode hanya dipakai bila mode vi MEMANG sedang aktif. PSReadLine
+    # menolak mendaftarkan tombol untuk mode yang belum dipakai, dan
+    # memanggilnya tetap hanya menghasilkan peringatan di setiap shell start
+    # tanpa memasang apa pun.
+    #
+    # Akibatnya urutan di profil menjadi penting, dan itu disebut di README:
+    # `Set-PSReadLineOption -EditMode Vi` harus berada SEBELUM baris anjuran.
+    # Bila dibalik, seluruh tombol anjuran hilang tanpa satu pun pesan.
+    if ((Get-PSReadLineOption).EditMode -eq 'Vi') {
+        try {
+            Set-PSReadLineKeyHandler -Key $Key -BriefDescription $Keterangan -ScriptBlock $Aksi -ViMode Insert -ErrorAction Stop
+        } catch {
+            Write-Verbose 'anjuran: PSReadLine tanpa -ViMode; mode vi dilewati.'
+        }
+    }
+}
+
 # Get-AnjuranAlias mencari arti alias untuk kata pertama segmen TERAKHIR.
 #
 # Alias hanya berlaku di posisi perintah, jadi "docker ps | gst" memakai gst,
@@ -108,7 +140,7 @@ function Invoke-AnjuranWidget {
     }
 }
 
-Set-PSReadLineKeyHandler -Key $script:UfKey -BriefDescription 'anjuran' -LongDescription 'Dropdown completion anjuran' -ScriptBlock {
+Set-AnjuranKey -Key $script:UfKey -Keterangan 'anjuran' -Aksi {
     Invoke-AnjuranWidget -Trigger 'manual'
 }
 
@@ -133,7 +165,7 @@ if ($env:ANJURAN_AUTO -notin @('0', 'no', 'off', 'false')) {
         $chord = if ($karakter -eq ' ') { 'Spacebar' } else { $karakter }
         # Kutip TUNGGAL dengan sengaja: di dalamnya PowerShell tidak memproses
         # backslash sebagai escape, sehingga '\' sampai apa adanya.
-        Set-PSReadLineKeyHandler -Key $chord -BriefDescription 'anjuran-auto' -ScriptBlock ([scriptblock]::Create(@"
+        Set-AnjuranKey -Key $chord -Keterangan 'anjuran-auto' -Aksi ([scriptblock]::Create(@"
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert('$karakter')
             Invoke-AnjuranWidget -Trigger 'auto'
 "@))

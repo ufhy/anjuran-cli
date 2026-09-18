@@ -121,8 +121,14 @@ Keempat shell mendapat fitur yang sama, dan itu diuji — bukan diasumsikan.
 | turun ke dalam folder | ✓ | ✓ | ✓ | ✓ |
 | pemekaran alias | ✓ | ✓ | ✓ | ✓ |
 | tombol kursor | ✓ | ✓ | ✓ | ✓ |
-| mode vi | ✓ | — | ✓ | — |
+| mode vi | ✓ | ✓ | ✓ | ✓¹ |
 | saran dari riwayat | sendiri | — | bawaan fish | bawaan PSReadLine |
+
+¹ Di PowerShell, `Set-PSReadLineOption -EditMode Vi` harus berada **sebelum**
+baris anjuran di profilmu. PSReadLine menolak mendaftarkan tombol untuk mode
+yang belum aktif, jadi kalau urutannya terbalik seluruh tombol anjuran hilang
+tanpa satu pun pesan. Di bash urutannya tidak penting: `set -o vi` boleh di
+mana saja.
 
 Saran dari riwayat dinyalakan dengan `ANJURAN_GHOST=1`. Di fish dan PowerShell
 yang dipakai fitur bawaan shell-nya, karena miliknya lebih baik dan menirunya
