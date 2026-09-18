@@ -262,3 +262,43 @@ func TestGhostTextMemakaiFiturBawaanShell(t *testing.T) {
 		t.Error("skrip bash tidak menyebut ANJURAN_GHOST sama sekali")
 	}
 }
+
+// Kurung kurawal skrip PowerShell harus seimbang.
+//
+// Sebuah kurawal berlebih membuat `anjuran init powershell` menghasilkan
+// skrip yang GAGAL DIURAI — integrasinya mati seluruhnya, bukan cacat
+// sebagian. Dan kegagalannya diam: `Invoke-Expression` mengeluh ke stderr
+// lalu prompt tetap muncul seperti biasa, jadi tidak ada yang tampak rusak
+// sampai seseorang menekan Tab dan tidak terjadi apa-apa.
+//
+// Pemeriksaan ini kasar dan tidak menggantikan parser sungguhan, tetapi
+// menangkap justru kesalahan yang paling mudah dibuat saat menyunting skrip
+// ini dari luar PowerShell.
+func TestPowerShellKurawalSeimbang(t *testing.T) {
+	s, _ := Script("powershell")
+
+	dalamKomentar := false
+	imbang := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\n':
+			dalamKomentar = false
+		case '#':
+			dalamKomentar = true
+		case '{':
+			if !dalamKomentar {
+				imbang++
+			}
+		case '}':
+			if !dalamKomentar {
+				imbang--
+			}
+		}
+		if imbang < 0 {
+			t.Fatalf("kurawal penutup berlebih pada offset %d", i)
+		}
+	}
+	if imbang != 0 {
+		t.Errorf("kurawal tidak seimbang: selisih %d", imbang)
+	}
+}

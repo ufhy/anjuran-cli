@@ -107,7 +107,6 @@ function Invoke-AnjuranWidget {
         }
     }
 }
-}
 
 Set-PSReadLineKeyHandler -Key $script:UfKey -BriefDescription 'anjuran' -LongDescription 'Dropdown completion anjuran' -ScriptBlock {
     Invoke-AnjuranWidget -Trigger 'manual'
