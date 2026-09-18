@@ -160,8 +160,10 @@ func TestZshTidakMembungkusSelfInsert(t *testing.T) {
 // alat berbeda begitu seseorang berpindah mesin — dan itu paling terasa lewat
 // SSH, tempat shell di seberang sering bukan shell yang dipakai sehari-hari.
 var pengikatan = map[string][]string{
-	"zsh":  {`bindkey " " _anjuran_spasi`, `bindkey "/" _anjuran_garismiring`, `bindkey "=" _anjuran_samadengan`},
-	"bash": {`bind -x '" ": _anjuran_spasi'`, `bind -x '"/": _anjuran_garismiring'`, `bind -x '"=": _anjuran_samadengan'`},
+	"zsh": {`bindkey " " _anjuran_spasi`, `bindkey "/" _anjuran_garismiring`, `bindkey "=" _anjuran_samadengan`},
+	// Tombol bash dipasang lewat _anjuran_ikat, yang memasangnya di keymap
+	// emacs DAN vi-insert sekaligus.
+	"bash": {`_anjuran_ikat " " _anjuran_spasi`, `_anjuran_ikat "/" _anjuran_garismiring`, `_anjuran_ikat "=" _anjuran_samadengan`},
 	"fish": {`bind ' ' _anjuran_spasi`, `bind / _anjuran_garismiring`, `bind = _anjuran_samadengan`},
 	// PowerShell memicu pada "\" juga: path Windows tidak memakai garis
 	// miring, sehingga tanpa itu pemicu path di shell ini tidak pernah
