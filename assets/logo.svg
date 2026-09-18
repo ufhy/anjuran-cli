@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="320" height="120" role="img" aria-label="anjuran">
+  <!-- Bentuknya adalah yang digambar alat ini sendiri: kotak completion dengan
+       satu baris tersorot dan tanda ❯ di depannya. Bukan ikon generik. -->
+  <style>
+    .bingkai { fill: none; stroke: #6b7280; stroke-width: 2; }
+    .sorot   { fill: #16a34a; }
+    .teks    { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .nama    { fill: #111827; font-size: 34px; font-weight: 600; letter-spacing: -0.5px; }
+    .baris   { fill: #9ca3af; font-size: 13px; }
+    .terang  { fill: #052e16; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      .nama   { fill: #f3f4f6; }
+      .baris  { fill: #6b7280; }
+      .terang { fill: #052e16; }
+    }
+  </style>
+
+  <rect class="bingkai" x="9" y="9" width="150" height="102" rx="10"/>
+  <rect class="sorot" x="17" y="26" width="134" height="22" rx="5"/>
+  <text class="teks terang" x="27" y="41">❯ commit</text>
+  <text class="teks baris"  x="27" y="70">  checkout</text>
+  <text class="teks baris"  x="27" y="94">  cherry-pick</text>
+
+  <text class="teks nama" x="178" y="72">anjuran</text>
+</svg>

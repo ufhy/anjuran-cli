@@ -1,4 +1,20 @@
-# anjuran
+<p align="center">
+  <img src="assets/logo.svg" alt="anjuran" width="320">
+</p>
+
+<p align="center">
+  <em>Shell autocomplete that works over SSH — inline ANSI, no overlay.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ufhy/anjuran-cli/actions/workflows/ci.yml"><img src="https://github.com/ufhy/anjuran-cli/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+  <a href="https://github.com/ufhy/anjuran-cli/releases"><img src="https://img.shields.io/github/v/release/ufhy/anjuran-cli?include_prereleases&amp;label=rilis" alt="rilis"></a>
+  <img src="https://img.shields.io/badge/shell-zsh%20%C2%B7%20bash%20%C2%B7%20fish%20%C2%B7%20pwsh-informational" alt="shell">
+  <img src="https://img.shields.io/badge/platform-linux%20%C2%B7%20macos%20%C2%B7%20windows-informational" alt="platform">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/lisensi-MIT-blue" alt="lisensi"></a>
+</p>
+
+---
 
 Autocomplete untuk shell, lintas platform, digambar langsung di dalam terminal.
 
