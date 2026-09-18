@@ -1,0 +1,213 @@
+# Menjalankan skrip pemasang SUNGGUHAN terhadap rilis yang sudah terbit.
+#
+# Berbeda dari job `pemasang` di ci.yml, yang hanya memeriksa sintaks: shellcheck
+# tidak akan pernah menangkap nama berkas rilis yang salah, checksum yang tidak
+# cocok, atau specs/ yang tidak ikut terbawa ke dalam arsip. Ketiganya cuma
+# kelihatan kalau berkasnya benar-benar diunduh dan dipasang.
+#
+# Dijadwalkan mingguan dengan sengaja. Pemasang bergantung pada GitHub API dan
+# tata nama berkas rilis; keduanya bisa berubah tanpa ada satu pun commit di
+# repo ini, dan kerusakannya baru ketahuan dari orang yang gagal memasang.
+name: pemasang-nyata
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      versi:
+        description: 'Tag rilis yang diuji (kosong: terbaru)'
+        required: false
+        type: string
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+
+env:
+  # Dibaca install.sh dan install.ps1. Kosong berarti "cari sendiri yang
+  # terbaru" — dan jalur pencarian itu justru bagian yang paling perlu diuji.
+  ANJURAN_VERSION: ${{ inputs.versi }}
+  # Rilis stabil belum ada; tanpa ini pemasang tidak akan menemukan apa pun.
+  ANJURAN_PRERELEASE: '1'
+
+jobs:
+  unix:
+    name: ${{ matrix.nama }}
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # /bin/sh di Debian adalah dash, bukan bash. Ini jalur yang
+          # dilewati mayoritas pengguna Linux.
+          - nama: debian (dash)
+            runs-on: ubuntu-latest
+            container: debian:stable-slim
+            siapkan: apt-get update -qq && apt-get install -y -qq --no-install-recommends curl ca-certificates
+
+          # busybox ash dan musl sekaligus. Alpine juga tidak punya bash,
+          # sehingga bashism sekecil apa pun akan terlihat di sini.
+          - nama: alpine (busybox ash)
+            runs-on: ubuntu-latest
+            container: alpine:3.20
+            siapkan: apk add --no-cache curl ca-certificates tar
+
+          # Sengaja TANPA curl. Cabang wget ada di dalam skrip sejak awal dan
+          # belum pernah dijalankan sekali pun.
+          - nama: debian (wget saja)
+            runs-on: ubuntu-latest
+            container: debian:stable-slim
+            siapkan: apt-get update -qq && apt-get install -y -qq --no-install-recommends wget ca-certificates
+
+          # macOS memakai shasum, bukan sha256sum, dan mengarantina berkas
+          # yang diunduh. Keduanya tidak ada di Linux.
+          - nama: macos
+            runs-on: macos-latest
+            container: ''
+            siapkan: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: siapkan sistem
+        run: ${{ matrix.siapkan }}
+
+      - name: pasang
+        shell: sh
+        run: |
+          set -eu
+          export HOME="$PWD/rumah-uji"
+          mkdir -p "$HOME"
+          sh install.sh
+
+      - name: binary jalan dan versinya benar
+        shell: sh
+        run: |
+          set -eu
+          export HOME="$PWD/rumah-uji"
+          keluaran=$("$HOME/.local/bin/anjuran" version)
+          echo "$keluaran"
+          case "$keluaran" in
+            "anjuran "*) ;;
+            *) echo "keluaran versi tidak dikenali" >&2; exit 1 ;;
+          esac
+
+      - name: spec ikut terbawa
+        shell: sh
+        run: |
+          set -eu
+          export HOME="$PWD/rumah-uji"
+          n=$(find "$HOME/.local/share/anjuran/specs" -name '*.json.gz' | wc -l)
+          echo "spec: $n"
+          # Arsip tanpa specs/ tetap memasang binary yang berjalan — dan
+          # diam saja saat Tab ditekan. Kegagalan yang tidak terlihat itu
+          # persis yang harus ditangkap di sini.
+          [ "$n" -gt 1000 ] || { echo "spec terlalu sedikit" >&2; exit 1; }
+
+      - name: completion benar-benar menjawab
+        shell: sh
+        run: |
+          set -eu
+          export HOME="$PWD/rumah-uji"
+          # Binary yang jalan belum berarti spec-nya terbaca. Ini
+          # menanyakannya sesuatu yang hanya bisa dijawab dari berkas spec.
+          "$HOME/.local/bin/anjuran" complete --line 'git comm' | tee hasil.txt
+          grep -q '^commit' hasil.txt || { echo "git commit tidak ditawarkan" >&2; exit 1; }
+
+      - name: dijalankan dua kali tetap satu blok
+        shell: sh
+        run: |
+          set -eu
+          export HOME="$PWD/rumah-uji"
+          sh install.sh >/dev/null
+          rc=$(ls -1 "$HOME"/.bashrc "$HOME"/.zshrc "$HOME"/.profile "$HOME"/.config/fish/config.fish 2>/dev/null | head -1)
+          [ -n "$rc" ] || { echo "tidak ada berkas rc yang ditulis" >&2; exit 1; }
+          n=$(grep -c '>>> anjuran >>>' "$rc")
+          echo "$rc memuat $n blok"
+          [ "$n" -eq 1 ] || { echo "blok tertumpuk" >&2; exit 1; }
+
+      - name: ANJURAN_NO_SHELL tidak menyentuh apa pun
+        shell: sh
+        run: |
+          set -eu
+          export HOME="$PWD/rumah-bersih"
+          mkdir -p "$HOME"
+          ANJURAN_NO_SHELL=1 sh install.sh >/dev/null
+          for f in .bashrc .zshrc .profile .config/fish/config.fish; do
+            [ ! -e "$HOME/$f" ] || { echo "$f ditulis padahal diminta tidak" >&2; exit 1; }
+          done
+          echo "tidak ada berkas rc yang disentuh"
+
+  windows:
+    name: ${{ matrix.nama }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nama: windows amd64
+            runs-on: windows-latest
+          # Berkas rilis windows/arm64 tidak pernah disentuh siapa pun sampai
+          # ada yang menjalankannya.
+          - nama: windows arm64
+            runs-on: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pasang
+        shell: pwsh
+        run: |
+          $env:ANJURAN_INSTALL_DIR = Join-Path $PWD 'uji-anjuran'
+          ./install.ps1
+
+      - name: binary jalan, versinya benar, spec terbawa
+        shell: pwsh
+        run: |
+          $base = Join-Path $PWD 'uji-anjuran'
+          $exe = Join-Path $base 'anjuran.exe'
+          $versi = & $exe version
+          Write-Host $versi
+          if ($versi -notlike 'anjuran *') { throw 'keluaran versi tidak dikenali' }
+
+          $n = @(Get-ChildItem (Join-Path $base 'specs') -Filter '*.json.gz' -Recurse).Count
+          Write-Host "spec: $n"
+          if ($n -le 1000) { throw 'spec terlalu sedikit' }
+
+          # Binary yang jalan belum berarti spec-nya terbaca.
+          $hasil = & $exe complete --line 'git comm'
+          if (($hasil -join "`n") -notmatch '(?m)^commit') { throw 'git commit tidak ditawarkan' }
+
+      - name: PATH pengguna benar-benar berubah
+        shell: pwsh
+        run: |
+          $base = Join-Path $PWD 'uji-anjuran'
+          # Dibaca ulang dari registry, bukan dari $env:Path proses ini:
+          # yang kedua diubah skripnya sendiri dan akan lulus walau
+          # penulisannya gagal.
+          $p = [Environment]::GetEnvironmentVariable('Path', 'User')
+          if ($p -notlike "*$base*") { throw "PATH pengguna tidak memuat $base" }
+
+      - name: dijalankan dua kali tetap satu blok
+        shell: pwsh
+        run: |
+          $env:ANJURAN_INSTALL_DIR = Join-Path $PWD 'uji-anjuran'
+          ./install.ps1 | Out-Null
+          $profil = $PROFILE.CurrentUserAllHosts
+          $n = @(Select-String -Path $profil -SimpleMatch '# >>> anjuran >>>').Count
+          Write-Host "$profil memuat $n blok"
+          if ($n -ne 1) { throw 'blok tertumpuk' }
+
+      - name: ANJURAN_NO_SHELL tidak menyentuh profil
+        shell: pwsh
+        run: |
+          $profil = $PROFILE.CurrentUserAllHosts
+          $sebelum = (Get-FileHash $profil).Hash
+          $env:ANJURAN_INSTALL_DIR = Join-Path $PWD 'uji-anjuran-2'
+          $env:ANJURAN_NO_SHELL = '1'
+          ./install.ps1 | Out-Null
+          $sesudah = (Get-FileHash $profil).Hash
+          if ($sebelum -ne $sesudah) { throw 'profil berubah padahal diminta tidak' }
