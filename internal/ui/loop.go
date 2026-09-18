@@ -195,6 +195,12 @@ type Session struct {
 	// ketikan yang datang terlalu cepat untuk berasal dari jari manusia.
 	runeTerakhir time.Time
 
+	// tempelanTerlihat menandai sesi ini ditutup karena mengenali tempelan.
+	// Dibawa keluar supaya pemanggil bisa mencatatnya untuk proses berikutnya:
+	// setiap pemicu adalah proses baru, dan tempelan yang sama akan memicu
+	// lagi beberapa kali.
+	tempelanTerlihat bool
+
 	// manual menandakan sesi dibuka karena pengguna menekan tombol completion,
 	// bukan karena mengetik karakter pemicu.
 	manual bool
@@ -202,6 +208,9 @@ type Session struct {
 
 // Leftover mengembalikan tombol yang belum ditangani sesi, bila ada.
 func (s *Session) Leftover() Leftover { return s.leftover }
+
+// TempelanTerlihat menjawab apakah sesi ditutup karena mengenali tempelan.
+func (s *Session) TempelanTerlihat() bool { return s.tempelanTerlihat }
 
 // selesai mengakhiri sesi, mengembalikan tombol yang mengakhirinya BESERTA
 // seluruh ketikan yang sudah telanjur terbaca.
@@ -361,6 +370,7 @@ func (s *Session) Run() (State, Outcome, error) {
 			//
 			// Dibiarkan di penyangga terminal, sisanya dibaca shell sendiri
 			// begitu proses widget ini keluar.
+			s.tempelanTerlihat = true
 			return s.st, Accepted, nil
 		}
 

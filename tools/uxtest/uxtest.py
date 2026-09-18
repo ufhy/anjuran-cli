@@ -217,6 +217,27 @@ PERSIAPAN = {
 
 SKENARIO = [
     # (nama, ketikan, pemeriksa)
+
+    # Menempel satu baris perintah mengirim seluruh isinya sekaligus, dan
+    # setiap spasi di dalamnya adalah pemicu. Tanpa penjagaan, tempelan
+    # membuka satu kotak per spasi dan pengguna harus menekan Esc berkali-kali
+    # hanya untuk menempel — pada pekerjaan yang paling biasa.
+    #
+    # Dikirim sebagai SATU tulisan ke PTY, tanpa jeda antar karakter: itulah
+    # yang membedakan tempelan dari ketikan, dan itu pula yang dibaca anjuran
+    # sebagai tandanya.
+    #
+    # Yang diperiksa dua-duanya: kotaknya tidak muncul, DAN barisnya utuh.
+    # Memeriksa kotaknya saja akan lolos walau setengah tempelannya hilang.
+    ("tempelan tidak membuka kotak",
+     [b"git commit -m pesan --amend"],
+     gabung(tanpa("╭"), memuat("git commit -m pesan --amend"))),
+
+    # Tempelan yang diakhiri Enter harus benar-benar berjalan sebagaimana
+    # ditempel, bukan versi yang sudah disunting kotak.
+    ("tempelan utuh sampai dijalankan",
+     [b"echo satu dua tiga\r"], memuat("satu dua tiga")),
+
     # Nama perintah yang sudah lengkap langsung menawarkan ISINYA, termasuk
     # perintah yang isinya berupa argumen dan bukan subcommand.
     ("Tab pada cd menawarkan direktori", [b"cd", b"\t"], memuat("proyek/")),
