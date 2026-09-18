@@ -59,6 +59,40 @@ jobs:
             exit 1
           fi
 
+  # Skrip pemasang adalah hal PERTAMA yang dijalankan orang, dan
+  # satu-satunya bagian proyek ini yang tidak pernah tersentuh `go test`.
+  # Kesalahan di sana tidak terlihat sampai seseorang menempelkan perintah
+  # curl dari README dan mendapati shell-nya mengeluh.
+  pemasang:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: sintaks sh POSIX
+        run: |
+          sh -n install.sh
+          # dash lebih ketat daripada bash dalam mode sh, dan ia yang menjadi
+          # /bin/sh di Debian dan Ubuntu.
+          dash -n install.sh
+      - name: shellcheck
+        run: shellcheck -s sh install.sh
+      - name: rencana pemasangan bisa disusun tanpa jaringan
+        run: |
+          keluaran=$(ANJURAN_DRY_RUN=1 ANJURAN_VERSION=v0.0.0 sh install.sh)
+          echo "$keluaran"
+          echo "$keluaran" | grep -q 'anjuran_0.0.0_linux_' || {
+            echo "nama berkas rilis tidak terbentuk benar" >&2; exit 1; }
+      - name: sintaks PowerShell
+        shell: pwsh
+        run: |
+          $err = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/install.ps1", [ref]$null, [ref]$err) | Out-Null
+          if ($err) {
+            $err | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+          'install.ps1 terurai bersih'
+
   cross:
     runs-on: ubuntu-latest
     steps:
