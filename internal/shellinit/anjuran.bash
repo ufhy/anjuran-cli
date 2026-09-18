@@ -90,7 +90,26 @@ _anjuran_gambar_baris() {
   printf '\r\033[K%s%s' "$prompt" "$READLINE_LINE" > /dev/tty 2>/dev/null
 }
 
+# _anjuran_widget membungkus sesi, lalu MEMBERSIHKAN baris sebelum kembali.
+#
+# Sesudah sesi selesai, anjuran mengembalikan kursor ke posisi yang disimpan
+# saat kotak dibuka — yaitu akhir baris perintah. bash lalu menggambar ulang
+# barisnya SENDIRI, mulai dari posisi itu, sehingga gambarnya menempel di
+# belakang gambar pertama:
+#
+#   bash-5.3# anjuran bash-5.3# anjuran
+#
+# Menghapus baris di sini membuat gambar ulang bash mendarat di kolom nol,
+# menggantikan yang lama alih-alih menyambungnya. Di zsh hal ini tidak perlu:
+# zle menggambar ulang seluruh barisnya sendiri.
 _anjuran_widget() {
+  _anjuran_widget_isi "$@"
+  local status=$?
+  printf '\r\033[K' > /dev/tty 2>/dev/null
+  return $status
+}
+
+_anjuran_widget_isi() {
   local trigger=${1:-manual}
   local select_from=${2:-first}
   local out head body anjuran_status new_cursor sisa

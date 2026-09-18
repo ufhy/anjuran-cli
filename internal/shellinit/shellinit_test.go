@@ -337,3 +337,23 @@ func TestBarisTetapTergambarSaatKotakDibuka(t *testing.T) {
 		t.Error("skrip zsh tidak memakai zle -R")
 	}
 }
+
+// Sesi yang selesai harus meninggalkan baris yang BERSIH.
+//
+// anjuran mengembalikan kursor ke posisi yang disimpan saat kotak dibuka —
+// akhir baris perintah. bash lalu menggambar ulang barisnya sendiri mulai dari
+// posisi itu, sehingga gambarnya menempel di belakang gambar pertama:
+//
+//	bash-5.3# anjuran bash-5.3# anjuran
+//
+// Menghapus baris sebelum kembali membuat gambar ulang bash mendarat di kolom
+// nol, menggantikan yang lama alih-alih menyambungnya.
+func TestBashMembersihkanBarisSebelumKembali(t *testing.T) {
+	s, _ := Script("bash")
+	if !strings.Contains(s, `_anjuran_widget_isi`) {
+		t.Error("sesi bash tidak dibungkus, jadi tidak ada tempat membersihkan barisnya")
+	}
+	if !strings.Contains(s, `printf '\r\033[K'`) {
+		t.Error("baris tidak dibersihkan sesudah sesi selesai")
+	}
+}
