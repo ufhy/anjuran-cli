@@ -176,11 +176,34 @@ Set-AnjuranKey -Key $script:UfKey -Keterangan 'anjuran' -Aksi {
 #
 # NYALA secara bawaan. Matikan dengan $env:ANJURAN_AUTO = '0'.
 
+$script:AnjuranPemicu = @(' ', '/', '\', '=')
+
+# Mematikan pemicu berarti MENGEMBALIKAN tombolnya, bukan sekadar tidak
+# memasangnya.
+#
+# Skrip ini lumrah dimuat ulang di sesi yang sedang berjalan — `. $PROFILE`
+# sesudah menyetel ANJURAN_AUTO=0 adalah cara paling wajar untuk mematikannya
+# sementara. Bila yang dilakukan hanya melewatkan pemasangan, handler dari
+# pemuatan sebelumnya tetap terpasang dan tidak ada yang berubah sama sekali.
+if ($env:ANJURAN_AUTO -in @('0', 'no', 'off', 'false')) {
+    foreach ($karakter in $script:AnjuranPemicu) {
+        $chord = if ($karakter -eq ' ') { 'Spacebar' } else { $karakter }
+        # Dikembalikan ke SelfInsert, bukan dilepas: tombol yang dilepas tidak
+        # lagi mengetik apa pun, dan spasi yang mati jauh lebih buruk daripada
+        # kotak yang tidak diinginkan.
+        try {
+            Set-PSReadLineKeyHandler -Key $chord -Function SelfInsert -ErrorAction Stop
+        } catch {
+            Write-Verbose "anjuran: tidak bisa mengembalikan tombol $chord."
+        }
+    }
+}
+
 if ($env:ANJURAN_AUTO -notin @('0', 'no', 'off', 'false')) {
     # Backslash ikut memicu, dan hanya di sini. Path Windows memakai "\",
     # sehingga tanpa itu satu-satunya pemicu path di shell ini tidak pernah
     # ditekan siapa pun: mengetik "cd C:\" tidak memunculkan apa-apa.
-    foreach ($karakter in @(' ', '/', '\', '=')) {
+    foreach ($karakter in $script:AnjuranPemicu) {
         # Karakternya disisipkan sendiri: handler mengambil alih tombolnya
         # sepenuhnya, jadi tanpa Insert karakter yang diketik pengguna hilang.
         $chord = if ($karakter -eq ' ') { 'Spacebar' } else { $karakter }

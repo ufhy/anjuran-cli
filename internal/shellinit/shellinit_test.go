@@ -220,6 +220,30 @@ func TestModeViTidakMematikanBinding(t *testing.T) {
 	}
 }
 
+// Mematikan pemicu harus MENGEMBALIKAN tombolnya, bukan sekadar tidak
+// memasangnya.
+//
+// Skrip integrasi lumrah dimuat ulang di sesi yang sedang berjalan —
+// `. $PROFILE` sesudah menyetel ANJURAN_AUTO=0 adalah cara paling wajar untuk
+// mematikannya sementara. Bila yang dilakukan hanya melewatkan pemasangan,
+// handler dari pemuatan sebelumnya tetap terpasang dan tidak ada yang berubah
+// sama sekali; pengguna menyimpulkan saklarnya rusak.
+func TestMematikanPemicuMengembalikanTombol(t *testing.T) {
+	p, _ := Script("powershell")
+	if !strings.Contains(p, "-Function SelfInsert") {
+		t.Error("skrip powershell tidak mengembalikan tombolnya saat pemicu dimatikan")
+	}
+
+	// zsh dan bash memasang pemicunya di dalam cabang yang hanya dijalankan
+	// saat pemicu menyala, dan keduanya memakai widget bawaan shell yang
+	// tersimpan lebih dulu — jadi memuat ulang skripnya tanpa pemicu tidak
+	// meninggalkan apa pun yang perlu dilepas.
+	z, _ := Script("zsh")
+	if !strings.Contains(z, "_anjuran_simpan_asli") {
+		t.Error("skrip zsh tidak menyimpan widget asli tombol pemicunya")
+	}
+}
+
 // Menempel satu baris perintah tidak boleh membuka satu kotak per spasi.
 //
 // Tempelan datang sebagai satu ledakan tombol, dan setiap spasi di dalamnya
