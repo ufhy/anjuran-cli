@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -63,9 +64,14 @@ func TestPasangDiTempatMenimpaSpecLama(t *testing.T) {
 	if string(isi) != "baru" {
 		t.Errorf("binary = %q, mau %q", isi, "baru")
 	}
-	fi, err := os.Stat(exe)
-	if err != nil || fi.Mode().Perm()&0o111 == 0 {
-		t.Error("binary kehilangan bit eksekusinya")
+	// Bit eksekusi hanya ada di Unix. Windows tidak memilikinya sama sekali —
+	// 0o755 di sana dipetakan menjadi berkas baca-tulis biasa, sehingga
+	// memeriksanya bukan menguji apa pun, melainkan memastikan kegagalan.
+	if runtime.GOOS != "windows" {
+		fi, err := os.Stat(exe)
+		if err != nil || fi.Mode().Perm()&0o111 == 0 {
+			t.Error("binary kehilangan bit eksekusinya")
+		}
 	}
 	if _, err := os.Stat(filepath.Join(share, "specs", "usang.json")); err == nil {
 		t.Error("spec lama tertinggal")
