@@ -36,6 +36,12 @@ const (
 	KeyCtrlD
 	KeyCtrlU
 	KeyCtrlW
+	// KeyHome dan KeyEnd dikenali supaya anjuran bisa MENGERJAKANNYA sendiri,
+	// bukan mengembalikannya ke shell. Hanya zsh punya cara menerima tombol
+	// yang dikembalikan (`zle -U`); readline, fish, dan PSReadLine tidak. Kalau
+	// tombolnya tidak dikenali di sini, ia tertelan di tiga shell dari empat.
+	KeyHome
+	KeyEnd
 	KeyUnknown
 )
 
@@ -222,6 +228,14 @@ func (t *Terminal) readKey() (Key, error) {
 		return Key{Type: KeyCtrlU}, nil
 	case 0x17:
 		return Key{Type: KeyCtrlW}, nil
+	case 0x01:
+		return Key{Type: KeyHome}, nil // Ctrl-A, kebiasaan emacs dan readline
+	case 0x05:
+		return Key{Type: KeyEnd}, nil // Ctrl-E
+	case 0x02:
+		return Key{Type: KeyLeft}, nil // Ctrl-B
+	case 0x06:
+		return Key{Type: KeyRight}, nil // Ctrl-F
 	case 0x0e:
 		return Key{Type: KeyDown}, nil // Ctrl-N, kebiasaan emacs
 	case 0x10:
@@ -263,16 +277,42 @@ func (t *Terminal) readEscape() (Key, error) {
 		return Key{Type: KeyLeft}, nil
 	case 'Z':
 		return Key{Type: KeyShiftTab}, nil
-	case '5', '6':
-		// Bentuk ESC [ 5 ~ dan ESC [ 6 ~; tilde penutupnya dibuang.
-		t.readByteTimeout(escTimeout)
-		if b == '5' {
-			return Key{Type: KeyPageUp}, nil
+	case 'H':
+		return Key{Type: KeyHome}, nil // ESC [ H dan ESC O H
+	case 'F':
+		return Key{Type: KeyEnd}, nil // ESC [ F dan ESC O F
+	case '1', '4', '5', '6', '7', '8':
+		// Bentuk ESC [ N ~. Nomornya berbeda antar keluarga terminal dan
+		// keduanya masih dipakai: Home bisa 1 atau 7, End bisa 4 atau 8.
+		//
+		// Penutupnya HARUS diperiksa, bukan sekadar dibuang. Tombol dengan
+		// pengubah datang sebagai ESC [ 1 ; 5 C — awalannya sama persis, dan
+		// menganggapnya Home akan menggeser kursor setiap kali seseorang
+		// menekan Ctrl-panah.
+		akhir, ok := t.readByteTimeout(escTimeout)
+		if !ok {
+			return Key{Type: KeyEscape}, nil
 		}
-		return Key{Type: KeyPageDown}, nil
+		if akhir != '~' {
+			return t.serapSisa(akhir)
+		}
+		switch b {
+		case '5':
+			return Key{Type: KeyPageUp}, nil
+		case '6':
+			return Key{Type: KeyPageDown}, nil
+		case '1', '7':
+			return Key{Type: KeyHome}, nil
+		}
+		return Key{Type: KeyEnd}, nil
 	}
 
-	// Sequence lain diserap sampai byte akhirnya agar tidak bocor ke prompt.
+	return t.serapSisa(b)
+}
+
+// serapSisa menghabiskan sisa sebuah escape sequence yang tidak dikenali,
+// supaya byte-nya tidak bocor ke prompt sebagai teks.
+func (t *Terminal) serapSisa(b byte) (Key, error) {
 	for b < 0x40 || b > 0x7e {
 		var ok bool
 		b, ok = t.readByteTimeout(escTimeout)

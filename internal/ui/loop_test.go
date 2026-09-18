@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/ufhy/anjuran-cli/internal/engine"
 	"github.com/ufhy/anjuran-cli/internal/spec"
@@ -450,9 +451,7 @@ func TestTombolAsingDikembalikan(t *testing.T) {
 		nama string
 		key  tty.Key
 	}{
-		{"Ctrl-A", tty.Key{Type: tty.KeyUnknown, Raw: []byte{0x01}}},
-		{"panah kiri", tty.Key{Type: tty.KeyLeft, Raw: []byte("\x1b[D")}},
-		{"panah kanan", tty.Key{Type: tty.KeyRight, Raw: []byte("\x1b[C")}},
+		{"tombol tak dikenal", tty.Key{Type: tty.KeyUnknown, Raw: []byte{0x1c}}},
 		{"Ctrl-C", tty.Key{Type: tty.KeyCtrlC, Raw: []byte{0x03}}},
 	}
 
@@ -465,6 +464,76 @@ func TestTombolAsingDikembalikan(t *testing.T) {
 		if string(s.Leftover()) != string(tt.key.Raw) {
 			t.Errorf("%s: Leftover = %q, mau %q", tt.nama, s.Leftover(), tt.key.Raw)
 		}
+	}
+}
+
+// Pergerakan kursor DIKERJAKAN sesi, tidak dikembalikan ke shell.
+//
+// Mengembalikan tombol hanya pernah bekerja di zsh, satu-satunya shell yang
+// punya cara menerimanya (`zle -U`). Di bash, fish, dan PowerShell tombolnya
+// tertelan, dan Ctrl-A terasa seperti tombol yang kadang mati. Yang
+// dikembalikan sekarang bukan tombolnya, melainkan baris dengan kursor yang
+// sudah benar — dan itu sesuatu yang keempat shell memang sudah tahu cara
+// memakai.
+func TestKursorDikerjakanSesi(t *testing.T) {
+	tests := []struct {
+		nama string
+		key  tty.Key
+		mau  int
+	}{
+		{"panah kiri", tty.Key{Type: tty.KeyLeft, Raw: []byte("\x1b[D")}, 3},
+		{"Home", tty.Key{Type: tty.KeyHome, Raw: []byte{0x01}}, 0},
+		{"End", tty.Key{Type: tty.KeyEnd, Raw: []byte{0x05}}, 4},
+	}
+
+	for _, tt := range tests {
+		term := &fakeTerm{keys: []tty.Key{tt.key}}
+		s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+		st, out, err := s.Run()
+		if err != nil {
+			t.Fatalf("%s: %v", tt.nama, err)
+		}
+		if out != Accepted {
+			t.Errorf("%s: outcome = %v, mau Accepted", tt.nama, out)
+		}
+		if st.Cursor != tt.mau {
+			t.Errorf("%s: Cursor = %d, mau %d", tt.nama, st.Cursor, tt.mau)
+		}
+		if st.Line != "git " {
+			t.Errorf("%s: Line = %q, mau tidak berubah", tt.nama, st.Line)
+		}
+		if len(s.Leftover()) != 0 {
+			t.Errorf("%s: Leftover = %q, mau kosong", tt.nama, s.Leftover())
+		}
+	}
+}
+
+// Kursor bergeser per RUNE, bukan per byte.
+//
+// Menggeser satu byte di tengah huruf beraksen atau CJK meninggalkan kursor di
+// tengah karakter, dan shell yang menerimanya akan menyisipkan di tempat yang
+// salah pada ketikan berikutnya. Gejalanya tidak pernah muncul pada baris
+// ASCII, yang justru membuatnya bertahan lama.
+func TestKursorBergeserPerRune(t *testing.T) {
+	baris := "git commit -m héllo"
+	s := NewSession(newEngine(), &fakeTerm{}, discard(), State{Line: baris, Cursor: len(baris)})
+
+	// Empat geseran ke kiri melewati o, l, l, lalu é — dan é memakan DUA
+	// byte. Geseran per byte akan berhenti di tengah huruf itu pada langkah
+	// keempat; angka 15, bukan 16, adalah bukti bahwa satuannya rune.
+	mau := []int{19, 18, 17, 15}
+	for i, ingin := range mau {
+		st, _, err := s.geserKursor(-1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st.Cursor != ingin {
+			t.Fatalf("geseran %d: Cursor = %d, mau %d", i+1, st.Cursor, ingin)
+		}
+		if !utf8.ValidString(st.Line[:st.Cursor]) {
+			t.Fatalf("geseran %d: kursor %d jatuh di tengah rune", i+1, st.Cursor)
+		}
+		s.st = st
 	}
 }
 
@@ -819,7 +888,7 @@ func TestPanahKananMasukKeFolder(t *testing.T) {
 
 // Pada baris yang BUKAN folder, panah kanan tetap milik shell: menelannya
 // membuat pergerakan kursor terasa kadang tidak berfungsi.
-func TestPanahKananBukanFolderDikembalikan(t *testing.T) {
+func TestPanahKananBukanFolderMenggeserKursor(t *testing.T) {
 	dyn := &fakeDynamic{names: []string{"catatan.txt", "catatan-lain.txt"}}
 	term := &fakeTerm{keys: []tty.Key{{Type: tty.KeyRight, Raw: []byte("\x1b[C")}}}
 
@@ -835,8 +904,13 @@ func TestPanahKananBukanFolderDikembalikan(t *testing.T) {
 	if st.Line != "cat cat" {
 		t.Errorf("Line = %q, mau tidak berubah", st.Line)
 	}
-	if len(sesi.Leftover()) == 0 {
-		t.Error("panah kanan tidak dikembalikan ke shell")
+	// Di baris yang bukan folder, panah kanan hanya menggeser kursor — dan
+	// menggesernya di sini, bukan menyerahkannya ke shell.
+	if len(sesi.Leftover()) != 0 {
+		t.Errorf("Leftover = %q, mau kosong", sesi.Leftover())
+	}
+	if st.Cursor != 7 {
+		t.Errorf("Cursor = %d, mau 7 (sudah di ujung baris)", st.Cursor)
 	}
 }
 

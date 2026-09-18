@@ -27,5 +27,7 @@ const (
 	KeyCtrlD     = tty.KeyCtrlD
 	KeyCtrlU     = tty.KeyCtrlU
 	KeyCtrlW     = tty.KeyCtrlW
+	KeyHome      = tty.KeyHome
+	KeyEnd       = tty.KeyEnd
 	KeyUnknown   = tty.KeyUnknown
 )

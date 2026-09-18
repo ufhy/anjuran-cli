@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/ufhy/anjuran-cli/internal/engine"
 	"github.com/ufhy/anjuran-cli/internal/parser"
@@ -500,12 +501,26 @@ func (s *Session) Run() (State, Outcome, error) {
 				}
 				return s.st, Accepted, nil
 			}
-			// Di baris yang bukan folder, pergerakan kursor tetap urusan
-			// shell: sesi ditutup dan tombolnya diteruskan.
-			return s.selesai(key.Raw, s.st, Accepted)
+			// Di baris yang bukan folder, → hanya menggeser kursor.
+			return s.geserKursor(+1)
 
 		case KeyLeft:
-			return s.selesai(key.Raw, s.st, Accepted)
+			// Pergerakan kursor DIKERJAKAN di sini, bukan diteruskan.
+			//
+			// Dulu tombolnya dikembalikan ke shell lewat Leftover. Itu hanya
+			// pernah bekerja di zsh, karena hanya zsh punya `zle -U` untuk
+			// menerima tombol yang dikembalikan; di bash, fish, dan PowerShell
+			// tombolnya tertelan dan terasa seperti keyboard yang kadang mati.
+			// Mengerjakannya di sini membuat satu jalur yang sama untuk
+			// keempatnya, dan baris yang dikembalikan sudah memuat kursor yang
+			// benar — sesuatu yang setiap shell memang sudah tahu cara memakai.
+			return s.geserKursor(-1)
+
+		case KeyHome:
+			return s.pindahKursor(0)
+
+		case KeyEnd:
+			return s.pindahKursor(len(s.st.Line))
 
 		default:
 			// Tombol yang tidak ditangani menutup dropdown, lalu DIKEMBALIKAN
@@ -671,4 +686,36 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// geserKursor menutup sesi dengan kursor bergeser satu karakter.
+//
+// Satuannya RUNE, bukan byte: menggeser satu byte di tengah huruf beraksen
+// atau CJK meninggalkan kursor di tengah karakter, dan shell yang menerimanya
+// akan menyisipkan di tempat yang salah pada ketikan berikutnya.
+func (s *Session) geserKursor(arah int) (State, Outcome, error) {
+	st := s.st
+	if arah < 0 {
+		if st.Cursor > 0 {
+			_, lebar := utf8.DecodeLastRuneInString(st.Line[:st.Cursor])
+			st.Cursor -= lebar
+		}
+	} else if st.Cursor < len(st.Line) {
+		_, lebar := utf8.DecodeRuneInString(st.Line[st.Cursor:])
+		st.Cursor += lebar
+	}
+	return s.selesai(nil, st, Accepted)
+}
+
+// pindahKursor menutup sesi dengan kursor di posisi tertentu.
+func (s *Session) pindahKursor(pos int) (State, Outcome, error) {
+	st := s.st
+	if pos < 0 {
+		pos = 0
+	}
+	if pos > len(st.Line) {
+		pos = len(st.Line)
+	}
+	st.Cursor = pos
+	return s.selesai(nil, st, Accepted)
 }
