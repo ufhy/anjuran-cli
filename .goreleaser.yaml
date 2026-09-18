@@ -113,6 +113,14 @@ scoops:
   - repository:
       owner: ufhy
       name: scoop-bucket
+      token: '{{ envOrDefault "TAP_GITHUB_TOKEN" "" }}'
+    # Penjaga yang sama seperti cask dan winget, dan satu-satunya yang
+    # terlewat. Tanpa ini goreleaser tetap menghubungi repo bucket walau
+    # tokennya tidak ada, mendapat 404 karena repo itu belum dibuat, lalu
+    # MEMBATALKAN seluruh rilis — padahal seluruh berkasnya sudah terbit.
+    # Rilis yang dilaporkan gagal padahal berhasil adalah bentuk kegagalan
+    # yang paling mahal: orang mengulanginya, atau menghapus tagnya.
+    skip_upload: '{{ if envOrDefault "TAP_GITHUB_TOKEN" "" }}false{{ else }}true{{ end }}'
     homepage: https://github.com/ufhy/anjuran-cli
     description: Autocomplete gaya Fig untuk shell, lintas platform
     license: MIT
