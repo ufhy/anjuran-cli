@@ -34,6 +34,17 @@ menumpuk apa pun.
 
 Lalu buka sesi shell baru.
 
+Memperbarui nanti:
+
+```sh
+anjuran update          # ke rilis terbaru
+anjuran update --check  # lihat dulu tanpa memasang
+```
+
+Yang diperbarui bukan hanya binary: spec dan tambalan ikut, karena keduanya
+berpasangan dengan versinya. Pemasangan lewat pengelola paket dilewati —
+perbaruilah dengan pengelola itu.
+
 <details>
 <summary>Cara lain</summary>
 
@@ -175,6 +186,7 @@ tujuan.
 | `ANJURAN_SPECS` | direktori spec |
 | `ANJURAN_CACHE_DIR` | lokasi cache generator dan ingatan pilihan |
 | `ANJURAN_LOG` | rekam byte yang digambar, untuk menyelidiki layar yang aneh |
+| `ANJURAN_RELEASE_URL` | asal berkas rilis, untuk cermin atau jaringan tertutup |
 
 ## Pengembangan
 

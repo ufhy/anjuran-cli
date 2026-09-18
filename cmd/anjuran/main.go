@@ -31,6 +31,7 @@ const usage = `anjuran - autocomplete lintas platform untuk shell
 Penggunaan:
   anjuran init      <zsh|bash|fish|powershell>
   anjuran up        [user@]host [--from <dir>] [--dry-run]
+  anjuran update    [--check] [--pre] [--version <tag>]
   anjuran version
   anjuran complete --line <baris> [--cursor N] [--json]
   anjuran widget   --line <baris> --cursor <N>
@@ -50,6 +51,10 @@ berkas konfigurasi shell:
   zsh   ~/.zshrc                     eval "$(anjuran init zsh)"
   bash  ~/.bashrc                    eval "$(anjuran init bash)"
   fish  ~/.config/fish/config.fish   anjuran init fish | source
+
+update memperbarui anjuran ke rilis terbaru, beserta spec dan tambalannya.
+Binary yang dipasang lewat pengelola paket dilewati: memperbaruinya dari sini
+akan membuat kedua pihak berselisih tentang apa yang sebenarnya terpasang.
 
 up memasang anjuran di host lain, supaya completion ikut jalan saat kamu
 SSH ke sana. Engine harus berjalan di sisi
@@ -97,6 +102,8 @@ func main() {
 	// tidak pantas mendadak gagal.
 	case "up", "bootstrap":
 		os.Exit(runUp(os.Args[2:]))
+	case "update":
+		os.Exit(runUpdate(os.Args[2:]))
 	case "complete":
 		os.Exit(runComplete(os.Args[2:]))
 	case "widget":

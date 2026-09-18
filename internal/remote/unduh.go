@@ -24,9 +24,86 @@ const EnvAsalRilis = "ANJURAN_RELEASE_URL"
 // bukan bahwa ia dicoba lalu gagal.
 var errTakBisaUnduh = errors.New("tidak ada rilis yang bisa diunduh")
 
-// batasUnduh menjaga `anjuran up` tidak menggantung pada jaringan yang buruk.
-// Arsipnya sekitar 7 MB; satu menit sudah sangat longgar.
-const batasUnduh = 60 * time.Second
+// Batas waktu dipisahkan menurut yang ditunggu.
+//
+// http.Client.Timeout mencakup SELURUH permintaan, termasuk membaca isinya.
+// Satu angka untuk keduanya berarti memilih antara menggantung lama pada
+// pertanyaan kecil, atau memutus unduhan 7 MB di tengah jalan pada sambungan
+// yang lambat — dan yang kedua sudah pernah terjadi.
+const (
+	// batasTanya untuk pertanyaan kecil ke GitHub API: beberapa kilobyte.
+	batasTanya = 30 * time.Second
+	// batasUnduh untuk arsip rilis. Longgar dengan sengaja: lebih baik lambat
+	// daripada gagal, karena kegagalannya berarti pemasangan yang batal.
+	batasUnduh = 10 * time.Minute
+)
+
+// UnduhRilis mengunduh berkas rilis sebuah versi untuk sebuah platform.
+//
+// Dipakai `anjuran update`, yang berbeda dari jalur `up`: di sana versinya
+// ditentukan pemanggil, bukan diikat ke versi lokal.
+func UnduhRilis(p Platform, versi string) (Source, func(), error) {
+	return unduhRilis(p, versi)
+}
+
+// RilisTerbaru menanyakan tag rilis terakhir kepada GitHub.
+//
+// /releases/latest sengaja TIDAK memuat prarilis — itulah gunanya. Tetapi
+// selama proyek ini belum punya rilis stabil, satu-satunya yang ada adalah
+// beta, dan berkeras pada "latest" berarti berkata tidak ada apa-apa padahal
+// berkasnya ada. Nilai kedua menandai bahwa yang ditemukan sebuah prarilis,
+// supaya pemanggilnya bisa mengatakannya alih-alih menyamarkannya.
+func RilisTerbaru(prarilis bool) (tag string, pra bool, err error) {
+	if !prarilis {
+		if t, err := tagDari("https://api.github.com/repos/" + UnduhRepo + "/releases/latest"); err == nil && t != "" {
+			return t, false, nil
+		}
+	}
+	t, err := tagDari("https://api.github.com/repos/" + UnduhRepo + "/releases?per_page=1")
+	if err != nil {
+		return "", false, err
+	}
+	if t == "" {
+		return "", false, errors.New("tidak ada rilis di " + UnduhRepo)
+	}
+	return t, !prarilis, nil
+}
+
+// tagDari mengambil tag_name pertama dari sebuah tanggapan GitHub.
+//
+// Diurai dengan pencarian sederhana, bukan encoding/json: yang dibutuhkan satu
+// medan, dan tanggapan rilis GitHub memuat puluhan medan lain yang tidak perlu
+// dijelaskan sebagai struct hanya untuk dibuang lagi.
+func tagDari(url string) (string, error) {
+	c := &http.Client{Timeout: batasTanya}
+	resp, err := c.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%s: %s", url, resp.Status)
+	}
+	isi, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", err
+	}
+	i := strings.Index(string(isi), `"tag_name"`)
+	if i < 0 {
+		return "", nil
+	}
+	sisa := string(isi)[i+len(`"tag_name"`):]
+	j := strings.Index(sisa, `"`)
+	if j < 0 {
+		return "", nil
+	}
+	sisa = sisa[j+1:]
+	k := strings.Index(sisa, `"`)
+	if k < 0 {
+		return "", nil
+	}
+	return sisa[:k], nil
+}
 
 // unduhRilis mengambil berkas rilis untuk platform host.
 //
@@ -36,10 +113,10 @@ const batasUnduh = 60 * time.Second
 // berakhir dengan pesan yang menyuruh menjalankan `make cross` di repo yang
 // tidak pernah mereka unduh.
 //
-// Versinya diikat ke versi binary LOKAL, bukan ke rilis terbaru. Perintah ini
-// memasang "anjuran yang sama seperti di mesin ini"; diam-diam memasang versi
-// lain di host membuat perbedaan perilaku antara dua mesin menjadi teka-teki
-// yang tidak ada petunjuknya.
+// Untuk `up`, versinya diikat ke versi binary LOKAL, bukan ke rilis terbaru:
+// perintah itu memasang "anjuran yang sama seperti di mesin ini", dan
+// diam-diam memasang versi lain di host membuat perbedaan perilaku antara dua
+// mesin menjadi teka-teki yang tidak ada petunjuknya.
 func unduhRilis(p Platform, versi string) (Source, func(), error) {
 	noop := func() {}
 
