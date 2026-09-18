@@ -170,3 +170,19 @@ function _anjuran_samadengan
 end
 
 _anjuran_bind
+
+# ---------------------------------------------------------------------------
+# Saran dari riwayat (ghost text)
+#
+# Teks abu-abu yang melanjutkan ketikan berdasarkan perintah yang pernah
+# dijalankan. Di zsh fitur ini ditulis sendiri, karena zsh tidak punya
+# padanannya. fish SUDAH punya, bawaan, dan miliknya lebih baik: ia memakai
+# riwayat beserta konteks direktori dan diperbarui oleh shell sendiri tanpa
+# proses tambahan.
+#
+# Jadi yang benar bukan menirunya di sini — dua teks abu-abu bertumpuk hanya
+# menambah kebisingan — melainkan memakai milik fish, dengan saklar yang sama
+# seperti shell lain: ANJURAN_GHOST.
+if test "$ANJURAN_GHOST" = 1 -o "$ANJURAN_GHOST" = yes -o "$ANJURAN_GHOST" = on -o "$ANJURAN_GHOST" = true
+    set -g fish_autosuggestion_enabled 1
+end

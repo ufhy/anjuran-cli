@@ -203,3 +203,18 @@ case ${ANJURAN_AUTO:-1} in
     bind -x '"=": _anjuran_samadengan'
     ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Saran dari riwayat (ghost text): TIDAK ADA di bash, dan tidak bisa ada.
+#
+# Teks abu-abu yang melanjutkan ketikan membutuhkan dua hal yang readline
+# tidak punya. Pertama, kait pada setiap ketikan: zsh membungkus `self-insert`,
+# sedangkan di readline satu-satunya cara adalah mengikat kesembilan puluh
+# lima karakter cetak satu per satu — mahal, dan merusak binding orang lain.
+# Kedua, tempat menggambar teks yang BUKAN bagian dari buffer: zsh punya
+# POSTDISPLAY, readline tidak. Menaruh sarannya di READLINE_LINE berarti
+# menulis teks yang tidak diminta ke dalam perintah yang akan dijalankan.
+#
+# Jadi ANJURAN_GHOST tidak berpengaruh di bash. Disebutkan di sini supaya
+# ketiadaannya menjadi keterangan, bukan kejutan. fish dan PowerShell memakai
+# fitur bawaan shell masing-masing; zsh memakai implementasi sendiri.

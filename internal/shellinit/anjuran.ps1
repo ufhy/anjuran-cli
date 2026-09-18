@@ -135,3 +135,23 @@ if ($env:ANJURAN_AUTO -notin @('0', 'no', 'off', 'false')) {
 "@))
     }
 }
+
+# ---------------------------------------------------------------------------
+# Saran dari riwayat (ghost text)
+#
+# Teks abu-abu yang melanjutkan ketikan berdasarkan perintah yang pernah
+# dijalankan. Di zsh fitur ini ditulis sendiri, karena zsh tidak punya
+# padanannya. PSReadLine SUDAH punya lewat PredictionSource, dan miliknya
+# lebih baik: ia bisa memakai plugin prediksi selain riwayat, dan
+# diperbarui oleh PSReadLine sendiri tanpa proses tambahan.
+#
+# Jadi yang dipakai milik PSReadLine, dengan saklar yang sama seperti shell
+# lain: ANJURAN_GHOST. PredictionSource baru ada di PSReadLine 2.1, jadi
+# kegagalannya ditelan — shell yang lebih tua tetap jalan tanpa fitur ini.
+if ($env:ANJURAN_GHOST -in @('1', 'yes', 'on', 'true')) {
+    try {
+        Set-PSReadLineOption -PredictionSource History -ErrorAction Stop
+    } catch {
+        Write-Verbose 'anjuran: PSReadLine terlalu tua untuk PredictionSource; ghost text dilewati.'
+    }
+}

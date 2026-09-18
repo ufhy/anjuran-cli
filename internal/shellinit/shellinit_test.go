@@ -231,3 +231,34 @@ func TestTurunFolderDanAliasDiSetiapShell(t *testing.T) {
 		}
 	}
 }
+
+// ANJURAN_GHOST harus punya arti di setiap shell yang bisa menampilkannya.
+//
+// zsh menulis implementasinya sendiri karena zsh tidak punya padanannya.
+// fish dan PSReadLine SUDAH punya, dan miliknya lebih baik — jadi yang benar
+// memakai milik mereka, bukan menirunya dan menumpuk dua teks abu-abu.
+func TestGhostTextMemakaiFiturBawaanShell(t *testing.T) {
+	tanda := map[string]string{
+		"zsh":        "POSTDISPLAY",
+		"fish":       "fish_autosuggestion_enabled",
+		"powershell": "PredictionSource",
+	}
+	for sh, t2 := range tanda {
+		s, _ := Script(sh)
+		if !strings.Contains(s, "ANJURAN_GHOST") {
+			t.Errorf("skrip %s tidak menghormati ANJURAN_GHOST", sh)
+		}
+		if !strings.Contains(s, t2) {
+			t.Errorf("skrip %s tidak memakai %s", sh, t2)
+		}
+	}
+
+	// bash memang tidak bisa: readline tidak punya kait per-ketikan maupun
+	// tempat menggambar teks di luar buffer. Yang diwajibkan di sini bukan
+	// fiturnya, melainkan KETERANGANNYA — supaya ketiadaannya tidak lagi
+	// ditemukan orang dengan cara mencobanya.
+	b, _ := Script("bash")
+	if !strings.Contains(b, "ANJURAN_GHOST") {
+		t.Error("skrip bash tidak menyebut ANJURAN_GHOST sama sekali")
+	}
+}
