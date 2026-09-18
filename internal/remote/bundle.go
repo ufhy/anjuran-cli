@@ -164,8 +164,15 @@ func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (So
 		} else if !errors.Is(err, errTakBisaBangun) {
 			return Source{}, noop, err
 		}
+		// Pembangunan otomatis bergantung pada DIREKTORI KERJA, dan itu
+		// tidak kelihatan. Tanpa disebut di sini, kegagalannya terbaca
+		// sebagai "fitur ini tidak ada" padahal syaratnya cuma satu.
 		return Source{}, noop, fmt.Errorf(
-			"host adalah %s sedangkan mesin ini %s/%s; bangun binary-nya lalu sebutkan dengan --from (misalnya `make cross` atau `make snapshot`)",
+			"host adalah %s sedangkan mesin ini %s/%s.\n"+
+				"  Tiga jalan keluar:\n"+
+				"    - jalankan perintah ini dari dalam pohon sumber anjuran; binary-nya dibangun sendiri\n"+
+				"    - `make cross` lalu --from bin\n"+
+				"    - `make snapshot` lalu --from dist",
 			p, runtime.GOOS, runtime.GOARCH)
 	}
 
