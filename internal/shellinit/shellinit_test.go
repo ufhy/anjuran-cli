@@ -220,6 +220,36 @@ func TestModeViTidakMematikanBinding(t *testing.T) {
 	}
 }
 
+// Menempel satu baris perintah tidak boleh membuka satu kotak per spasi.
+//
+// Tempelan datang sebagai satu ledakan tombol, dan setiap spasi di dalamnya
+// adalah pemicu. Tanpa penjagaan, menempel satu perintah memaksa pengguna
+// menekan Esc berkali-kali — gejala yang membuat alat ini terasa mengganggu
+// justru pada pekerjaan paling biasa.
+func TestPenjagaTempelan(t *testing.T) {
+	penjaga := map[string]string{
+		"zsh":        "KEYS_QUEUED_COUNT",
+		"bash":       "read -t 0",
+		"powershell": "Test-AnjuranMasukanMenunggu",
+	}
+	for sh, tanda := range penjaga {
+		s, _ := Script(sh)
+		if !strings.Contains(s, tanda) {
+			t.Errorf("skrip %s tidak menjaga tempelan (%q tidak ada)", sh, tanda)
+		}
+	}
+
+	// fish tidak menyediakan pertanyaan "apakah ada ketikan yang antre" kepada
+	// skrip sama sekali; yang menjaganya di sana adalah bracketed paste milik
+	// terminal. Yang diwajibkan di sini bukan penjaganya, melainkan
+	// KETERANGANNYA — supaya ketiadaannya menjadi keputusan yang tercatat,
+	// bukan sesuatu yang terlewat lagi.
+	f, _ := Script("fish")
+	if !strings.Contains(f, "bracketed paste") {
+		t.Error("skrip fish tidak menjelaskan kenapa tidak ada penjaga tempelan")
+	}
+}
+
 // Setiap pemicu otomatis harus menyisipkan karakternya sendiri.
 //
 // Di keempat shell, mengikat sebuah karakter berarti mengambil alih tombolnya

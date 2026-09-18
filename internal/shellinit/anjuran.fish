@@ -152,6 +152,20 @@ end
 #
 # Menyisipkan sendiri adalah keharusan, bukan pilihan: bind mengambil alih
 # tombolnya sepenuhnya, jadi tanpa ini karakter yang diketik pengguna hilang.
+# Tidak ada penjagaan tempelan di sini, dan itu bukan kelalaian.
+#
+# zsh memakai PENDING + KEYS_QUEUED_COUNT, bash memakai `read -t 0`, dan
+# PowerShell memakai [Console]::KeyAvailable — ketiganya bisa menanyakan
+# "apakah masih ada ketikan yang antre". fish tidak menyediakan pertanyaan itu
+# kepada skrip sama sekali.
+#
+# Yang menjaganya di fish adalah bracketed paste: terminal membungkus tempelan
+# dengan ESC[200~ dan ESC[201~, dan fish membaca seluruh blok itu lalu
+# menyisipkannya sekaligus TANPA menjalankan binding per karakter. Semua
+# terminal yang masih dirawat mendukungnya.
+#
+# Yang tersisa: terminal tanpa bracketed paste. Di sana tempelan akan membuka
+# satu kotak per spasi, dan satu-satunya jalan keluar adalah ANJURAN_AUTO=0.
 function _anjuran_pemicu
     commandline -i -- $argv[1]
 

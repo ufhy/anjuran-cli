@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Uji UX anjuran di dalam zsh sungguhan.
+"""Uji UX anjuran di dalam shell sungguhan.
+
+Shell dipilih lewat SHELL_UJI; bawaannya zsh. Skenarionya sama untuk
+semuanya, karena yang diuji adalah apa yang TERLIHAT — dan tampilan justru
+bagian yang paling berbeda antar shell.
+
 
 Menjalankan skenario yang benar-benar diketik orang, lalu memeriksa apa yang
 TERLIHAT di layar. Uji Go memeriksa jawaban engine; berkas ini memeriksa
@@ -34,7 +39,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import term  # noqa: E402
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-ZSH = "/bin/zsh"
 
 
 class Hasil:
@@ -103,8 +107,42 @@ def siapkan_sandbox():
     return d
 
 
+# Cara menyiapkan tiap shell berbeda, isi skenarionya tidak.
+#
+# Dipisahkan begini karena bug yang paling sering lolos justru bug TAMPILAN,
+# dan tampilan adalah bagian yang paling berbeda antar shell: zsh menggambar
+# ulang barisnya sendiri lewat zle, bash menghapus baris sebelum menjalankan
+# `bind -x`, fish tidak menggambar karakter yang disisipkan sampai binding-nya
+# selesai. Menjalankan skenario yang sama di ketiganya adalah satu-satunya
+# cara membuktikan ketiganya benar.
+SHELL = {
+    "zsh": {
+        "argv": ["/bin/zsh", "-i", "-l"],
+        "prompt": 'PROMPT="%% "',
+        # Variabel ditulis di depan perintah: zsh dan bash sama-sama menerima
+        # bentuk ini, dan dengan begitu ia hanya berlaku untuk baris itu.
+        "muat": lambda env: " ".join(env) + ' eval "$(anjuran init zsh)"',
+    },
+    "bash": {
+        "argv": ["/bin/bash", "-i"],
+        "prompt": 'PS1="% "',
+        "muat": lambda env: " ".join(env) + ' eval "$(anjuran init bash)"',
+    },
+    "fish": {
+        "argv": ["/usr/bin/fish", "-i"],
+        "prompt": "function fish_prompt; echo -n '% '; end",
+        # fish tidak mengenal awalan VAR=nilai di depan perintah, jadi
+        # variabelnya disetel sebagai perintah tersendiri.
+        "muat": lambda env: "; ".join(
+            ["set -gx " + v.replace("=", " ", 1) for v in env]
+            + ["anjuran init fish | source"]
+        ),
+    },
+}
+
+
 def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost=False,
-             persiapan=(), rows=24):
+             persiapan=(), rows=24, shell="zsh"):
     """Jalankan satu skenario; periksa(teks_layar) mengembalikan None atau alasan gagal."""
     env = {
         "PATH": bindir + ":" + os.environ["PATH"],
@@ -112,10 +150,11 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         # milik pengguna tidak ikut berubah saat pengujian.
         "ANJURAN_CACHE_DIR": cachedir,
     }
-    s = term.Sesi([ZSH, "-i", "-l"], cwd=sandbox, env=env, rows=rows)
+    sh = SHELL[shell]
+    s = term.Sesi(sh["argv"], cwd=sandbox, env=env, rows=rows)
     try:
         s.siap()
-        s.ketik('PROMPT="%% "\r')
+        s.ketik(sh["prompt"] + "\r")
         env_awal = []
         if auto is True:
             env_awal.append("ANJURAN_AUTO=1")
@@ -123,7 +162,7 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
             env_awal.append("ANJURAN_AUTO=0")
         if ghost:
             env_awal.append("ANJURAN_GHOST=1")
-        s.ketik(" ".join(env_awal) + ' eval "$(anjuran init zsh)"\r')
+        s.ketik(sh["muat"](env_awal) + "\r")
         s.siap()
         for baris in persiapan:
             s.ketik(baris + "\r")
@@ -516,6 +555,15 @@ SKENARIO = [
 
 def main():
     saring = os.environ.get("SKENARIO", "")
+    # Shell yang diuji. Bawaannya zsh, karena di situlah skenarionya ditulis
+    # dan di situ pula fiturnya paling lengkap.
+    shell = os.environ.get("SHELL_UJI", "zsh")
+    if shell not in SHELL:
+        print(f"shell {shell!r} tidak dikenal; pilihan: {', '.join(SHELL)}", file=sys.stderr)
+        return 2
+    if not os.path.exists(SHELL[shell]["argv"][0]):
+        print(f"{SHELL[shell]['argv'][0]} tidak terpasang", file=sys.stderr)
+        return 2
     if not os.path.exists(os.path.join(REPO, "bin", "anjuran")):
         print("bin/anjuran belum ada; jalankan `make build` lebih dulu", file=sys.stderr)
         return 2
@@ -571,7 +619,8 @@ def main():
     def kerjakan(t):
         nama, ketikan, periksa, cachedir, auto, ghost, persiapan, rows = t
         alasan = jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir,
-                          auto=auto, ghost=ghost, persiapan=persiapan, rows=rows)
+                          auto=auto, ghost=ghost, persiapan=persiapan, rows=rows,
+                          shell=shell)
         with kunci:
             if alasan is None:
                 h.lulus += 1

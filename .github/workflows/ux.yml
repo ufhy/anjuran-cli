@@ -1,0 +1,71 @@
+# Menjalankan skenario UX di dalam shell sungguhan, di dalam PTY.
+#
+# Ini satu-satunya lapisan yang memeriksa apa yang TERLIHAT. `go test`
+# memeriksa jawaban engine; uji pemasang memeriksa berkas yang mendarat.
+# Keduanya tidak akan pernah menangkap baris perintah yang tergambar dua kali,
+# karakter pemicu yang tidak pernah tampil, atau kotak yang menuntut ruang
+# lebih banyak daripada tinggi layar.
+#
+# Sampai hari ini rangkaian ini hanya pernah jalan di mesin penulisnya, dan
+# hanya untuk zsh. Tiga rilis berturut-turut memuat bug tampilan yang
+# ditemukan pengguna, bukan CI.
+name: ux
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ux:
+    name: ux (${{ matrix.shell }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Skenarionya sama untuk ketiganya. Yang berbeda justru bagian yang
+        # paling sering rusak: zsh menggambar ulang barisnya sendiri lewat
+        # zle, bash menghapus baris sebelum menjalankan `bind -x`, fish tidak
+        # menggambar karakter yang disisipkan sampai binding-nya selesai.
+        shell: [zsh, bash, fish]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      # Node dibutuhkan karena skenarionya memakai spec sungguhan — git,
+      # docker, kubectl. Menjalankannya tanpa spec hanya menguji kotak kosong.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: pasang shell
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh fish
+
+      - name: bangun
+        run: make build
+
+      - name: bangun spec
+        run: make specs
+
+      - name: skenario UX
+        env:
+          SHELL_UJI: ${{ matrix.shell }}
+          # Runner CI berbagi inti dengan pekerjaan lain; terlalu banyak sesi
+          # sekaligus membuat penantian berbasis keadaan ikut melambat.
+          PARALEL: '4'
+        run: python3 -u tools/uxtest/uxtest.py
+
+      - name: rekam layar saat gagal
+        if: failure()
+        run: |
+          echo "Skenario yang gagal mencetak isi layarnya di keluaran di atas."
+          echo "Jalankan satu skenario saja dengan: SKENARIO='<potongan nama>' make ux"

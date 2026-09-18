@@ -17,6 +17,27 @@ Import-Module PSReadLine -ErrorAction SilentlyContinue
 
 $script:UfKey = if ($env:ANJURAN_KEY) { $env:ANJURAN_KEY } else { 'Tab' }
 
+# Test-AnjuranMasukanMenunggu menjawab apakah masih ada ketikan yang antre.
+#
+# Menempelkan satu baris perintah mengirim seluruh isinya sekaligus, dan
+# setiap spasi di dalamnya adalah tombol pemicu. Tanpa penjagaan ini, sebuah
+# tempelan membuka satu kotak per spasi — pengguna harus menekan Esc
+# berkali-kali hanya untuk menempel satu perintah.
+#
+# Padanannya: `read -t 0` di bash, dan PENDING + KEYS_QUEUED_COUNT di zsh.
+# Keduanya sudah ada sejak lama; PowerShell terlewat.
+#
+# KeyAvailable melempar bila masukannya dialihkan, misalnya saat dijalankan
+# dari skrip. Di sana tidak ada tempelan yang perlu dijaga, jadi jawabannya
+# "tidak ada yang antre".
+function Test-AnjuranMasukanMenunggu {
+    try {
+        return [Console]::KeyAvailable
+    } catch {
+        return $false
+    }
+}
+
 # Set-AnjuranKey memasang satu tombol untuk mode edit apa pun.
 #
 # PSReadLine menyimpan tabel tombol terpisah untuk mode vi. Pengguna yang
@@ -167,6 +188,7 @@ if ($env:ANJURAN_AUTO -notin @('0', 'no', 'off', 'false')) {
         # backslash sebagai escape, sehingga '\' sampai apa adanya.
         Set-AnjuranKey -Key $chord -Keterangan 'anjuran-auto' -Aksi ([scriptblock]::Create(@"
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert('$karakter')
+            if (Test-AnjuranMasukanMenunggu) { return }
             Invoke-AnjuranWidget -Trigger 'auto'
 "@))
     }
