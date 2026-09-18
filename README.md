@@ -196,6 +196,11 @@ membangunnya sendiri bila perintah ini dijalankan dari dalam pohon sumber.
 Untuk jaringan tertutup, pakai `--from`. Tidak pernah memakai sudo di host
 tujuan.
 
+**Host Windows belum ikut diunduh otomatis.** Arsip rilis Windows berbentuk
+zip, dan pembongkarnya belum ada — jadi untuk host Windows sebutkan sendiri
+sumbernya dengan `--from <direktori>`. Semua langkah lain berjalan seperti
+biasa. Lihat [#5](https://github.com/ufhy/anjuran-cli/issues/5).
+
 ## Lingkungan
 
 | Lingkungan | Arti |
