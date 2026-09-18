@@ -3,6 +3,7 @@ package generator
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -63,7 +64,17 @@ func TestDirektoriBerakhirPemisah(t *testing.T) {
 // juga berhak mendapat "/" kembali.
 func TestPemisahMengikutiYangDiketik(t *testing.T) {
 	dir := pohonUji(t)
-	for _, p := range []string{"/", `\`} {
+
+	// Backslash hanya diuji di Windows. Di Unix ia BUKAN pemisah path
+	// melainkan karakter nama berkas yang sah — dan di shell ia karakter
+	// escape, sehingga "cd foo\ bar" adalah satu nama dengan spasi, bukan dua
+	// komponen path.
+	pemisahUji := []string{"/"}
+	if runtime.GOOS == "windows" {
+		pemisahUji = append(pemisahUji, `\`)
+	}
+
+	for _, p := range pemisahUji {
 		hasil := Files(dir+p, "", true)
 		if len(hasil) == 0 {
 			t.Fatalf("awalan %q tidak menghasilkan apa-apa", dir+p)
