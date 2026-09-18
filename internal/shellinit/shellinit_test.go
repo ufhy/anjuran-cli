@@ -163,7 +163,10 @@ var pengikatan = map[string][]string{
 	"zsh":        {`bindkey " " _anjuran_spasi`, `bindkey "/" _anjuran_garismiring`, `bindkey "=" _anjuran_samadengan`},
 	"bash":       {`bind -x '" ": _anjuran_spasi'`, `bind -x '"/": _anjuran_garismiring'`, `bind -x '"=": _anjuran_samadengan'`},
 	"fish":       {`bind ' ' _anjuran_spasi`, `bind / _anjuran_garismiring`, `bind = _anjuran_samadengan`},
-	"powershell": {`@(' ', '/', '=')`, `::Insert('$karakter')`},
+	// PowerShell memicu pada "\" juga: path Windows tidak memakai garis
+	// miring, sehingga tanpa itu pemicu path di shell ini tidak pernah
+	// ditekan siapa pun.
+	"powershell": {`@(' ', '/', '\', '=')`, `::Insert('$karakter')`},
 }
 
 func TestPemicuOtomatisSamaDiSetiapShell(t *testing.T) {

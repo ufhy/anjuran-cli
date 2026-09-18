@@ -14,5 +14,9 @@ func openDevice() (*os.File, *os.File, error) {
 	return f, f, nil
 }
 
+// tutupMasukan menutup handle masukan. Di Unix penutupan membangunkan
+// pembacaan yang sedang tertunda, jadi tidak ada yang menggantung.
+func tutupMasukan(f *os.File) error { return f.Close() }
+
 // enableVirtualTerminal tidak diperlukan di luar Windows.
 func enableVirtualTerminal(*os.File) {}

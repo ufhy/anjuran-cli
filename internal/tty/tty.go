@@ -143,10 +143,15 @@ func (t *Terminal) Size() (int, int) {
 
 // Close memulihkan mode terminal.
 func (t *Terminal) Close() error {
+	// Mode dipulihkan LEBIH DULU, dan tanpa syarat. Terminal yang ditinggalkan
+	// dalam mode raw tidak lagi menggemakan ketikan maupun menghormati Ctrl-C;
+	// itu kerusakan yang bertahan sesudah anjuran sendiri sudah lama keluar.
 	err := term.Restore(int(t.in.Fd()), t.state)
-	t.in.Close()
 	if t.out != t.in {
 		t.out.Close()
+	}
+	if e := tutupMasukan(t.in); e != nil && err == nil {
+		err = e
 	}
 	return err
 }
