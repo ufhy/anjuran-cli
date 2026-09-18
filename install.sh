@@ -162,7 +162,31 @@ periksa_checksum() {
 # $SHELL di sini adalah sh — dan menulis ke berkas yang tidak pernah dibaca
 # adalah cara paling halus untuk membuat pemasangan tampak berhasil padahal
 # tidak ada yang berubah.
-berkas_shell() {
+# shell_berjalan menebak shell yang BENAR-BENAR dipakai orangnya.
+#
+# Skrip ini dijalankan lewat pipe ke sh, jadi induk prosesnya adalah shell
+# tempat perintah curl itu diketik — dan itu jawaban yang jauh lebih dekat
+# dengan kenyataan daripada /etc/passwd. Di container passwd hampir tidak
+# pernah disetel: root di sana tercatat memakai /bin/sh sementara orangnya
+# duduk di dalam bash.
+shell_berjalan() {
+  induk=""
+  # /proc dibaca lebih dulu, dan bukan sekadar sebagai jalan pintas: `ps` milik
+  # BusyBox tidak mengenal opsi -p sama sekali, sehingga di Alpine — tempat
+  # kekeliruan ini paling sering terjadi — jalur ps tidak pernah menjawab.
+  if [ -r "/proc/$PPID/comm" ]; then
+    induk=$(cat "/proc/$PPID/comm" 2>/dev/null)
+  fi
+  if [ -z "$induk" ]; then
+    induk=$(ps -o comm= -p "$PPID" 2>/dev/null) || induk=""
+  fi
+  induk=${induk##*/}
+  # Shell login muncul dengan awalan tanda hubung, misalnya "-bash".
+  printf '%s\n' "${induk#-}"
+}
+
+# shell_login membaca shell yang tercatat di passwd.
+shell_login() {
   masuk=""
   if command -v getent >/dev/null 2>&1; then
     masuk=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)
@@ -171,13 +195,25 @@ berkas_shell() {
     masuk=$(id -P "$(id -un)" 2>/dev/null | cut -d: -f10) || masuk=""
   fi
   [ -n "$masuk" ] || masuk=${SHELL:-}
+  basename "${masuk:-sh}"
+}
 
-  case $(basename "${masuk:-sh}") in
-    zsh)  RC_BERKAS="$HOME/.zshrc";                     RC_JENIS=zsh ;;
-    bash) RC_BERKAS="$HOME/.bashrc";                    RC_JENIS=bash ;;
-    fish) RC_BERKAS="$HOME/.config/fish/config.fish";   RC_JENIS=fish ;;
-    *)    RC_BERKAS="$HOME/.profile";                   RC_JENIS=polos ;;
-  esac
+# berkas_shell memilih berkas konfigurasi mana yang ditulis.
+#
+# Yang sedang dijalankan didahulukan atas yang tercatat di passwd, karena di
+# situlah orangnya benar-benar mengetik. Keduanya diperiksa, dan yang pertama
+# DIDUKUNG yang dipakai: shell yang sedang berjalan bisa saja sh — misalnya
+# saat skrip ini dipanggil dari skrip lain — dan di situ passwd lebih tahu.
+berkas_shell() {
+  for kandidat in "$(shell_berjalan)" "$(shell_login)"; do
+    case $kandidat in
+      zsh)  RC_BERKAS="$HOME/.zshrc";                   RC_JENIS=zsh;  return 0 ;;
+      bash) RC_BERKAS="$HOME/.bashrc";                  RC_JENIS=bash; return 0 ;;
+      fish) RC_BERKAS="$HOME/.config/fish/config.fish"; RC_JENIS=fish; return 0 ;;
+    esac
+  done
+  RC_BERKAS="$HOME/.profile"
+  RC_JENIS=polos
 }
 
 pasang_shell() {
@@ -217,10 +253,29 @@ pasang_shell() {
   } >> "$rc"
 
   if [ "$jenis" = polos ]; then
-    info "  shell    : $rc (PATH saja; shell ini belum punya integrasi)"
+    info "  shell    : $rc (PATH saja)"
   else
     info "  shell    : $rc (ditambahkan)"
   fi
+}
+
+# peringatan_tanpa_integrasi menjelaskan keadaan yang paling mudah disalahpahami.
+#
+# "PATH saja" terbaca seperti keberhasilan, padahal fitur utamanya justru tidak
+# terpasang: binary-nya ada, tetapi menekan spasi tidak akan memunculkan apa
+# pun. Yang dicetak di sini perintah yang bisa langsung ditempel, bukan
+# keterangan bahwa sesuatu tidak didukung.
+peringatan_tanpa_integrasi() {
+  bindir="\$HOME/${BASE#"$HOME"/}/bin"
+  info ""
+  info "Shell-mu tidak dikenali, jadi HANYA PATH yang disetel — kotak"
+  info "completion belum akan muncul. Kalau kamu memakai bash atau zsh,"
+  info "tambahkan satu baris ini sendiri:"
+  info ""
+  info "  echo 'export PATH=\"$bindir:\$PATH\"' >> ~/.bashrc"
+  info "  echo 'eval \"\$(anjuran init bash)\"' >> ~/.bashrc"
+  info ""
+  info "Ganti bash dengan zsh dan ~/.bashrc dengan ~/.zshrc bila perlu."
 }
 
 # ---------------------------------------------------------------------------
@@ -307,7 +362,16 @@ main() {
   fi
 
   info ""
-  info "Buka sesi shell baru, lalu tekan spasi sesudah sebuah perintah."
+  if [ "${RC_JENIS:-}" = polos ]; then
+    peringatan_tanpa_integrasi
+  else
+    info "Buka sesi shell baru, lalu tekan spasi sesudah sebuah perintah."
+    # Sesi yang SEDANG berjalan tidak membaca ulang berkas rc-nya sendiri.
+    # Tanpa disebut, perintah berikutnya yang orang ketik adalah `anjuran`,
+    # dan jawabannya "command not found" — tepat sesudah pemasangan yang
+    # dilaporkan berhasil.
+    info "Untuk sesi ini: . $RC_BERKAS"
+  fi
 }
 
 main "$@"

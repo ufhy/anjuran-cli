@@ -50,10 +50,14 @@ jobs:
 
           # busybox ash dan musl sekaligus. Alpine juga tidak punya bash,
           # sehingga bashism sekecil apa pun akan terlihat di sini.
+          #
+          # bash sengaja DIPASANG walau /bin/sh tetap ash: di situlah pemasang
+          # harus memilih .bashrc alih-alih .profile, dan passwd tidak akan
+          # memberitahunya. Kekeliruan itu sudah pernah terjadi sungguhan.
           - nama: alpine (busybox ash)
             runs-on: ubuntu-latest
             container: alpine:3.20
-            siapkan: apk add --no-cache curl ca-certificates tar
+            siapkan: apk add --no-cache curl ca-certificates tar bash
 
           # Sengaja TANPA curl. Cabang wget ada di dalam skrip sejak awal dan
           # belum pernah dijalankan sekali pun.
