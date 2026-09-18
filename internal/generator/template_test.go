@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -29,7 +30,9 @@ func pohonUji(t *testing.T) string {
 func TestFilepaths(t *testing.T) {
 	dir := pohonUji(t)
 	got := Files("", dir, false)
-	want := []string{"catatan.txt", "cmd/", "data.json", "internal/"}
+	// Pemisahnya mengikuti sistem bila pengguna belum mengetik satu pun.
+	ps := string(filepath.Separator)
+	want := []string{"catatan.txt", "cmd" + ps, "data.json", "internal" + ps}
 	sort.Strings(got)
 	if len(got) != len(want) {
 		t.Fatalf("hasil = %v, mau %v", got, want)
@@ -41,12 +44,34 @@ func TestFilepaths(t *testing.T) {
 	}
 }
 
-// Direktori diberi garis miring supaya penelusuran bisa langsung dilanjutkan.
-func TestDirektoriBerakhirGarisMiring(t *testing.T) {
+// Direktori diberi pemisah di ujungnya supaya penelusuran bisa langsung
+// dilanjutkan — dan supaya IsDir mengenalinya sebagai direktori.
+func TestDirektoriBerakhirPemisah(t *testing.T) {
 	dir := pohonUji(t)
 	for _, c := range Files("", dir, true) {
-		if c[len(c)-1] != '/' {
-			t.Errorf("direktori %q seharusnya berakhir dengan /", c)
+		if rune(c[len(c)-1]) != filepath.Separator {
+			t.Errorf("direktori %q seharusnya berakhir dengan %q", c, filepath.Separator)
+		}
+	}
+}
+
+// Pemisah yang SEDANG DIPAKAI pengguna yang diikuti, bukan pemisah sistem.
+//
+// Di Windows, mengetik `cd C:\` lalu mendapat `C:\Users/` adalah jawaban
+// bercampur yang tidak pernah benar untuk siapa pun. Sebaliknya, orang yang
+// mengetik "/" di Windows — kebiasaan yang dibawa dari WSL atau Git Bash —
+// juga berhak mendapat "/" kembali.
+func TestPemisahMengikutiYangDiketik(t *testing.T) {
+	dir := pohonUji(t)
+	for _, p := range []string{"/", `\`} {
+		hasil := Files(dir+p, "", true)
+		if len(hasil) == 0 {
+			t.Fatalf("awalan %q tidak menghasilkan apa-apa", dir+p)
+		}
+		for _, c := range hasil {
+			if !strings.HasSuffix(c, p) {
+				t.Errorf("awalan %q: %q tidak berakhir dengan %q", dir+p, c, p)
+			}
 		}
 	}
 }

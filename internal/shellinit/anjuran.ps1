@@ -124,10 +124,15 @@ Set-PSReadLineKeyHandler -Key $script:UfKey -BriefDescription 'anjuran' -LongDes
 # NYALA secara bawaan. Matikan dengan $env:ANJURAN_AUTO = '0'.
 
 if ($env:ANJURAN_AUTO -notin @('0', 'no', 'off', 'false')) {
-    foreach ($karakter in @(' ', '/', '=')) {
+    # Backslash ikut memicu, dan hanya di sini. Path Windows memakai "\",
+    # sehingga tanpa itu satu-satunya pemicu path di shell ini tidak pernah
+    # ditekan siapa pun: mengetik "cd C:\" tidak memunculkan apa-apa.
+    foreach ($karakter in @(' ', '/', '\', '=')) {
         # Karakternya disisipkan sendiri: handler mengambil alih tombolnya
         # sepenuhnya, jadi tanpa Insert karakter yang diketik pengguna hilang.
         $chord = if ($karakter -eq ' ') { 'Spacebar' } else { $karakter }
+        # Kutip TUNGGAL dengan sengaja: di dalamnya PowerShell tidak memproses
+        # backslash sebagai escape, sehingga '\' sampai apa adanya.
         Set-PSReadLineKeyHandler -Key $chord -BriefDescription 'anjuran-auto' -ScriptBlock ([scriptblock]::Create(@"
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert('$karakter')
             Invoke-AnjuranWidget -Trigger 'auto'

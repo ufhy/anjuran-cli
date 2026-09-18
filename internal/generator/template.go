@@ -88,7 +88,7 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 		}
 
 		if isDir {
-			name += "/"
+			name += pemisah(dirPart)
 		}
 		// Bagian direktori dikembalikan APA ADANYA, termasuk tilde-nya:
 		// yang disisipkan harus tetap "~/berkas", bukan path rumah yang
@@ -98,6 +98,24 @@ func Files(prefix, workdir string, onlyDirs bool) []string {
 
 	sort.Strings(out)
 	return out
+}
+
+// pemisah memilih pemisah path yang dipakai untuk menandai direktori.
+//
+// Yang diikuti adalah pemisah yang SEDANG DIPAKAI pengguna, bukan pemisah
+// milik sistem operasinya. Di Windows, mengetik "cd C:\" lalu mendapat
+// "C:\Users/" adalah jawaban bercampur yang tidak pernah benar untuk siapa
+// pun — dan pemisah yang salah membuat baris berikutnya tidak lagi dikenali
+// sebagai path oleh pemicu maupun oleh IsDir.
+//
+// Bila belum ada pemisah sama sekali — "cd " pada kata pertama — dipakai
+// pemisah sistem: di Windows itulah yang diharapkan orang, dan di sanalah
+// completion bawaan shell juga mengarah.
+func pemisah(dirPart string) string {
+	if i := strings.LastIndexAny(dirPart, `/\`); i >= 0 {
+		return string(dirPart[i])
+	}
+	return string(filepath.Separator)
 }
 
 // splitPrefix memisahkan bagian direktori dari kata yang sedang diketik.

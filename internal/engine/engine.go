@@ -170,9 +170,17 @@ func Quote(s string) string {
 // garis miringnya tidak lagi berada di ujung. Memeriksa Insert saja membuat
 // folder berspasi kehilangan seluruh perlakuan folder — tidak bisa ditelusuri,
 // dan tidak menampilkan petunjuk tombolnya.
+// Kedua pemisah diterima. Di Windows kandidat direktori berakhiran "\", dan
+// memeriksa "/" saja membuat seluruh perlakuan folder hilang di sana: ikonnya
+// salah, panah kanan tidak masuk ke dalamnya, dan penelusuran path berhenti
+// di tingkat pertama.
 func (c Candidate) IsDir() bool {
-	return strings.HasSuffix(c.Name, "/") ||
-		strings.HasSuffix(strings.TrimRight(c.Insert, `'"`), "/")
+	return berakhirPemisah(c.Name) ||
+		berakhirPemisah(strings.TrimRight(c.Insert, `'"`))
+}
+
+func berakhirPemisah(s string) bool {
+	return strings.HasSuffix(s, "/") || strings.HasSuffix(s, `\`)
 }
 
 // Result adalah jawaban lengkap engine untuk satu posisi kursor.
