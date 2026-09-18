@@ -148,11 +148,32 @@ changelog:
       - Merge pull request
 
 release:
+  # Tag dengan bagian prarilis — v0.1.0-beta.1 — ditandai prarilis di GitHub.
+  # Tanpa ini sebuah beta akan menjadi "latest", dan skrip pemasang akan
+  # memberikannya kepada semua orang yang cuma menempelkan satu baris curl.
+  prerelease: auto
   footer: |
     ## Pemasangan
 
-    Unduh arsip untuk platform kamu, letakkan `anjuran` di dalam PATH, dan biarkan
-    `specs/` bersebelahan dengannya. Lalu satu baris di berkas konfigurasi shell:
+    Satu baris:
+
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/ufhy/anjuran-cli/main/install.sh | sh
+    ```
+
+    ```powershell
+    irm https://raw.githubusercontent.com/ufhy/anjuran-cli/main/install.ps1 | iex
+    ```
+
+    Untuk memasang versi prarilis, sebutkan tagnya:
+
+    ```sh
+    ANJURAN_VERSION=TAG curl -fsSL https://raw.githubusercontent.com/ufhy/anjuran-cli/main/install.sh | sh
+    ```
+
+    Atau unduh arsip untuk platform kamu, letakkan `anjuran` di dalam PATH, dan
+    biarkan `specs/` bersebelahan dengannya. Lalu satu baris di berkas
+    konfigurasi shell:
 
     | Shell | Baris |
     |---|---|

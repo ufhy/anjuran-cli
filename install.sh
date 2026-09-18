@@ -14,6 +14,7 @@
 #
 # Lingkungan yang dibaca:
 #   ANJURAN_VERSION     tag rilis tertentu, misalnya v0.1.0 (bawaan: terbaru)
+#   ANJURAN_PRERELEASE  bila diisi, terima juga rilis beta
 #   ANJURAN_INSTALL_DIR direktori dasar (bawaan: $HOME/.local)
 #   ANJURAN_NO_SHELL    bila diisi, jangan sentuh berkas konfigurasi shell
 #   ANJURAN_DRY_RUN     bila diisi, laporkan rencananya tanpa mengunduh apa pun
@@ -90,14 +91,32 @@ unduh_stdout() {
   fi
 }
 
-# versi_terbaru membaca tag rilis terakhir dari GitHub.
+# tag_pertama mengambil tag_name pertama dari keluaran JSON.
 #
 # Diurai dengan sed, bukan jq: jq bukan bawaan di mana pun, dan menuntutnya
 # berarti pemasangan gagal sebelum apa pun terunduh.
+tag_pertama() {
+  sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
+# versi_terbaru memilih rilis mana yang dipasang bila pengguna tidak menyebut.
+#
+# /releases/latest sengaja TIDAK memuat prarilis — itulah gunanya. Tetapi
+# selama proyek ini belum punya rilis stabil, satu-satunya yang ada adalah
+# beta, dan pemasang yang berkeras pada "latest" akan berkata tidak ada apa-apa
+# padahal berkasnya ada. Jadi stabil dicoba lebih dulu, lalu jatuh ke rilis
+# terbaru apa pun — dan pengguna diberi tahu bahwa yang dipasang sebuah beta,
+# bukan dibiarkan mengiranya versi biasa.
 versi_terbaru() {
-  unduh_stdout "https://api.github.com/repos/$REPO/releases/latest" |
-    sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
-    head -1
+  if [ -z "${ANJURAN_PRERELEASE:-}" ]; then
+    stabil=$(unduh_stdout "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | tag_pertama) || stabil=""
+    if [ -n "$stabil" ]; then
+      printf '%s\n' "$stabil"
+      return 0
+    fi
+    info "  catatan  : belum ada rilis stabil; memakai prarilis terbaru" >&2
+  fi
+  unduh_stdout "https://api.github.com/repos/$REPO/releases?per_page=1" 2>/dev/null | tag_pertama
 }
 
 # ---------------------------------------------------------------------------

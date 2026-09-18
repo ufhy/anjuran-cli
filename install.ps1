@@ -8,6 +8,7 @@
 #
 # Lingkungan yang dibaca:
 #   ANJURAN_VERSION     tag rilis tertentu, misalnya v0.1.0 (bawaan: terbaru)
+#   ANJURAN_PRERELEASE  bila diisi, terima juga rilis beta
 #   ANJURAN_INSTALL_DIR direktori dasar (bawaan: $env:LOCALAPPDATA\anjuran)
 #   ANJURAN_NO_SHELL    bila diisi, jangan sentuh profil PowerShell
 #   ANJURAN_DRY_RUN     bila diisi, laporkan rencananya tanpa mengunduh apa pun
@@ -38,9 +39,22 @@ function Get-AnjuranArch {
 }
 
 function Get-AnjuranVersiTerbaru {
-    $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
-    if (-not $r.tag_name) { throw 'tidak bisa membaca rilis terbaru dari GitHub; sebutkan ANJURAN_VERSION' }
-    return $r.tag_name
+    # /releases/latest sengaja TIDAK memuat prarilis — itulah gunanya. Tetapi
+    # selama proyek ini belum punya rilis stabil, satu-satunya yang ada adalah
+    # beta, dan pemasang yang berkeras pada "latest" akan berkata tidak ada
+    # apa-apa padahal berkasnya ada.
+    if (-not $env:ANJURAN_PRERELEASE) {
+        try {
+            $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
+            if ($r.tag_name) { return $r.tag_name }
+        } catch {
+            Write-Host '  catatan  : belum ada rilis stabil; memakai prarilis terbaru'
+        }
+    }
+    $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=1" -UseBasicParsing
+    $tag = @($r)[0].tag_name
+    if (-not $tag) { throw 'tidak bisa membaca rilis dari GitHub; sebutkan ANJURAN_VERSION' }
+    return $tag
 }
 
 $arch = Get-AnjuranArch
