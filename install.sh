@@ -55,7 +55,12 @@ platform() {
     *) galat "arsitektur $arch belum didukung" ;;
   esac
 
-  printf '%s %s\n' "$os" "$arch"
+  # Nilainya disetel sebagai variabel, bukan dicetak lalu dipecah kembali
+  # oleh pemanggilnya: fungsi sh berjalan di shell yang sama, jadi mencetak
+  # dua nilai hanya untuk memecahnya lagi menambah satu tempat kesalahan
+  # tanpa menambah apa pun.
+  ANJURAN_OS=$os
+  ANJURAN_ARCH=$arch
 }
 
 # ---------------------------------------------------------------------------
@@ -149,10 +154,10 @@ berkas_shell() {
   [ -n "$masuk" ] || masuk=${SHELL:-}
 
   case $(basename "${masuk:-sh}") in
-    zsh)  printf '%s %s\n' "$HOME/.zshrc" zsh ;;
-    bash) printf '%s %s\n' "$HOME/.bashrc" bash ;;
-    fish) printf '%s %s\n' "$HOME/.config/fish/config.fish" fish ;;
-    *)    printf '%s %s\n' "$HOME/.profile" polos ;;
+    zsh)  RC_BERKAS="$HOME/.zshrc";                     RC_JENIS=zsh ;;
+    bash) RC_BERKAS="$HOME/.bashrc";                    RC_JENIS=bash ;;
+    fish) RC_BERKAS="$HOME/.config/fish/config.fish";   RC_JENIS=fish ;;
+    *)    RC_BERKAS="$HOME/.profile";                   RC_JENIS=polos ;;
   esac
 }
 
@@ -167,6 +172,10 @@ pasang_shell() {
   fi
 
   mkdir -p "$(dirname "$rc")"
+  # shellcheck disable=SC2016
+  # Kutip tunggalnya disengaja. Yang ditulis ke berkas rc harus berupa $HOME
+  # dan $PATH LITERAL, supaya barisnya tetap benar kalau rumah pengguna
+  # pindah — bukan nilainya pada saat pemasangan.
   {
     printf '\n%s\n' "$PENANDA_AWAL"
     case $jenis in
@@ -198,9 +207,9 @@ pasang_shell() {
 # ---------------------------------------------------------------------------
 
 main() {
-  set -- $(platform)
-  os=$1
-  arch=$2
+  platform
+  os=$ANJURAN_OS
+  arch=$ANJURAN_ARCH
 
   versi=${ANJURAN_VERSION:-}
   if [ -z "$versi" ]; then
@@ -274,7 +283,8 @@ main() {
   info "  spec     : $jumlah"
 
   if [ -z "${ANJURAN_NO_SHELL:-}" ]; then
-    pasang_shell $(berkas_shell)
+    berkas_shell
+    pasang_shell "$RC_BERKAS" "$RC_JENIS"
   fi
 
   info ""
