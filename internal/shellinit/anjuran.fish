@@ -154,6 +154,22 @@ end
 # tombolnya sepenuhnya, jadi tanpa ini karakter yang diketik pengguna hilang.
 function _anjuran_pemicu
     commandline -i -- $argv[1]
+
+    # Karakternya digemakan sendiri sebelum kotak digambar.
+    #
+    # fish baru menggambar ulang barisnya SESUDAH fungsi binding ini selesai,
+    # dan saat itu anjuran sudah terlanjur menggambar kotaknya. Tanpa ini,
+    # mengetik "cd " menampilkan "cd" dengan daftar direktori di bawahnya —
+    # spasinya tidak pernah terlihat, walau buffer-nya sendiri benar.
+    #
+    # Hanya saat kursor berada di UJUNG baris. Di tengah baris, menyisipkan
+    # sebuah karakter berarti menggeser teks di kanannya, dan menggemakannya
+    # begitu saja justru menimpa yang sudah ada.
+    set -l isi (commandline)
+    if test (commandline -C) -eq (string length -- "$isi")
+        printf '%s' $argv[1] > /dev/tty 2>/dev/null
+    end
+
     _anjuran_widget auto
 end
 

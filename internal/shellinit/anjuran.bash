@@ -52,6 +52,36 @@ _anjuran_alias() {
   _anjuran_alias_exp=$baris
 }
 
+# _anjuran_gambar_baris menggambar ulang prompt dan baris perintah.
+#
+# bash MENGHAPUS baris yang terlihat sebelum menjalankan perintah `bind -x`,
+# lalu menggambarnya ulang sesudah perintah itu selesai. Untuk perintah biasa
+# itu benar. Untuk anjuran tidak: kotaknya digambar SELAMA fungsi berjalan,
+# jadi selama kotak terbuka prompt dan baris perintahnya memang kosong di
+# layar — mengetik "cd /" menampilkan daftar direktori tanpa satu pun jejak
+# perintah yang sedang ditulis.
+#
+# Buffer-nya sendiri selalu benar, dan itu yang membuat cacat seperti ini
+# bertahan lama: perintahnya tetap berjalan sebagaimana mestinya. zsh
+# mengatasi hal yang sama dengan `zle -R`; readline tidak punya padanan yang
+# bisa dipanggil dari dalam `bind -x`.
+_anjuran_gambar_baris() {
+  local prompt=""
+  # ${PS1@P} memekarkan escape prompt seperti \u dan \w; baru ada di bash 4.4.
+  # Di bawah itu barisnya tetap digambar, hanya tanpa prompt — masih jauh
+  # lebih baik daripada layar yang kosong.
+  if [ "${BASH_VERSINFO[0]}" -gt 4 ] ||
+     { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 4 ]; }; then
+    prompt=${PS1@P}
+    # \[ dan \] menjadi byte 0x01 dan 0x02 setelah pemekaran. Keduanya
+    # penanda "lebar nol" untuk readline, bukan sesuatu yang boleh sampai ke
+    # terminal.
+    prompt=${prompt//$'\001'/}
+    prompt=${prompt//$'\002'/}
+  fi
+  printf '\r%s%s' "$prompt" "$READLINE_LINE" > /dev/tty 2>/dev/null
+}
+
 _anjuran_widget() {
   local trigger=${1:-manual}
   local select_from=${2:-first}
@@ -60,6 +90,7 @@ _anjuran_widget() {
   local sebelum=$READLINE_LINE
   local _anjuran_alias_exp
   _anjuran_alias
+  _anjuran_gambar_baris
 
   # READLINE_POINT dihitung dalam BYTE, berbeda dari zsh dan fish yang
   # menghitung karakter. Salah satuan akan menyisipkan di tempat yang salah

@@ -302,3 +302,38 @@ func TestPowerShellKurawalSeimbang(t *testing.T) {
 		t.Errorf("kurawal tidak seimbang: selisih %d", imbang)
 	}
 }
+
+// Baris perintah harus tetap terlihat saat kotak dibuka.
+//
+// bash MENGHAPUS baris yang terlihat sebelum menjalankan perintah `bind -x`
+// dan baru menggambarnya ulang sesudah perintah itu selesai; fish tidak
+// menggambar karakter yang disisipkan sampai binding-nya selesai. Pada
+// keduanya, kotak digambar SELAMA fungsi berjalan — sehingga tanpa penanganan
+// khusus, mengetik "cd " menampilkan daftar direktori tanpa satu pun jejak
+// perintah yang sedang ditulis.
+//
+// Buffer-nya sendiri selalu benar, dan itu yang membuat cacat seperti ini
+// bertahan lama: perintahnya tetap berjalan sebagaimana mestinya.
+func TestBarisTetapTergambarSaatKotakDibuka(t *testing.T) {
+	b, _ := Script("bash")
+	// Prompt ikut digambar ulang, bukan hanya isinya: yang dihapus bash
+	// adalah seluruh baris, prompt dan semuanya.
+	for _, tanda := range []string{"_anjuran_gambar_baris", "${PS1@P}", "READLINE_LINE"} {
+		if !strings.Contains(b, tanda) {
+			t.Errorf("skrip bash tidak menggambar ulang barisnya (%q tidak ada)", tanda)
+		}
+	}
+
+	f, _ := Script("fish")
+	if !strings.Contains(f, "/dev/tty") {
+		t.Error("skrip fish tidak menggemakan karakter pemicunya ke terminal")
+	}
+
+	// zsh memakai `zle -R`, yang menggambar SAAT ITU JUGA. `zle redisplay`
+	// hanya menandai baris perlu digambar ulang, dan penggambarannya tetap
+	// menunggu widget selesai — persis kegagalan yang sama.
+	z, _ := Script("zsh")
+	if !strings.Contains(z, "zle -R") {
+		t.Error("skrip zsh tidak memakai zle -R")
+	}
+}
