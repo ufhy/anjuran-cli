@@ -78,6 +78,15 @@ _anjuran_gambar_baris() {
     # terminal.
     prompt=${prompt//$'\001'/}
     prompt=${prompt//$'\002'/}
+    # Hanya BARIS TERAKHIR prompt yang digambar ulang.
+    #
+    # Prompt berbaris banyak lumrah — bawaan Git Bash saja memuat dua newline,
+    # begitu pula hampir semua tema populer. Mencetaknya utuh berarti
+    # menambahkan salinan baru di bawah yang lama, mendorong layar turun setiap
+    # kali kotak dibuka; yang dihapus \r ESC[K hanya satu baris, dan baris
+    # itulah satu-satunya yang memang perlu digambar kembali. Baris prompt di
+    # atasnya masih utuh di layar dan tidak pernah disentuh bash.
+    prompt=${prompt##*$'\n'}
   fi
   # Baris DIHAPUS dulu, bukan sekadar ditimpa.
   #

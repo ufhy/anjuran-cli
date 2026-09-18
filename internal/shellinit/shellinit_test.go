@@ -327,6 +327,14 @@ func TestBarisTetapTergambarSaatKotakDibuka(t *testing.T) {
 		}
 	}
 
+	// Hanya baris TERAKHIR prompt yang digambar ulang. Prompt berbaris banyak
+	// lumrah — bawaan Git Bash memuat dua newline — dan mencetaknya utuh
+	// menambahkan salinan baru di bawah yang lama, mendorong layar turun setiap
+	// kali kotak dibuka.
+	if !strings.Contains(b, `${prompt##*$'\n'}`) {
+		t.Error("skrip bash menggambar ulang seluruh prompt, bukan baris terakhirnya")
+	}
+
 	f, _ := Script("fish")
 	if !strings.Contains(f, "/dev/tty") {
 		t.Error("skrip fish tidak menggemakan karakter pemicunya ke terminal")
