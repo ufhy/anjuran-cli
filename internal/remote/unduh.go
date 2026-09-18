@@ -176,6 +176,21 @@ func unduhRilis(p Platform, versi string) (Source, func(), error) {
 	return src, func() { bersihkanArsip(); bersihkan() }, nil
 }
 
+// Kemajuan menerima laporan kemajuan unduhan. Nil berarti tidak dilaporkan.
+//
+// Sebuah antarmuka, bukan penulisan langsung ke terminal: paket ini juga
+// dipakai `up`, yang laporannya berbentuk lain, dan dipakai uji yang tidak
+// boleh mengotori keluarannya.
+type Kemajuan func(sudah, total int64)
+
+// pelapor dipasang pemanggil sebelum mengunduh. Disimpan sebagai variabel
+// paket karena ia menembus beberapa lapis pemanggilan yang seluruhnya tidak
+// punya urusan dengan tampilan.
+var pelapor Kemajuan
+
+// LaporkanKemajuan memasang penerima laporan kemajuan unduhan.
+func LaporkanKemajuan(f Kemajuan) { pelapor = f }
+
 // ambil mengunduh satu berkas.
 func ambil(url, tujuan string) error {
 	c := &http.Client{Timeout: batasUnduh}
@@ -192,11 +207,41 @@ func ambil(url, tujuan string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
+
+	var r io.Reader = resp.Body
+	// Hanya berkas besar yang dilaporkan. checksums.txt beberapa ratus byte,
+	// dan batang kemajuan untuknya hanya berkedip sekali lalu hilang.
+	if pelapor != nil && resp.ContentLength > 1<<20 {
+		r = &pembacaLapor{r: resp.Body, total: resp.ContentLength, lapor: pelapor}
+	}
+	if _, err := io.Copy(f, r); err != nil {
 		f.Close()
 		return err
 	}
 	return f.Close()
+}
+
+// pembacaLapor menghitung byte yang lewat lalu melaporkannya.
+type pembacaLapor struct {
+	r        io.Reader
+	total    int64
+	sudah    int64
+	terakhir time.Time
+	lapor    Kemajuan
+}
+
+func (p *pembacaLapor) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	p.sudah += int64(n)
+
+	// Dibatasi sepuluh kali sedetik. Melaporkan setiap potongan berarti
+	// menulis ke terminal ribuan kali untuk satu unduhan — cukup untuk
+	// membuat pengunduhan itu sendiri terasa lambat.
+	if err == io.EOF || time.Since(p.terakhir) > 100*time.Millisecond {
+		p.terakhir = time.Now()
+		p.lapor(p.sudah, p.total)
+	}
+	return n, err
 }
 
 // periksaChecksum membandingkan arsip dengan baris yang bersesuaian di

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ufhy/anjuran-cli/internal/remote"
+	"golang.org/x/term"
 )
 
 // runUpdate memperbarui anjuran ke rilis terbaru.
@@ -87,6 +88,11 @@ func runUpdate(args []string) int {
 	}
 
 	plat := remote.Platform{OS: runtime.GOOS, Arch: runtime.GOARCH}
+
+	// Unduhannya 7 MB. Tanpa tanda kehidupan, sambungan yang lambat tidak bisa
+	// dibedakan dari perintah yang menggantung — dan yang tampak menggantung
+	// akan ditekan Ctrl-C, di tengah penggantian binary.
+	remote.LaporkanKemajuan(kemajuanKeTerminal())
 	src, bersihkan, err := remote.UnduhRilis(plat, tag)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "anjuran:", err)
@@ -187,4 +193,52 @@ func salinPohon(asal, tujuan string) error {
 		}
 		return salinBerkas(p, ke, info.Mode().Perm())
 	})
+}
+
+// kemajuanKeTerminal menggambar batang kemajuan, atau tidak sama sekali.
+//
+// Di luar terminal — pipa, CI, cron — batang yang digambar ulang dengan \r
+// menjadi ribuan baris sampah di dalam log. Di sana satu baris ringkas saat
+// selesai jauh lebih berguna.
+func kemajuanKeTerminal() remote.Kemajuan {
+	kaTerminal := term.IsTerminal(int(os.Stdout.Fd()))
+	selesai := false
+	return func(sudah, total int64) {
+		if selesai {
+			return
+		}
+		if !kaTerminal {
+			if sudah >= total {
+				selesai = true
+				fmt.Printf("  diunduh   : %s\n", ukuran(total))
+			}
+			return
+		}
+		lebar := 24
+		isi := 0
+		if total > 0 {
+			isi = int(int64(lebar) * sudah / total)
+		}
+		fmt.Printf("\r  mengunduh : [%s%s] %s / %s",
+			strings.Repeat("█", isi), strings.Repeat("░", lebar-isi),
+			ukuran(sudah), ukuran(total))
+		if sudah >= total {
+			selesai = true
+			fmt.Println()
+		}
+	}
+}
+
+// ukuran memformat jumlah byte agar mudah dibaca.
+func ukuran(n int64) string {
+	const satuan = 1024
+	if n < satuan {
+		return fmt.Sprintf("%d B", n)
+	}
+	bagi, exp := int64(satuan), 0
+	for n/bagi >= satuan && exp < 3 {
+		bagi *= satuan
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(n)/float64(bagi), "KMGT"[exp])
 }

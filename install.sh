@@ -81,6 +81,24 @@ unduh() {
   fi
 }
 
+# unduh_besar menampilkan kemajuan; dipakai untuk arsip rilis saja.
+#
+# Arsipnya sekitar 7 MB. Tanpa tanda kehidupan, sambungan yang lambat tidak
+# bisa dibedakan dari pemasangan yang menggantung — dan yang tampak
+# menggantung akan ditekan Ctrl-C. Untuk berkas kecil seperti checksums.txt
+# batangnya hanya berkedip sekali lalu hilang, jadi di sana tetap senyap.
+unduh_besar() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL --progress-bar "$1" -o "$2"
+  elif command -v wget >/dev/null 2>&1; then
+    # --show-progress baru ada di wget 1.16; yang lebih tua tetap senyap
+    # alih-alih gagal.
+    wget -q --show-progress -O "$2" "$1" 2>/dev/null || wget -qO "$2" "$1"
+  else
+    galat "butuh curl atau wget"
+  fi
+}
+
 unduh_stdout() {
   if command -v curl >/dev/null 2>&1; then
     curl -fsSL "$1"
@@ -314,7 +332,7 @@ main() {
   # setiap kali pemasangan gagal adalah kerusakan yang tidak diminta siapa pun.
   trap 'rm -rf "$tmp"' EXIT INT TERM
 
-  unduh "$url" "$tmp/$nama" ||
+  unduh_besar "$url" "$tmp/$nama" ||
     galat "gagal mengunduh $url
   Periksa apakah rilis $versi memang punya berkas untuk $os/$arch."
 
