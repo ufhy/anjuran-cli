@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/ufhy/anjuran-cli/internal/ui"
@@ -69,8 +70,9 @@ func TestSimpleModeMengikutiTerm(t *testing.T) {
 		{"dumb", "", true},
 		{"vt100", "", true},
 		{"VT102", "", true},
-		{"", "", true},
 		{"xterm-256color", "1", true},
+		// TERM kosong berarti berbeda tergantung sistemnya, jadi diperiksa
+		// terpisah di bawah.
 	}
 	for _, tt := range tests {
 		t.Setenv("TERM", tt.term)
@@ -78,6 +80,28 @@ func TestSimpleModeMengikutiTerm(t *testing.T) {
 		if got := simpleMode(); got != tt.want {
 			t.Errorf("TERM=%q ANJURAN_SIMPLE=%q -> %v, mau %v", tt.term, tt.simple, got, tt.want)
 		}
+	}
+}
+
+// TERM kosong bukan tanda terminal terbatas di Windows.
+//
+// TERM adalah kebiasaan Unix; conhost maupun Windows Terminal tidak pernah
+// menyetelnya. Memperlakukannya sebagai "terbatas" membuat anjuran selalu
+// berjalan tanpa warna di sana — baris yang tersorot kehilangan latarnya, dan
+// satu-satunya pembeda tinggal tanda ❯ di depannya. Di Unix sebaliknya: TERM
+// kosong memang berarti tidak ada keterangan terminal sama sekali.
+func TestTermKosongBergantungSistem(t *testing.T) {
+	t.Setenv("TERM", "")
+	t.Setenv("ANJURAN_SIMPLE", "")
+	mau := runtime.GOOS != "windows"
+	if got := simpleMode(); got != mau {
+		t.Errorf("TERM kosong di %s -> %v, mau %v", runtime.GOOS, got, mau)
+	}
+
+	// ANJURAN_SIMPLE tetap menang di mana pun.
+	t.Setenv("ANJURAN_SIMPLE", "1")
+	if !simpleMode() {
+		t.Error("ANJURAN_SIMPLE harus tetap memaksa mode polos")
 	}
 }
 

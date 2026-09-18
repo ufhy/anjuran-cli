@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -193,12 +194,25 @@ func generatorTimeout() time.Duration {
 }
 
 // simpleMode mematikan warna dan sorotan pada terminal yang terbatas.
+//
+// TERM adalah kebiasaan Unix. Konsol Windows — conhost maupun Windows
+// Terminal — tidak pernah menyetelnya, sehingga menganggap TERM kosong
+// sebagai "terminal terbatas" membuat anjuran SELALU berjalan tanpa warna di
+// sana: baris yang tersorot tidak punya latar, dan tidak ada cara
+// membedakannya dari baris lain selain tanda ❯ di depannya.
+//
+// Di Windows yang menentukan justru ENABLE_VIRTUAL_TERMINAL_PROCESSING, dan
+// itu sudah dinyalakan saat konsolnya dibuka.
 func simpleMode() bool {
 	if os.Getenv("ANJURAN_SIMPLE") != "" {
 		return true
 	}
-	switch strings.ToLower(os.Getenv("TERM")) {
-	case "", "dumb", "vt100", "vt102", "ansi":
+	t := strings.ToLower(os.Getenv("TERM"))
+	if t == "" {
+		return runtime.GOOS != "windows"
+	}
+	switch t {
+	case "dumb", "vt100", "vt102", "ansi":
 		return true
 	}
 	return false
