@@ -31,12 +31,29 @@ $script:UfKey = if ($env:ANJURAN_KEY) { $env:ANJURAN_KEY } else { 'Tab' }
 # dari skrip. Di sana tidak ada tempelan yang perlu dijaga, jadi jawabannya
 # "tidak ada yang antre".
 function Test-AnjuranMasukanMenunggu {
+    # Jalur langsung: bila terminal mengirim lebih cepat daripada PSReadLine
+    # menelannya, tombol yang antre masih terlihat di buffer konsol.
     try {
-        return [Console]::KeyAvailable
+        if ([Console]::KeyAvailable) { return $true }
     } catch {
-        return $false
     }
+
+    # Jalur yang sebenarnya menangkap tempelan.
+    #
+    # PSReadLine menarik seluruh tempelan ke antreannya sendiri sebelum handler
+    # ini dipanggil, sehingga KeyAvailable menjawab kosong. Yang tersisa adalah
+    # JARAK WAKTU: tombol berikutnya yang sudah antre diproses seketika begitu
+    # handler ini kembali, sedangkan tombol dari jari selalu menyisakan jeda —
+    # ditambah waktu yang dipakai orangnya untuk membaca kotaknya.
+    #
+    # 15 ms: tombol yang antre diproses dalam hitungan mikrodetik, sementara
+    # ketikan tercepat pun menyisakan puluhan milidetik.
+    $sejak = ([datetime]::UtcNow - $script:AnjuranSelesai).TotalMilliseconds
+    return $sejak -lt 15
 }
+
+# Waktu selesainya pemicu terakhir, dipakai Test-AnjuranMasukanMenunggu.
+$script:AnjuranSelesai = [datetime]::MinValue
 
 # Set-AnjuranKey memasang satu tombol untuk mode edit apa pun.
 #
@@ -211,8 +228,9 @@ if ($env:ANJURAN_AUTO -notin @('0', 'no', 'off', 'false')) {
         # backslash sebagai escape, sehingga '\' sampai apa adanya.
         Set-AnjuranKey -Key $chord -Keterangan 'anjuran-auto' -Aksi ([scriptblock]::Create(@"
             [Microsoft.PowerShell.PSConsoleReadLine]::Insert('$karakter')
-            if (Test-AnjuranMasukanMenunggu) { return }
+            if (Test-AnjuranMasukanMenunggu) { `$script:AnjuranSelesai = [datetime]::UtcNow; return }
             Invoke-AnjuranWidget -Trigger 'auto'
+            `$script:AnjuranSelesai = [datetime]::UtcNow
 "@))
     }
 }
