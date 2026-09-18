@@ -97,7 +97,7 @@ func Prepare(ctx context.Context, t Transport, opt Options) (Plan, func(), error
 		return plan, noop, nil
 	}
 
-	src, cleanup, err := ResolveSource(opt.From, plat, opt.LocalSpecs, opt.LocalExtra)
+	src, cleanup, err := ResolveSource(opt.From, plat, opt.LocalSpecs, opt.LocalExtra, opt.Version)
 	if err != nil {
 		return Plan{}, noop, err
 	}

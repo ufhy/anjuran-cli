@@ -194,7 +194,7 @@ func TestResolveSourceMenemukanBinaryLintasSendiri(t *testing.T) {
 
 	pindah(t, dir)
 
-	src, bersihkan, err := ResolveSource("", Platform{OS: "linux", Arch: "arm64"}, nil, nil)
+	src, bersihkan, err := ResolveSource("", Platform{OS: "linux", Arch: "arm64"}, nil, nil, "dev")
 	if err != nil {
 		t.Fatalf("seharusnya ditemukan tanpa --from: %v", err)
 	}

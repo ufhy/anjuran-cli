@@ -157,8 +157,11 @@ Opsi milik anjuran ditulis **sebelum** host; apa pun setelah host diteruskan ke
 `ssh`, sehingga `-p 2222` dan `-i kunci` bekerja seperti biasa.
 
 Kalau platform host berbeda dari mesinmu, anjuran mencari binary yang sudah
-dibangun, lalu membangunnya sendiri bila perintah ini dijalankan dari dalam
-pohon sumber. Tidak pernah memakai sudo di host tujuan.
+dibangun, lalu **mengunduh berkas rilis** untuk platform host — versi yang
+sama persis dengan yang terpasang di mesinmu, checksum diperiksa — lalu
+membangunnya sendiri bila perintah ini dijalankan dari dalam pohon sumber.
+Untuk jaringan tertutup, pakai `--from`. Tidak pernah memakai sudo di host
+tujuan.
 
 ## Lingkungan
 

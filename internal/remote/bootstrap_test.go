@@ -227,7 +227,7 @@ func TestSumberTidakDitemukan(t *testing.T) {
 }
 
 func TestPlatformBerbedaTanpaSumber(t *testing.T) {
-	_, cleanup, err := ResolveSource("", Platform{OS: "plan9", Arch: "amd64"}, nil, nil)
+	_, cleanup, err := ResolveSource("", Platform{OS: "plan9", Arch: "amd64"}, nil, nil, "dev")
 	defer cleanup()
 	if err == nil {
 		t.Fatal("mau error")

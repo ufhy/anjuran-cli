@@ -143,7 +143,7 @@ type Source struct {
 //
 // from boleh kosong, sebuah direktori berisi anjuran dan specs, atau direktori
 // hasil rilis yang memuat arsip goreleaser.
-func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (Source, func(), error) {
+func ResolveSource(from string, p Platform, localSpecs, localExtra []string, versi string) (Source, func(), error) {
 	noop := func() {}
 
 	if from != "" {
@@ -159,6 +159,15 @@ func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (So
 		if dir := cariBinaryLintas(p); dir != "" {
 			return fromDir(dir, p, noop)
 		}
+		// Diunduh SEBELUM dibangun. Berkas rilis adalah binary yang sama
+		// persis dengan yang dipakai orang lain, sudah diperiksa checksum-nya,
+		// dan tidak menuntut toolchain apa pun — sedangkan hasil build lokal
+		// bergantung pada versi Go yang kebetulan terpasang di sini.
+		if src, bersihkan, err := unduhRilis(p, versi); err == nil {
+			return src, bersihkan, nil
+		} else if !errors.Is(err, errTakBisaUnduh) {
+			return Source{}, noop, err
+		}
 		if src, bersihkan, err := bangunLintas(p, localSpecs, localExtra); err == nil {
 			return src, bersihkan, nil
 		} else if !errors.Is(err, errTakBisaBangun) {
@@ -168,11 +177,11 @@ func ResolveSource(from string, p Platform, localSpecs, localExtra []string) (So
 		// tidak kelihatan. Tanpa disebut di sini, kegagalannya terbaca
 		// sebagai "fitur ini tidak ada" padahal syaratnya cuma satu.
 		return Source{}, noop, fmt.Errorf(
-			"host adalah %s sedangkan mesin ini %s/%s.\n"+
+			"host adalah %s sedangkan mesin ini %s/%s, dan berkas rilisnya tidak bisa diunduh.\n"+
 				"  Tiga jalan keluar:\n"+
 				"    - jalankan perintah ini dari dalam pohon sumber anjuran; binary-nya dibangun sendiri\n"+
 				"    - `make cross` lalu --from bin\n"+
-				"    - `make snapshot` lalu --from dist",
+				"    - unduh arsip rilis untuk platform host, lalu --from <direktorinya>",
 			p, runtime.GOOS, runtime.GOARCH)
 	}
 
@@ -308,11 +317,12 @@ func extractArchive(arc string, p Platform) (Source, func(), error) {
 		return Source{}, noop, fmt.Errorf("arsip %s tidak memuat binary anjuran", filepath.Base(arc))
 	}
 
-	specs := filepath.Join(dir, "specs")
-	if fi, err := os.Stat(specs); err != nil || !fi.IsDir() {
-		specs = ""
-	}
-	return Source{Binary: bin, Specs: specs, Origin: filepath.Base(arc)}, cleanup, nil
+	return Source{
+		Binary: bin,
+		Specs:  subdirJikaAda(dir, "specs"),
+		Extra:  subdirJikaAda(dir, "extra"),
+		Origin: filepath.Base(arc),
+	}, cleanup, nil
 }
 
 // untar membongkar tar.gz ke dalam dir.
