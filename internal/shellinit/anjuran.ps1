@@ -46,10 +46,29 @@ function Test-AnjuranMasukanMenunggu {
     # handler ini kembali, sedangkan tombol dari jari selalu menyisakan jeda —
     # ditambah waktu yang dipakai orangnya untuk membaca kotaknya.
     #
-    # 15 ms: tombol yang antre diproses dalam hitungan mikrodetik, sementara
-    # ketikan tercepat pun menyisakan puluhan milidetik.
+    # Ambangnya 120 ms, dan itu HARUS jauh lebih besar daripada "secepat
+    # mungkin": di antara dua pemicu, anjuran sendiri berjalan 20–60 ms —
+    # menumbuhkan proses, memuat spec, menggambar. Ambang 15 ms tidak pernah
+    # aktif sama sekali karena waktu itu selalu terlampaui.
+    #
+    # Yang dibandingkan bukan kecepatan mesin melainkan kecepatan ORANG:
+    # sesudah kotak muncul, orang membacanya dulu sebelum mengetik kata
+    # berikutnya, dan itu tidak pernah selesai dalam seperdelapan detik.
     $sejak = ([datetime]::UtcNow - $script:AnjuranSelesai).TotalMilliseconds
-    return $sejak -lt 15
+
+    # Pencatat diagnosa: ANJURAN_LOG_PEMICU berisi path berkas.
+    #
+    # Tempelan hanya bisa diamati dari terminal sungguhan, dan angkanya
+    # berbeda tiap mesin. Tanpa ini, menyetel ambangnya berarti menebak.
+    if ($env:ANJURAN_LOG_PEMICU) {
+        try {
+            "sejak=$([int]$sejak)ms ambang=120 antre=$($sejak -lt 120)" |
+                Add-Content -Path $env:ANJURAN_LOG_PEMICU -ErrorAction SilentlyContinue
+        } catch {
+        }
+    }
+
+    return $sejak -lt 120
 }
 
 # Waktu selesainya pemicu terakhir, dipakai Test-AnjuranMasukanMenunggu.
@@ -194,6 +213,29 @@ Set-AnjuranKey -Key $script:UfKey -Keterangan 'anjuran' -Aksi {
 # NYALA secara bawaan. Matikan dengan $env:ANJURAN_AUTO = '0'.
 
 $script:AnjuranPemicu = @(' ', '/', '\', '=')
+
+# Di PowerShell pemicu otomatis MATI secara bawaan. Ini satu-satunya shell
+# yang begitu, dan alasannya bukan selera melainkan kerusakan.
+#
+# Saat kotak terbuka, anjuran membaca konsol langsung — sementara thread
+# pembaca PSReadLine juga masih membaca konsol yang sama. Selama pengguna
+# mengetik, itu tidak kelihatan: tombolnya datang satu per satu dan yang
+# sedang menunggu mengambilnya. Begitu ada masukan yang MENGANTRE — tempelan
+# — karakternya terbelah di antara keduanya.
+#
+# Akibatnya bukan kotak yang mengganggu, melainkan perintah yang RUSAK:
+# menempel "git log --oneline" bisa berakhir menjadi "git gilog 'AppData\'=",
+# karena sebagian karakter masuk ke kotak sebagai penyaring lalu tersisip
+# sebagai kandidat. Perintah yang disalin orang lalu berubah tanpa ia sadari.
+#
+# Tidak ada ambang waktu yang bisa memperbaikinya: dua pembaca yang berebut
+# satu konsol bukan soal cepat atau lambat. zsh, bash, dan fish tidak punya
+# masalah ini karena di sana shell-nya berhenti membaca selama widget
+# berjalan.
+#
+# Tab tetap bekerja, dan di sana tidak ada yang mengantre.
+# Nyalakan dengan sadar: $env:ANJURAN_AUTO = '1'.
+if (-not $env:ANJURAN_AUTO) { $env:ANJURAN_AUTO = '0' }
 
 # Mematikan pemicu berarti MENGEMBALIKAN tombolnya, bukan sekadar tidak
 # memasangnya.

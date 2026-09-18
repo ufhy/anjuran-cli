@@ -110,6 +110,15 @@ Di dalam kotak:
 
 Matikan pemicu otomatis dengan `ANJURAN_AUTO=0`; Tab tetap jalan.
 
+**Di PowerShell pemicu otomatis mati secara bawaan, dan Tab yang dipakai.**
+Sementara kotak terbuka, anjuran membaca konsol langsung — dan thread pembaca
+PSReadLine juga masih membaca konsol yang sama. Selama kamu mengetik itu tidak
+terlihat, tetapi begitu ada masukan yang mengantre — sebuah tempelan —
+karakternya terbelah di antara keduanya, dan perintah yang kamu tempel bisa
+berubah isinya. zsh, bash, dan fish tidak punya masalah ini karena di sana
+shell berhenti membaca selama widget berjalan. Nyalakan dengan sadar lewat
+`$env:ANJURAN_AUTO = '1'` bila kamu jarang menempel.
+
 ## Yang didukung
 
 Keempat shell mendapat fitur yang sama, dan itu diuji — bukan diasumsikan.
