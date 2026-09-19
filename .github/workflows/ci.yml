@@ -108,6 +108,20 @@ jobs:
           go-version: '1.25'
           cache: true
 
+      # Korpusnya WAJIB dibangun di sini.
+      #
+      # BenchmarkMuatDingin melewati dirinya sendiri bila specs/ tidak ada,
+      # dan pemeriksaan ambang di bawah lalu gagal dengan "tidak ditemukan di
+      # keluaran". Job ini karena itu merah sejak hari ia ditambahkan — dan
+      # yang diukurnya justru muat dingin, satu-satunya angka yang tidak bisa
+      # diukur tanpa korpus sungguhan.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: bangun spec
+        run: make specs
+
       - name: benchmark
         run: make bench | tee bench.txt
 
