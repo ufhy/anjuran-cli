@@ -61,6 +61,17 @@ def siapkan_pemasangan():
         asal = os.path.join(REPO, nama)
         if os.path.isdir(asal):
             shutil.copytree(asal, os.path.join(d, nama))
+
+    # Perintah palsu untuk menguji completion nama perintah dari PATH.
+    #
+    # Sebelumnya skenarionya mencari "kubectl", yang kebetulan terpasang di
+    # mesin penulisnya dan tidak ada di CI. Uji yang bergantung pada isi PATH
+    # mesin orang lain akan gagal karena alasan yang tidak ada hubungannya
+    # dengan anjuran.
+    palsu = os.path.join(d, "anjuranuji")
+    with open(palsu, "w") as f:
+        f.write("#!/bin/sh\necho anjuranuji\n")
+    os.chmod(palsu, 0o755)
     return d
 
 
@@ -97,8 +108,25 @@ def siapkan_sandbox():
     # ditampilkan.
     for f in ["dalam-satu.txt", "dalam-dua.txt"]:
         open(os.path.join(d, "berkas", f), "w").close()
+    # Satu subdirektori di dalamnya, supaya menelusuri "cd berkas/" punya
+    # kandidat. Tanpa itu anjuran menjawab "tidak ada", shell jatuh ke
+    # completion bawaannya, dan hasil skenarionya ditentukan konfigurasi zsh
+    # mesin yang menjalankannya — bukan oleh anjuran.
+    os.makedirs(os.path.join(d, "berkas", "dalam-folder"), exist_ok=True)
     subprocess.run(["git", "init", "-q", d], check=False)
-    env = {"GIT_DIR": os.path.join(d, ".git"), "GIT_WORK_TREE": d}
+    # Identitas disetel lewat lingkungan, bukan mengandalkan konfigurasi
+    # global. Mesin CI dan container tidak punya user.name maupun user.email,
+    # dan tanpa keduanya `git commit` gagal — sehingga tidak ada commit, tidak
+    # ada branch, dan skenario branch gagal karena alasan yang tidak ada
+    # hubungannya dengan anjuran.
+    env = {
+        "GIT_DIR": os.path.join(d, ".git"),
+        "GIT_WORK_TREE": d,
+        "GIT_AUTHOR_NAME": "uxtest",
+        "GIT_AUTHOR_EMAIL": "uxtest@example.invalid",
+        "GIT_COMMITTER_NAME": "uxtest",
+        "GIT_COMMITTER_EMAIL": "uxtest@example.invalid",
+    }
     e = dict(os.environ, **env)
     subprocess.run(["git", "-C", d, "commit", "-q", "--allow-empty", "-m", "awal"],
                    check=False, env=e, capture_output=True)
@@ -130,7 +158,12 @@ SHELL = {
     },
     "fish": {
         "argv": ["/usr/bin/fish", "-i"],
-        "prompt": "function fish_prompt; echo -n '% '; end",
+        # Saran otomatis dan sapaan awal ikut menggambar ke layar, dan
+        # keduanya membuat harness mengetik sebelum shell benar-benar diam.
+        # Yang diuji di sini kotak anjuran, bukan hiasan fish.
+        "prompt": ("function fish_prompt; echo -n '% '; end; "
+                   "function fish_greeting; end; "
+                   "set -g fish_autosuggestion_enabled 0"),
         # fish tidak mengenal awalan VAR=nilai di depan perintah, jadi
         # variabelnya disetel sebagai perintah tersendiri.
         "muat": lambda env: "; ".join(
@@ -150,6 +183,13 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         # milik pengguna tidak ikut berubah saat pengujian.
         "ANJURAN_CACHE_DIR": cachedir,
     }
+    # Generator dimatikan saat berjalan sebagai root — kebijakan keamanan
+    # anjuran, dan benar. Tetapi container pengembangan biasanya root, dan di
+    # sana skenario yang mengandalkan generator gagal karena alasan yang tidak
+    # ada hubungannya dengan apa yang diuji. Diteruskan bila memang disetel.
+    for v in ("ANJURAN_GENERATOR_ALLOW_ROOT",):
+        if os.environ.get(v):
+            env[v] = os.environ[v]
     sh = SHELL[shell]
     s = term.Sesi(sh["argv"], cwd=sandbox, env=env, rows=rows)
     try:
@@ -314,8 +354,10 @@ SKENARIO = [
      [b"g", b"i", b"t"], tanpa("commit", "checkout")),
     ("Tab pada nama perintah memunculkan isinya",
      [b"git", b"\t"], memuat("checkout", "commit")),
+    # Perintahnya disediakan sendiri oleh siapkan_pemasangan, bukan diambil
+    # dari isi PATH mesin yang kebetulan menjalankan uji ini.
     ("Tab melengkapi nama perintah dari PATH",
-     [b"kubec", b"\t"], memuat("kubectl")),
+     [b"anjuranu", b"\t"], memuat("anjuranuji")),
     # Bawaannya nyala: tanpa menyetel apa pun, kotaknya tetap muncul.
     ("pemicu otomatis nyala tanpa disetel",
      [b"git", b" "], memuat("commit")),
@@ -514,9 +556,13 @@ SKENARIO = [
     # Keutuhan barisnya diperiksa dengan MENJALANKANNYA: "gre" yang dibiarkan
     # apa adanya harus sampai ke shell sebagai satu perintah yang dicari, bukan
     # terpotong atau tertukar oleh kotak yang sempat terbuka.
+    # Susunan kalimat galatnya berbeda tiap shell — zsh menulis
+    # "command not found: gre", bash "bash: gre: command not found" — jadi
+    # yang diperiksa keduanya terpisah. Yang diuji di sini perintahnya sampai
+    # utuh ke shell, bukan kalimat siapa yang dipakai.
     ("pemicu sesudah pipa tidak merusak baris",
      [b"echo hai", b" ", b"|", b" ", b"gre", b"\x1b", b"\r"],
-     memuat("command not found: gre")),
+     gabung(memuat("command not found"), memuat("gre"))),
     ("opsi panjang dengan sama dengan",
      [b"kubectl", b" ", b"get", b" ", b"pods", b" ", b"--output", b"="], memuat("json")),
 
@@ -611,8 +657,18 @@ def main():
     pekerja = int(os.environ.get("PARALEL", str(bawaan)))
 
     tugas = []
+    # Bayangan riwayat hanya ada di zsh, dan itu keputusan yang tercatat:
+    # readline tidak punya kait per-ketikan maupun tempat menggambar teks di
+    # luar buffer, sedangkan fish dan PowerShell memakai fitur bawaan
+    # shell-nya. Menjalankan skenarionya di sana berarti menguji ketiadaan.
+    KHUSUS_ZSH = ("bayangan",)
+
+    dilewati = 0
     for nama, ketikan, periksa in SKENARIO:
         if saring and saring not in nama:
+            continue
+        if shell != "zsh" and any(k in nama for k in KHUSUS_ZSH):
+            dilewati += 1
             continue
         # auto punya TIGA keadaan, dan nama skenario yang memilihnya:
         #   "tanpa disetel"      -> tidak menyetel apa pun; menguji bawaannya
@@ -653,7 +709,8 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=pekerja) as kolam:
         list(kolam.map(kerjakan, tugas))
 
-    print(f"\n{h.lulus} lulus, {len(h.gagal)} gagal")
+    lewat = f", {dilewati} dilewati (khusus zsh)" if dilewati else ""
+    print(f"\n{h.lulus} lulus, {len(h.gagal)} gagal{lewat}")
     for nama, alasan in h.gagal:
         print(f"\n=== {nama} ===\n{alasan}")
     return 1 if h.gagal else 0

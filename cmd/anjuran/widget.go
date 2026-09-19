@@ -44,6 +44,11 @@ func runWidget(args []string) int {
 	sel := fs.String("select", "first", "baris yang tersorot saat dibuka: first, last, atau none")
 	alias := fs.String("alias", "", "pemekaran alias untuk kata pertama")
 	trigger := fs.String("trigger", "manual", "asal pemicu: manual (Tab) atau auto (karakter pemicu)")
+	// Hanya zsh yang bisa mengembalikan tombol ke antrean masukannya. Shell
+	// lain tidak menyebutkan opsi ini, dan di sana huruf yang telanjur terbaca
+	// disisipkan ke dalam baris alih-alih dikembalikan — kalau tidak, ia
+	// hilang begitu saja.
+	sisaBalik := fs.Bool("sisa-balik", false, "shell pemanggil bisa menerima tombol yang dikembalikan")
 	specsDir := fs.String("specs", "", "direktori spec")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -69,7 +74,7 @@ func runWidget(args []string) int {
 	// kembali ke baris asli sebelum diserahkan ke shell.
 	ax := newAliasExpansion(*line, byteCursor, *alias)
 	st, outcome, sisa, err := interact(eng,
-		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start, manual)
+		ui.State{Line: ax.Line(*line), Cursor: ax.Cursor(byteCursor)}, start, manual, *sisaBalik)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "anjuran:", err)
 		return 1
@@ -131,7 +136,7 @@ func modeIkon() string {
 }
 
 // interact membuka terminal, menjalankan sesi, lalu memulihkan mode terminal.
-func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State, ui.Outcome, ui.Leftover, error) {
+func interact(eng *engine.Engine, st ui.State, start int, manual, sisaBalik bool) (ui.State, ui.Outcome, ui.Leftover, error) {
 	// Kandidat dihitung lebih dulu. Nol atau satu kandidat tidak memerlukan
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	// Ingatan pilihan disimpan di disk: setiap penekanan tombol pemicu adalah
@@ -161,7 +166,7 @@ func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State
 	rend := ui.NewRenderer(draw, w, h, simpleMode())
 	rend.Ikon(modeIkon())
 
-	sesi := pre.Session(term, rend).StartAt(start)
+	sesi := pre.Session(term, rend).StartAt(start).DukungSisa(sisaBalik)
 	st2, outcome, err := sesi.Run()
 	return st2, outcome, sesi.Leftover(), err
 }

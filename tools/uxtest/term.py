@@ -58,6 +58,13 @@ class Layar:
                     self.row, self.col = self.saved[0], self.saved[1]
                     i += 2
                     continue
+                # Pemilih charset: ESC ( B dan kerabatnya. Tiga byte, tanpa
+                # pengaruh pada gambar. Tanpa dilompati, dua byte sesudah ESC
+                # tercetak sebagai teks dan setiap baris fish terbaca sebagai
+                # ketikan yang berantakan — "(B" bertaburan di layar.
+                if teks[i:i + 1] == "\x1b" and teks[i + 1:i + 2] in "()*+":
+                    i += 3
+                    continue
                 # OSC diakhiri BEL atau ST; isinya bukan gambar.
                 if teks[i:i + 2] == "\x1b]":
                     j = teks.find("\x07", i)
@@ -84,6 +91,19 @@ class Layar:
                         for y in range(self.row, self.rows):
                             for x in range(self.cols):
                                 self.grid[y][x] = " "
+                    elif op == "G":
+                        # Kolom ABSOLUT, dihitung dari 1. fish memakainya di
+                        # setiap penggambaran ulang; tanpa dimodelkan, teksnya
+                        # mendarat di kolom yang salah dan seluruh layar
+                        # terbaca seperti ketikan yang berantakan.
+                        self.col = max(0, min(self.cols - 1, n - 1))
+                    elif op in ("H", "f"):
+                        # Baris dan kolom absolut, keduanya dihitung dari 1.
+                        bagian = (arg or "").split(";")
+                        r = int(bagian[0]) if bagian[0].isdigit() else 1
+                        c = int(bagian[1]) if len(bagian) > 1 and bagian[1].isdigit() else 1
+                        self.row = max(0, min(self.rows - 1, r - 1))
+                        self.col = max(0, min(self.cols - 1, c - 1))
                     i += m.end()
                     continue
                 i += 1

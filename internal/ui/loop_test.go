@@ -144,7 +144,8 @@ func TestKursorDiTengahMenolakKetikan(t *testing.T) {
 	// shell, sehingga tetap tersisip — hanya oleh zsh, bukan oleh kita.
 	key := tty.Key{Type: tty.KeyRune, Rune: 'c', Raw: []byte("c")}
 	term := &fakeTerm{keys: []tty.Key{key}}
-	s := NewSession(newEngine(), term, discard(), State{Line: "git  --verbose", Cursor: 4})
+	s := NewSession(newEngine(), term, discard(), State{Line: "git  --verbose", Cursor: 4}).
+		DukungSisa(true)
 	st, _, err := s.Run()
 	if err != nil {
 		t.Fatal(err)
@@ -457,13 +458,62 @@ func TestTombolAsingDikembalikan(t *testing.T) {
 
 	for _, tt := range tests {
 		term := &fakeTerm{keys: []tty.Key{tt.key}}
-		s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+		s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4}).
+			DukungSisa(true)
 		if _, _, err := s.Run(); err != nil {
 			t.Fatalf("%s: %v", tt.nama, err)
 		}
 		if string(s.Leftover()) != string(tt.key.Raw) {
 			t.Errorf("%s: Leftover = %q, mau %q", tt.nama, s.Leftover(), tt.key.Raw)
 		}
+	}
+}
+
+// Shell yang tidak bisa menerima tombol kembali mendapat HURUFNYA di dalam
+// baris, bukan kehilangannya.
+//
+// Hanya zsh punya `zle -U`. Di bash, fish, dan PowerShell apa pun yang
+// dikembalikan hilang — dan yang hilang adalah huruf yang baru saja diketik
+// orangnya. Mengetik "git zzqq" cepat-cepat berakhir menjadi "git z".
+func TestTanpaDukunganSisaHurufMasukKeBaris(t *testing.T) {
+	// Ketikan cepat tiba dalam satu bongkahan: huruf pertama menutup sesi
+	// karena tidak ada yang cocok, sisanya masih menunggu di penyangga.
+	term := &fakeTerm{keys: []tty.Key{
+		{Type: tty.KeyRune, Rune: 'z', Raw: []byte("z")},
+		{Type: tty.KeyRune, Rune: 'z', Raw: []byte("z")},
+		{Type: tty.KeyRune, Rune: 'q', Raw: []byte("q")},
+		{Type: tty.KeyRune, Rune: 'q', Raw: []byte("q")},
+	}}
+	s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+
+	st, _, err := s.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Line != "git zzqq" {
+		t.Errorf("Line = %q, mau %q", st.Line, "git zzqq")
+	}
+	if len(s.Leftover()) != 0 {
+		t.Errorf("Leftover = %q, mau kosong — shell ini tidak bisa menerimanya", s.Leftover())
+	}
+}
+
+// Tombol kendali tidak punya wujud di dalam baris perintah; memasukkannya
+// justru mengotori perintah yang akan dijalankan.
+func TestTanpaDukunganSisaTombolKendaliDibuang(t *testing.T) {
+	term := &fakeTerm{keys: []tty.Key{
+		{Type: tty.KeyUnknown, Raw: []byte{0x1c}},
+		{Type: tty.KeyCtrlC, Raw: []byte{0x03}},
+		{Type: tty.KeyRune, Rune: 'a', Raw: []byte("a")},
+	}}
+	s := NewSession(newEngine(), term, discard(), State{Line: "git ", Cursor: 4})
+
+	st, _, err := s.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Line != "git a" {
+		t.Errorf("Line = %q, mau %q — hanya hurufnya yang diselamatkan", st.Line, "git a")
 	}
 }
 
@@ -928,7 +978,8 @@ func TestBackspaceMenutupKotak(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sesi := p.Session(term, discard())
+	// Jalur zsh: di sanalah backspace benar-benar bisa dikembalikan.
+	sesi := p.Session(term, discard()).DukungSisa(true)
 	st, out, err := sesi.Run()
 	if err != nil {
 		t.Fatal(err)

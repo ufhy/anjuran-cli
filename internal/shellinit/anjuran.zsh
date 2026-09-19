@@ -93,7 +93,7 @@ _anjuran_widget() {
   _anjuran_alias
   # Dropdown digambar anjuran langsung ke /dev/tty; stdout hanya membawa hasil.
   out="$(command anjuran widget --line "$BUFFER" --cursor "$CURSOR" \
-    --select "$select_from" --trigger "$trigger" \
+    --select "$select_from" --trigger "$trigger" --sisa-balik \
     --alias "$_anjuran_alias_exp" 2>/dev/null)"
 
   if [[ -z $out ]]; then

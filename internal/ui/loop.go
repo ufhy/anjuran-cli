@@ -190,6 +190,11 @@ type Session struct {
 	// leftover menampung tombol yang harus dikembalikan ke shell.
 	leftover Leftover
 
+	// sisaDidukung menandai shell pemanggil bisa menerima tombol yang
+	// dikembalikan. Hanya zsh yang bisa; di shell lain sisa itu hilang, jadi
+	// huruf yang terbaca disisipkan ke dalam baris alih-alih dikembalikan.
+	sisaDidukung bool
+
 	// manual menandakan sesi dibuka karena pengguna menekan tombol completion,
 	// bukan karena mengetik karakter pemicu.
 	manual bool
@@ -206,8 +211,58 @@ func (s *Session) Leftover() Leftover { return s.leftover }
 // bersama proses ini — dan itu terasa sebagai karakter yang kadang tidak
 // muncul, kegagalan yang jauh lebih mengganggu daripada dropdown yang menutup.
 func (s *Session) selesai(raw []byte, st State, out Outcome) (State, Outcome, error) {
-	s.leftover = append(append(Leftover(nil), raw...), s.term.Drain()...)
+	sisa := append(append([]byte(nil), raw...), s.term.Drain()...)
+
+	// Shell yang tidak bisa menerima tombol kembali mendapat perlakuan lain.
+	//
+	// Hanya zsh punya cara mengembalikan tombol ke antrean masukannya
+	// (`zle -U`). Di bash, fish, dan PowerShell, apa pun yang dikembalikan
+	// HILANG — dan yang hilang adalah huruf yang baru saja diketik orangnya.
+	// Mengetik "git zzqq" cepat-cepat berakhir menjadi "git z".
+	//
+	// Huruf yang bisa diselamatkan disisipkan langsung ke dalam baris, karena
+	// di situlah tempatnya seharusnya. Tombol kendali memang tidak bisa
+	// diselamatkan dengan cara ini, dan dibuang — tetapi kehilangan satu
+	// Ctrl-A jauh lebih ringan daripada kehilangan ketikan.
+	if !s.sisaDidukung {
+		st = s.sisipkanTerbaca(st, sisa)
+		s.leftover = nil
+		return st, out, nil
+	}
+
+	s.leftover = sisa
 	return st, out, nil
+}
+
+// sisipkanTerbaca menyisipkan huruf yang bisa dicetak dari sisa masukan.
+func (s *Session) sisipkanTerbaca(st State, sisa []byte) State {
+	var b strings.Builder
+	for _, r := range string(sisa) {
+		// Tombol kendali dan escape sequence tidak punya wujud di dalam baris
+		// perintah; memasukkannya justru mengotori perintah yang akan
+		// dijalankan.
+		if r >= 0x20 && r != 0x7f {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return st
+	}
+
+	c := st.Cursor
+	if c < 0 || c > len(st.Line) {
+		c = len(st.Line)
+	}
+	st.Line = st.Line[:c] + b.String() + st.Line[c:]
+	st.Cursor = c + b.Len()
+	return st
+}
+
+// DukungSisa menandai bahwa shell pemanggil bisa menerima tombol yang
+// dikembalikan. Bawaannya tidak: hanya zsh yang mampu.
+func (s *Session) DukungSisa(v bool) *Session {
+	s.sisaDidukung = v
+	return s
 }
 
 // StartAt menentukan baris yang tersorot saat sesi dibuka.
@@ -476,6 +531,21 @@ func (s *Session) Run() (State, Outcome, error) {
 			// perlu menghitung kolom sama sekali. Seluruh pembukuan gema untuk
 			// menghapus — berikut jaring pengaman agar tidak menembus prompt —
 			// menjadi tidak diperlukan bersama ini.
+			//
+			// Itu hanya berlaku bila shell-nya BISA menerima tombol kembali.
+			// Di bash, fish, dan PowerShell backspace yang dikembalikan hilang,
+			// sehingga menghapus terasa melewatkan satu tekanan: "cd " yang
+			// dihapus tiga kali menyisakan "c". Di sana anjuran menghapusnya
+			// sendiri dan menyerahkan baris yang sudah benar.
+			if !s.sisaDidukung {
+				st := s.st
+				if st.Cursor > 0 {
+					_, lebar := utf8.DecodeLastRuneInString(st.Line[:st.Cursor])
+					st.Line = st.Line[:st.Cursor-lebar] + st.Line[st.Cursor:]
+					st.Cursor -= lebar
+				}
+				return s.selesai(nil, st, Accepted)
+			}
 			return s.selesai(key.Raw, s.st, Accepted)
 
 		case KeyRight:

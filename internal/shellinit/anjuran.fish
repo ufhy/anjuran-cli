@@ -93,9 +93,13 @@ function _anjuran_bind --description 'Pasang tombol pemicu anjuran'
     bind $key _anjuran_widget
     # fish memisahkan mode default dan insert saat binding vi aktif; tanpa
     # baris ini tombolnya mati begitu pengguna memakai mode vi.
-    if bind --help 2>/dev/null | string match -q '*-M*'
-        bind -M insert $key _anjuran_widget 2>/dev/null
-    end
+    # Dicoba langsung, tanpa bertanya lebih dulu.
+    #
+    # Sebelumnya dukungannya diperiksa dengan `bind --help`, dan fish 4
+    # menjawabnya dengan MENCETAK SELURUH HALAMAN MANUAL ke terminal — setiap
+    # kali shell dibuka. Kegagalan `bind -M` sendiri tidak berbahaya: ia
+    # hanya berarti mode vi tidak tersedia, dan galatnya sudah dibungkam.
+    bind -M insert $key _anjuran_widget 2>/dev/null
 
     # Pemicu otomatis: kotak muncul begitu sebuah kata selesai ditulis, bukan
     # sambil mengetik. Sama persis dengan yang dipasang integrasi zsh dan bash
@@ -109,11 +113,9 @@ function _anjuran_bind --description 'Pasang tombol pemicu anjuran'
     bind ' ' _anjuran_spasi
     bind / _anjuran_garismiring
     bind = _anjuran_samadengan
-    if bind --help 2>/dev/null | string match -q '*-M*'
-        bind -M insert ' ' _anjuran_spasi 2>/dev/null
-        bind -M insert / _anjuran_garismiring 2>/dev/null
-        bind -M insert = _anjuran_samadengan 2>/dev/null
-    end
+    bind -M insert ' ' _anjuran_spasi 2>/dev/null
+    bind -M insert / _anjuran_garismiring 2>/dev/null
+    bind -M insert = _anjuran_samadengan 2>/dev/null
 end
 
 # _anjuran_alias mencari arti alias untuk kata pertama segmen TERAKHIR.
