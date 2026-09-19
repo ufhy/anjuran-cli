@@ -2,6 +2,7 @@ package remote
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -290,12 +291,79 @@ func findArchive(dir string, p Platform) string {
 	return ""
 }
 
+// unzip membongkar arsip zip ke dalam dir.
+//
+// Arsip rilis Windows berbentuk zip, dan tanpa ini `anjuran up` ke host
+// Windows berhenti sebelum mulai — padahal seluruh langkah lainnya sudah
+// bekerja di sana.
+func unzip(arc, dir string) error {
+	zr, err := zip.OpenReader(arc)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+
+	for _, f := range zr.File {
+		// Entri arsip berasal dari berkas yang bisa saja disusun pihak lain;
+		// path yang menunjuk keluar direktori tujuan ditolak. Nama di dalam
+		// zip selalu memakai garis miring, apa pun sistem yang membuatnya.
+		name := filepath.Clean(filepath.FromSlash(f.Name))
+		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
+			continue
+		}
+		dst := filepath.Join(dir, name)
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(dst, 0o755); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+
+		// Bit eksekusi dipertahankan bila ada. Zip yang dibuat di Windows
+		// tidak menyimpannya sama sekali, dan di sana memang tidak berarti
+		// apa-apa — tetapi zip yang dibuat goreleaser di Linux menyimpannya,
+		// dan binary yang kehilangan bitnya tidak bisa dijalankan di host
+		// Unix mana pun.
+		mode := f.Mode().Perm()
+		if mode == 0 {
+			mode = 0o644
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		// Disalin dengan batas: arsip yang mengaku kecil tetapi mengembang
+		// tanpa henti adalah cara paling murah menghabiskan disk orang lain.
+		_, err = io.Copy(out, io.LimitReader(rc, maksIsiArsip))
+		rc.Close()
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// maksIsiArsip membatasi ukuran satu entri arsip. Binary anjuran sekitar 12 MB;
+// 256 MB memberi ruang lebih dari cukup tanpa membiarkan arsip yang disusun
+// jahat menulis tanpa batas.
+const maksIsiArsip = 256 << 20
+
 // extractArchive membongkar arsip rilis ke direktori sementara.
 func extractArchive(arc string, p Platform) (Source, func(), error) {
 	noop := func() {}
-	if strings.HasSuffix(arc, ".zip") {
-		return Source{}, noop, fmt.Errorf("arsip zip belum didukung sebagai sumber; pakai direktori hasil ekstraksinya")
-	}
 
 	dir, err := os.MkdirTemp("", "anjuran-src-")
 	if err != nil {
@@ -303,7 +371,11 @@ func extractArchive(arc string, p Platform) (Source, func(), error) {
 	}
 	cleanup := func() { os.RemoveAll(dir) }
 
-	if err := untar(arc, dir); err != nil {
+	bongkar := untar
+	if strings.HasSuffix(arc, ".zip") {
+		bongkar = unzip
+	}
+	if err := bongkar(arc, dir); err != nil {
 		cleanup()
 		return Source{}, noop, err
 	}

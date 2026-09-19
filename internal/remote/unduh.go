@@ -127,15 +127,13 @@ func unduhRilis(p Platform, versi string) (Source, func(), error) {
 		return Source{}, noop, errTakBisaUnduh
 	}
 
-	// extractArchive hanya membongkar tar.gz. Host Windows tetap bisa dipasang
-	// lewat --from; yang tidak boleh terjadi adalah mengunduh 7 MB lalu baru
-	// mengaku tidak bisa membongkarnya.
-	if p.OS == "windows" {
-		return Source{}, noop, errTakBisaUnduh
-	}
-
 	polos := strings.TrimPrefix(versi, "v")
+	// Rilis Windows dikemas zip, sisanya tar.gz — mengikuti kebiasaan tiap
+	// sistem, dan itulah yang dihasilkan goreleaser.
 	nama := fmt.Sprintf("anjuran_%s_%s_%s.tar.gz", polos, p.OS, p.Arch)
+	if p.OS == "windows" {
+		nama = fmt.Sprintf("anjuran_%s_%s_%s.zip", polos, p.OS, p.Arch)
+	}
 	asal := os.Getenv(EnvAsalRilis)
 	if asal == "" {
 		asal = "https://github.com/" + UnduhRepo + "/releases/download"
