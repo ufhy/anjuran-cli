@@ -202,11 +202,22 @@ type Subcommand struct {
 	// tertentu: "php artisan" hanya ada di proyek Laravel, "npm run" hanya
 	// berguna bila ada package.json. Menawarkannya di mana-mana membuat
 	// daftarnya berbohong tentang apa yang sebenarnya bisa dijalankan.
-	WhenFile           string `json:"whenFile,omitempty"`
-	RequiresSubcommand bool   `json:"requiresSubcommand,omitempty"`
-	IsDangerous        bool   `json:"isDangerous,omitempty"`
-	Hidden             bool   `json:"hidden,omitempty"`
-	Deprecated         bool   `json:"deprecated,omitempty"`
+	WhenFile string `json:"whenFile,omitempty"`
+	// Contoh adalah baris perintah yang HARUS menjawab sesuatu.
+	//
+	// Hanya dipakai spec tulisan tangan di extra/, dan ada demi ujinya: spec
+	// yang diterima dari orang lain harus bisa dibuktikan menjawab, bukan
+	// sekadar bisa diurai. Menaruhnya di dalam berkas specnya sendiri membuat
+	// sumbangan cukup satu berkas — contoh yang terpisah akan lupa diperbarui
+	// saat specnya berubah.
+	//
+	// Namanya berawalan anjuran supaya tidak pernah bentrok dengan bidang Fig.
+	Contoh []string `json:"anjuranContoh,omitempty"`
+
+	RequiresSubcommand bool `json:"requiresSubcommand,omitempty"`
+	IsDangerous        bool `json:"isDangerous,omitempty"`
+	Hidden             bool `json:"hidden,omitempty"`
+	Deprecated         bool `json:"deprecated,omitempty"`
 }
 
 // FindSubcommand mencari subcommand berdasarkan nama atau alias.

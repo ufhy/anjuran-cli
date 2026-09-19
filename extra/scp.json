@@ -1,7 +1,22 @@
 {
   "name": "scp",
+  "anjuranContoh": [
+    "scp "
+  ],
   "args": [
-    { "name": "source", "template": ["filepaths", "anjuran:hosts"] },
-    { "name": "target", "template": ["filepaths", "anjuran:hosts"] }
+    {
+      "name": "source",
+      "template": [
+        "filepaths",
+        "anjuran:hosts"
+      ]
+    },
+    {
+      "name": "target",
+      "template": [
+        "filepaths",
+        "anjuran:hosts"
+      ]
+    }
   ]
 }

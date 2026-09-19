@@ -1,5 +1,8 @@
 {
   "name": "make",
+  "anjuranContoh": [
+    "make "
+  ],
   "description": "Bangun target dari Makefile",
   "args": [
     {

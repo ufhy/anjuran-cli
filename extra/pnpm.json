@@ -1,5 +1,8 @@
 {
   "name": "pnpm",
+  "anjuranContoh": [
+    "pnpm run "
+  ],
   "subcommands": [
     {
       "name": [

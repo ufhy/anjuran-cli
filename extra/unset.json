@@ -1,4 +1,15 @@
 {
   "name": "unset",
-  "args": [{ "name": "variable", "isVariadic": true, "template": ["anjuran:env"] }]
+  "anjuranContoh": [
+    "unset "
+  ],
+  "args": [
+    {
+      "name": "variable",
+      "isVariadic": true,
+      "template": [
+        "anjuran:env"
+      ]
+    }
+  ]
 }

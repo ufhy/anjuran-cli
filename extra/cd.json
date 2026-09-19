@@ -1,9 +1,14 @@
 {
   "name": "cd",
+  "anjuranContoh": [
+    "cd "
+  ],
   "args": [
     {
       "name": "folder",
-      "template": ["folders"]
+      "template": [
+        "folders"
+      ]
     }
   ]
 }

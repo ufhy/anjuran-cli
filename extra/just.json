@@ -1,5 +1,8 @@
 {
   "name": "just",
+  "anjuranContoh": [
+    "just "
+  ],
   "description": "Jalankan resep dari justfile",
   "args": [
     {

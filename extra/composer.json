@@ -1,5 +1,8 @@
 {
   "name": "composer",
+  "anjuranContoh": [
+    "composer run-script "
+  ],
   "description": "Manajer dependensi PHP",
   "args": [
     {

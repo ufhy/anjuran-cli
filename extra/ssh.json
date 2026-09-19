@@ -1,15 +1,60 @@
 {
   "name": "ssh",
+  "anjuranContoh": [
+    "ssh "
+  ],
   "args": [
     {
       "name": "destination",
       "description": "Host dari ~/.ssh/config dan known_hosts",
-      "generators": [{ "template": ["anjuran:hosts"] }]
+      "generators": [
+        {
+          "template": [
+            "anjuran:hosts"
+          ]
+        }
+      ]
     }
   ],
   "options": [
-    { "name": ["-i"], "args": [{ "name": "identity_file", "template": ["filepaths"] }] },
-    { "name": ["-F"], "args": [{ "name": "configfile", "template": ["filepaths"] }] },
-    { "name": ["-J"], "args": [{ "name": "destination", "template": ["anjuran:hosts"] }] }
+    {
+      "name": [
+        "-i"
+      ],
+      "args": [
+        {
+          "name": "identity_file",
+          "template": [
+            "filepaths"
+          ]
+        }
+      ]
+    },
+    {
+      "name": [
+        "-F"
+      ],
+      "args": [
+        {
+          "name": "configfile",
+          "template": [
+            "filepaths"
+          ]
+        }
+      ]
+    },
+    {
+      "name": [
+        "-J"
+      ],
+      "args": [
+        {
+          "name": "destination",
+          "template": [
+            "anjuran:hosts"
+          ]
+        }
+      ]
+    }
   ]
 }

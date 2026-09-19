@@ -152,7 +152,8 @@ Platform: Linux, macOS, dan Windows; amd64 dan arm64.
 - **716 perintah** dari korpus spec [withfig/autocomplete][fig] (MIT), 1.472
   berkas — git, docker, kubectl, aws, npm, dan seterusnya
 - **19 tambalan tulisan tangan** untuk yang tidak ada di sana atau salah di
-  sana: `cd`, `ssh`, `docker`, `kubectl`
+  sana: `cd`, `ssh`, `docker`, `kubectl` — terbuka untuk sumbangan, dengan
+  pemeriksaan otomatis dan tinjauan; lihat [extra/README.md](extra/README.md)
 - **skrip proyek** dibaca dari manifesnya: `package.json`, `deno.json`,
   `composer.json`, `Makefile`, `justfile` — sehingga `bun run ` menawarkan
   skrip yang memang ada di proyek itu

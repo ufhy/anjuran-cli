@@ -1,48 +1,311 @@
 {
   "name": "docker",
+  "anjuranContoh": [
+    "docker exec ",
+    "docker logs "
+  ],
   "options": [
-    { "name": ["-H", "--host"], "description": "Alamat daemon docker", "isPersistent": true,
-      "args": [{ "name": "host" }] },
-    { "name": ["--context"], "description": "Context yang dipakai", "isPersistent": true,
-      "args": [{ "name": "name", "generators": [{ "script": ["docker", "context", "ls", "--format", "{{.Name}}"], "trim": true, "cacheTtl": 60 }] }] },
-    { "name": ["--config"], "description": "Lokasi berkas konfigurasi klien", "isPersistent": true,
-      "args": [{ "name": "dir", "template": ["folders"] }] },
-    { "name": ["-l", "--log-level"], "description": "Tingkat pesan log", "isPersistent": true,
-      "args": [{ "name": "level", "suggestions": [
-        { "name": "debug" }, { "name": "info" }, { "name": "warn" },
-        { "name": "error" }, { "name": "fatal" } ] }] },
-    { "name": ["-D", "--debug"], "description": "Nyalakan mode debug", "isPersistent": true },
-    { "name": ["-v", "--version"], "description": "Tampilkan versi" },
-    { "name": ["--help"], "description": "Tampilkan bantuan" }
+    {
+      "name": [
+        "-H",
+        "--host"
+      ],
+      "description": "Alamat daemon docker",
+      "isPersistent": true,
+      "args": [
+        {
+          "name": "host"
+        }
+      ]
+    },
+    {
+      "name": [
+        "--context"
+      ],
+      "description": "Context yang dipakai",
+      "isPersistent": true,
+      "args": [
+        {
+          "name": "name",
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "context",
+                "ls",
+                "--format",
+                "{{.Name}}"
+              ],
+              "trim": true,
+              "cacheTtl": 60
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": [
+        "--config"
+      ],
+      "description": "Lokasi berkas konfigurasi klien",
+      "isPersistent": true,
+      "args": [
+        {
+          "name": "dir",
+          "template": [
+            "folders"
+          ]
+        }
+      ]
+    },
+    {
+      "name": [
+        "-l",
+        "--log-level"
+      ],
+      "description": "Tingkat pesan log",
+      "isPersistent": true,
+      "args": [
+        {
+          "name": "level",
+          "suggestions": [
+            {
+              "name": "debug"
+            },
+            {
+              "name": "info"
+            },
+            {
+              "name": "warn"
+            },
+            {
+              "name": "error"
+            },
+            {
+              "name": "fatal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": [
+        "-D",
+        "--debug"
+      ],
+      "description": "Nyalakan mode debug",
+      "isPersistent": true
+    },
+    {
+      "name": [
+        "-v",
+        "--version"
+      ],
+      "description": "Tampilkan versi"
+    },
+    {
+      "name": [
+        "--help"
+      ],
+      "description": "Tampilkan bantuan"
+    }
   ],
   "subcommands": [
-    { "name": "exec", "args": [
-      { "name": "container", "generators": [{ "script": ["docker", "ps", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "logs", "args": [
-      { "name": "container", "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "stop", "args": [
-      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "restart", "args": [
-      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "rm", "args": [
-      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "start", "args": [
-      { "name": "container", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "inspect", "args": [
-      { "name": "object", "isVariadic": true, "generators": [{ "script": ["docker", "ps", "-a", "--format", "{{.Names}}"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "rmi", "args": [
-      { "name": "image", "isVariadic": true, "generators": [{ "script": ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"], "trim": true, "cacheTtl": 30 }] }
-    ]},
-    { "name": "run", "args": [
-      { "name": "image", "generators": [{ "script": ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"], "trim": true, "cacheTtl": 30 }] },
-      { "name": "command", "isOptional": true, "isVariadic": true }
-    ]}
+    {
+      "name": "exec",
+      "args": [
+        {
+          "name": "container",
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "logs",
+      "args": [
+        {
+          "name": "container",
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stop",
+      "args": [
+        {
+          "name": "container",
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "restart",
+      "args": [
+        {
+          "name": "container",
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rm",
+      "args": [
+        {
+          "name": "container",
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "start",
+      "args": [
+        {
+          "name": "container",
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "inspect",
+      "args": [
+        {
+          "name": "object",
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "{{.Names}}"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rmi",
+      "args": [
+        {
+          "name": "image",
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "images",
+                "--format",
+                "{{.Repository}}:{{.Tag}}"
+              ],
+              "trim": true,
+              "cacheTtl": 30
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "run",
+      "args": [
+        {
+          "name": "image",
+          "generators": [
+            {
+              "script": [
+                "docker",
+                "images",
+                "--format",
+                "{{.Repository}}:{{.Tag}}"
+              ],
+              "trim": true,
+              "cacheTtl": 30
+            }
+          ]
+        },
+        {
+          "name": "command",
+          "isOptional": true,
+          "isVariadic": true
+        }
+      ]
+    }
   ]
 }

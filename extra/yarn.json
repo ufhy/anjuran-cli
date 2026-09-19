@@ -1,5 +1,8 @@
 {
   "name": "yarn",
+  "anjuranContoh": [
+    "yarn run "
+  ],
   "subcommands": [
     {
       "name": "run",

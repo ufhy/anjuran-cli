@@ -1,5 +1,8 @@
 {
   "name": "deno",
+  "anjuranContoh": [
+    "deno task "
+  ],
   "subcommands": [
     {
       "name": "task",

@@ -1,4 +1,15 @@
 {
   "name": "export",
-  "args": [{ "name": "variable", "isVariadic": true, "template": ["anjuran:env"] }]
+  "anjuranContoh": [
+    "export "
+  ],
+  "args": [
+    {
+      "name": "variable",
+      "isVariadic": true,
+      "template": [
+        "anjuran:env"
+      ]
+    }
+  ]
 }

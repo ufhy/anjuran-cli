@@ -1,59 +1,334 @@
 {
   "name": "kubectl",
+  "anjuranContoh": [
+    "kubectl logs ",
+    "kubectl get "
+  ],
   "subcommands": [
     {
       "name": "get",
       "args": [
-        { "name": "resource", "suggestions": [
-          { "name": ["pods", "po"], "description": "Pod" },
-          { "name": ["services", "svc"], "description": "Service" },
-          { "name": ["deployments", "deploy"], "description": "Deployment" },
-          { "name": ["statefulsets", "sts"], "description": "StatefulSet" },
-          { "name": ["daemonsets", "ds"], "description": "DaemonSet" },
-          { "name": ["replicasets", "rs"], "description": "ReplicaSet" },
-          { "name": ["jobs"], "description": "Job" },
-          { "name": ["cronjobs", "cj"], "description": "CronJob" },
-          { "name": ["nodes", "no"], "description": "Node" },
-          { "name": ["namespaces", "ns"], "description": "Namespace" },
-          { "name": ["configmaps", "cm"], "description": "ConfigMap" },
-          { "name": ["secrets"], "description": "Secret" },
-          { "name": ["ingresses", "ing"], "description": "Ingress" },
-          { "name": ["persistentvolumeclaims", "pvc"], "description": "PersistentVolumeClaim" },
-          { "name": ["persistentvolumes", "pv"], "description": "PersistentVolume" },
-          { "name": ["serviceaccounts", "sa"], "description": "ServiceAccount" },
-          { "name": ["events", "ev"], "description": "Event" },
-          { "name": ["endpoints", "ep"], "description": "Endpoint" },
-          { "name": ["roles"], "description": "Role" },
-          { "name": ["rolebindings"], "description": "RoleBinding" },
-          { "name": ["clusterroles"], "description": "ClusterRole" },
-          { "name": ["clusterrolebindings"], "description": "ClusterRoleBinding" },
-          { "name": ["all"], "description": "Seluruh resource umum" }
-        ]},
-        { "name": "name", "isOptional": true, "isVariadic": true,
-          "generators": [{ "script": ["kubectl", "get", "pods", "--no-headers", "-o", "custom-columns=:metadata.name"], "trim": true, "cacheTtl": 10 }] }
+        {
+          "name": "resource",
+          "suggestions": [
+            {
+              "name": [
+                "pods",
+                "po"
+              ],
+              "description": "Pod"
+            },
+            {
+              "name": [
+                "services",
+                "svc"
+              ],
+              "description": "Service"
+            },
+            {
+              "name": [
+                "deployments",
+                "deploy"
+              ],
+              "description": "Deployment"
+            },
+            {
+              "name": [
+                "statefulsets",
+                "sts"
+              ],
+              "description": "StatefulSet"
+            },
+            {
+              "name": [
+                "daemonsets",
+                "ds"
+              ],
+              "description": "DaemonSet"
+            },
+            {
+              "name": [
+                "replicasets",
+                "rs"
+              ],
+              "description": "ReplicaSet"
+            },
+            {
+              "name": [
+                "jobs"
+              ],
+              "description": "Job"
+            },
+            {
+              "name": [
+                "cronjobs",
+                "cj"
+              ],
+              "description": "CronJob"
+            },
+            {
+              "name": [
+                "nodes",
+                "no"
+              ],
+              "description": "Node"
+            },
+            {
+              "name": [
+                "namespaces",
+                "ns"
+              ],
+              "description": "Namespace"
+            },
+            {
+              "name": [
+                "configmaps",
+                "cm"
+              ],
+              "description": "ConfigMap"
+            },
+            {
+              "name": [
+                "secrets"
+              ],
+              "description": "Secret"
+            },
+            {
+              "name": [
+                "ingresses",
+                "ing"
+              ],
+              "description": "Ingress"
+            },
+            {
+              "name": [
+                "persistentvolumeclaims",
+                "pvc"
+              ],
+              "description": "PersistentVolumeClaim"
+            },
+            {
+              "name": [
+                "persistentvolumes",
+                "pv"
+              ],
+              "description": "PersistentVolume"
+            },
+            {
+              "name": [
+                "serviceaccounts",
+                "sa"
+              ],
+              "description": "ServiceAccount"
+            },
+            {
+              "name": [
+                "events",
+                "ev"
+              ],
+              "description": "Event"
+            },
+            {
+              "name": [
+                "endpoints",
+                "ep"
+              ],
+              "description": "Endpoint"
+            },
+            {
+              "name": [
+                "roles"
+              ],
+              "description": "Role"
+            },
+            {
+              "name": [
+                "rolebindings"
+              ],
+              "description": "RoleBinding"
+            },
+            {
+              "name": [
+                "clusterroles"
+              ],
+              "description": "ClusterRole"
+            },
+            {
+              "name": [
+                "clusterrolebindings"
+              ],
+              "description": "ClusterRoleBinding"
+            },
+            {
+              "name": [
+                "all"
+              ],
+              "description": "Seluruh resource umum"
+            }
+          ]
+        },
+        {
+          "name": "name",
+          "isOptional": true,
+          "isVariadic": true,
+          "generators": [
+            {
+              "script": [
+                "kubectl",
+                "get",
+                "pods",
+                "--no-headers",
+                "-o",
+                "custom-columns=:metadata.name"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
       ]
     },
-    { "name": "logs", "args": [
-      { "name": "pod", "generators": [{ "script": ["kubectl", "get", "pods", "--no-headers", "-o", "custom-columns=:metadata.name"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "exec", "args": [
-      { "name": "pod", "generators": [{ "script": ["kubectl", "get", "pods", "--no-headers", "-o", "custom-columns=:metadata.name"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "port-forward", "args": [
-      { "name": "pod", "generators": [{ "script": ["kubectl", "get", "pods", "--no-headers", "-o", "custom-columns=:metadata.name"], "trim": true, "cacheTtl": 10 }] }
-    ]},
-    { "name": "config", "subcommands": [
-      { "name": "use-context", "args": [
-        { "name": "context", "generators": [{ "script": ["kubectl", "config", "get-contexts", "-o", "name"], "trim": true, "cacheTtl": 60 }] }
-      ]}
-    ]}
+    {
+      "name": "logs",
+      "args": [
+        {
+          "name": "pod",
+          "generators": [
+            {
+              "script": [
+                "kubectl",
+                "get",
+                "pods",
+                "--no-headers",
+                "-o",
+                "custom-columns=:metadata.name"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "exec",
+      "args": [
+        {
+          "name": "pod",
+          "generators": [
+            {
+              "script": [
+                "kubectl",
+                "get",
+                "pods",
+                "--no-headers",
+                "-o",
+                "custom-columns=:metadata.name"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "port-forward",
+      "args": [
+        {
+          "name": "pod",
+          "generators": [
+            {
+              "script": [
+                "kubectl",
+                "get",
+                "pods",
+                "--no-headers",
+                "-o",
+                "custom-columns=:metadata.name"
+              ],
+              "trim": true,
+              "cacheTtl": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "config",
+      "subcommands": [
+        {
+          "name": "use-context",
+          "args": [
+            {
+              "name": "context",
+              "generators": [
+                {
+                  "script": [
+                    "kubectl",
+                    "config",
+                    "get-contexts",
+                    "-o",
+                    "name"
+                  ],
+                  "trim": true,
+                  "cacheTtl": 60
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
   ],
   "options": [
-    { "name": ["-n", "--namespace"], "args": [
-      { "name": "namespace", "generators": [{ "script": ["kubectl", "get", "namespaces", "--no-headers", "-o", "custom-columns=:metadata.name"], "trim": true, "cacheTtl": 60 }] }
-    ]},
-    { "name": ["--context"], "args": [
-      { "name": "context", "generators": [{ "script": ["kubectl", "config", "get-contexts", "-o", "name"], "trim": true, "cacheTtl": 60 }] }
-    ]}
+    {
+      "name": [
+        "-n",
+        "--namespace"
+      ],
+      "args": [
+        {
+          "name": "namespace",
+          "generators": [
+            {
+              "script": [
+                "kubectl",
+                "get",
+                "namespaces",
+                "--no-headers",
+                "-o",
+                "custom-columns=:metadata.name"
+              ],
+              "trim": true,
+              "cacheTtl": 60
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": [
+        "--context"
+      ],
+      "args": [
+        {
+          "name": "context",
+          "generators": [
+            {
+              "script": [
+                "kubectl",
+                "config",
+                "get-contexts",
+                "-o",
+                "name"
+              ],
+              "trim": true,
+              "cacheTtl": 60
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

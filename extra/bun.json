@@ -1,5 +1,8 @@
 {
   "name": "bun",
+  "anjuranContoh": [
+    "bun run "
+  ],
   "subcommands": [
     {
       "name": "run",
