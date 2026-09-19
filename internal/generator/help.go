@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"regexp"
@@ -31,6 +32,25 @@ import (
 // jarang. Menjalankannya berulang kali hanya menambah proses pada jalur yang
 // paling sering dipakai.
 const bantuanTTL = 30 * time.Minute
+
+// bantuanTungguDepan membatasi berapa lama JALUR PANAS boleh menunggu.
+//
+// Bantuan dibaca dengan menjalankan biner asing, dan waktu yang dibutuhkannya
+// tidak bisa ditebak: `kubectl get -h` pada mesin tanpa kubeconfig menghabiskan
+// detik, bukan milidetik. Sementara itu karakter yang diketik sudah digemakan
+// ke layar SEBELUM kandidatnya dihitung ulang — jadi yang terlihat adalah
+// baris yang terus terisi di atas kotak yang membeku. Persis seperti alat yang
+// rusak.
+//
+// Yang boleh dibayar di sini karena itu sangat kecil. Sisanya dibayar di latar.
+const bantuanTungguDepan = 150 * time.Millisecond
+
+// bantuanBatasLatar membatasi proses yang berjalan DI LATAR.
+//
+// Lebih longgar karena tidak ada yang menunggunya: ia hanya mengisi cache
+// untuk ketikan berikutnya. Tetap berbatas, karena proses yang menggantung
+// selamanya tetap harus mati bersama sesinya.
+const bantuanBatasLatar = 5 * time.Second
 
 // bantuanMaks membatasi berapa banyak baris keluaran yang diurai. Halaman
 // bantuan yang sangat panjang biasanya berupa contoh dan catatan, bukan
@@ -128,14 +148,11 @@ func (s *Source) jalankanBantuan(argv []string) (string, bool) {
 			}
 		}
 
-		out, err := jalankanPerintah(cmd, s.Dir, s.Timeout)
+		out, err := s.bantuanDariProses(cmd)
 		// Banyak alat mencetak bantuannya ke stderr dan keluar dengan status
 		// bukan nol; yang menentukan isinya, bukan status keluarnya.
 		if strings.TrimSpace(out) == "" && err != nil {
 			continue
-		}
-		if s.Cache != nil {
-			s.Cache.Put(cmd, "", out, bantuanTTL)
 		}
 		if strings.TrimSpace(out) != "" {
 			return out, true
@@ -143,6 +160,47 @@ func (s *Source) jalankanBantuan(argv []string) (string, bool) {
 	}
 	return "", false
 }
+
+// bantuanDariProses menjalankan satu bentuk bantuan TANPA menahan jalur panas.
+//
+// Prosesnya dilepas ke latar dan hasilnya disimpan di cache dari sana. Yang
+// ditunggu di sini hanya sekejap; bila tidak selesai dalam waktu itu, jalur
+// panas berjalan terus tanpa bantuan dan ketikan BERIKUTNYA yang memanennya —
+// pada saat itu jawabannya sudah ada di cache dan gratis.
+//
+// Ini yang membedakan "bantuan belum siap" dari "kotaknya membeku". Keduanya
+// terlihat sama bagi mesin; hanya yang kedua terasa seperti kerusakan.
+func (s *Source) bantuanDariProses(cmd []string) (string, error) {
+	type hasil struct {
+		out string
+		err error
+	}
+	// Berkapasitas satu supaya goroutine-nya tidak pernah tersangkut bila
+	// penungunya sudah pergi.
+	ch := make(chan hasil, 1)
+
+	dir, cache := s.Dir, s.Cache
+	go func() {
+		out, err := jalankanPerintah(cmd, dir, bantuanBatasLatar)
+		if cache != nil {
+			// Hasil KOSONG pun disimpan. Tanpa itu, biner yang memang tidak
+			// menjawab bentuk ini akan dicoba lagi di setiap ketikan.
+			cache.Put(cmd, "", out, bantuanTTL)
+		}
+		ch <- hasil{out, err}
+	}()
+
+	select {
+	case h := <-ch:
+		return h.out, h.err
+	case <-time.After(bantuanTungguDepan):
+		return "", errBantuanBelumSiap
+	}
+}
+
+// errBantuanBelumSiap menandai bantuan yang masih dihitung di latar. Ia bukan
+// kegagalan: pemanggil melanjutkan tanpa bantuan, dan memanennya nanti.
+var errBantuanBelumSiap = errors.New("bantuan belum siap")
 
 // jalankanPerintah menjalankan satu perintah dan mengambil seluruh
 // keluarannya.

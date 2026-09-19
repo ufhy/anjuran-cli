@@ -1,7 +1,10 @@
 package generator
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -168,7 +171,22 @@ func TestBantuanMengangkatEntriSpecTanpaMenggantinya(t *testing.T) {
 		},
 	}
 
-	s := &Source{Dir: t.TempDir(), Timeout: 5 * time.Second}
+	// Kebijakan generator mematikan dirinya saat berjalan sebagai root, dan
+	// container pengembangan biasanya root. Tanpa baris ini uji ini LOLOS
+	// tanpa pernah menjalankan satu proses pun — lolos yang tidak membuktikan
+	// apa-apa, yang lebih buruk daripada gagal.
+	t.Setenv("ANJURAN_GENERATOR_ALLOW_ROOT", "1")
+
+	// Dipanggil DUA KALI, dan itu bagian dari kontraknya.
+	//
+	// Bantuan tidak pernah menahan jalur panas: prosesnya dilepas ke latar dan
+	// hasilnya dipanen ketikan berikutnya, saat jawabannya sudah ada di cache.
+	// Panggilan pertama di sini hanya menghangatkannya.
+	s := &Source{Dir: t.TempDir(), Cache: &Cache{Dir: t.TempDir()}}
+	s.Candidates(res)
+	tungguCache(t, s, []string{"go", "--help"})
+
+	res.Candidates[0].Priority = engine.DefaultPriority
 	out := s.Candidates(res)
 
 	if got := res.Candidates[0].Priority; got != BantuanPrioritas {
@@ -185,4 +203,56 @@ func TestBantuanMengangkatEntriSpecTanpaMenggantinya(t *testing.T) {
 			t.Error("nama yang sudah ada di spec ditambahkan lagi sebagai kandidat kedua")
 		}
 	}
+}
+
+// Biner yang bantuannya lambat TIDAK BOLEH menahan jalur panas.
+//
+// Karakter yang diketik digemakan ke layar sebelum kandidatnya dihitung
+// ulang, jadi menunggu proses asing di sini menghasilkan baris yang terus
+// terisi di atas kotak yang membeku. Itu terlihat persis seperti alat yang
+// rusak — dan memang pernah terjadi: `kubectl get -h` pada mesin tanpa
+// kubeconfig menghabiskan detik, dan seluruh kotaknya ikut berhenti.
+func TestBantuanLambatTidakMenahanJalurPanas(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skrip sh tidak berlaku di Windows")
+	}
+	// Lihat catatan yang sama di uji di atas: tanpa ini, kebijakan menolak
+	// lebih dulu dan uji ini lolos tanpa menunggu apa pun.
+	t.Setenv("ANJURAN_GENERATOR_ALLOW_ROOT", "1")
+
+	dir := t.TempDir()
+	lambat := filepath.Join(dir, "lambat")
+	if err := os.WriteFile(lambat, []byte("#!/bin/sh\nsleep 5\necho '  --x  y'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	s := &Source{Dir: dir, Cache: &Cache{Dir: t.TempDir()}}
+
+	mulai := time.Now()
+	s.Bantuan([]string{"lambat"}, true)
+	lama := time.Since(mulai)
+
+	// Dua bentuk dicoba, masing-masing menunggu paling lama sekejap.
+	batas := 3 * bantuanTungguDepan
+	if lama > batas {
+		t.Errorf("menunggu %v, batasnya %v — jalur panas tertahan proses asing", lama, batas)
+	}
+}
+
+// tungguCache menanti proses latar selesai mengisi cache.
+//
+// Menunggu KEADAAN, bukan angka: tidur dengan durasi tetap akan lolos di
+// mesin lengang dan gagal di mesin sibuk, dan uji yang gagal sesekali
+// berhenti dipercaya.
+func tungguCache(t *testing.T, s *Source, cmd []string) {
+	t.Helper()
+	batas := time.Now().Add(10 * time.Second)
+	for time.Now().Before(batas) {
+		if _, ok := s.Cache.Get(cmd, ""); ok {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("cache bantuan untuk %v tidak pernah terisi", cmd)
 }

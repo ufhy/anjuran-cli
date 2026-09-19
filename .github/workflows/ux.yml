@@ -64,15 +64,6 @@ jobs:
       - name: bangun spec
         run: make specs
 
-      # Sementara. Engine di runner ini sudah terbukti menjawab benar —
-      # `kubectl get pods --output=` mengembalikan json, exit 0 — jadi yang
-      # tersisa hanya jalur integrasi shell. Langkah ini merekam argumen
-      # persis yang dikirim shell ke anjuran pada skenario yang gagal.
-      - name: rekam argumen yang dikirim shell
-        env:
-          SHELL_UJI: ${{ matrix.shell }}
-        run: python3 -u tools/uxtest/rekam_argv.py
-
       - name: skenario UX
         env:
           SHELL_UJI: ${{ matrix.shell }}
