@@ -247,7 +247,7 @@ def memuat(*bagian):
     def f(teks):
         for b in bagian:
             if b not in teks:
-                return f"tidak memuat {b!r}\n--- layar ---\n{teks[-400:]}"
+                return f"tidak memuat {b!r}\n--- layar ---\n{teks}"
         return None
     return f
 
@@ -265,7 +265,7 @@ def salah_satu(*bagian):
         for b in bagian:
             if b in teks:
                 return None
-        return f"tidak memuat satu pun dari {bagian!r}\n--- layar ---\n{teks[-400:]}"
+        return f"tidak memuat satu pun dari {bagian!r}\n--- layar ---\n{teks}"
     return f
 
 
@@ -273,7 +273,7 @@ def tanpa(*bagian):
     def f(teks):
         for b in bagian:
             if b in teks:
-                return f"seharusnya tidak memuat {b!r}\n--- layar ---\n{teks[-400:]}"
+                return f"seharusnya tidak memuat {b!r}\n--- layar ---\n{teks}"
         return None
     return f
 
@@ -609,13 +609,16 @@ SKENARIO = [
     # Keutuhan barisnya diperiksa dengan MENJALANKANNYA: "gre" yang dibiarkan
     # apa adanya harus sampai ke shell sebagai satu perintah yang dicari, bukan
     # terpotong atau tertukar oleh kotak yang sempat terbuka.
-    # Susunan kalimat galatnya berbeda tiap shell — zsh menulis
-    # "command not found: gre", bash "bash: gre: command not found" — jadi
-    # yang diperiksa keduanya terpisah. Yang diuji di sini perintahnya sampai
-    # utuh ke shell, bukan kalimat siapa yang dipakai.
+    # Susunan kalimatnya berbeda tiap shell DAN tiap distribusi: zsh menulis
+    # "command not found: gre", bash "bash: gre: command not found", fish
+    # "Unknown command", dan Ubuntu memasang command-not-found yang
+    # menggantinya lagi menjadi "Command 'gre' not found, did you mean:"
+    # beserta daftar paket. Yang diuji di sini perintahnya sampai utuh ke
+    # shell, bukan kalimat siapa yang dipakai — jadi yang dicocokkan potongan
+    # terkecil yang masih membuktikannya.
     ("pemicu sesudah pipa tidak merusak baris",
      [b"echo hai", b" ", b"|", b" ", b"gre", b"\x1b", b"\r"],
-     gabung(salah_satu("command not found", "Unknown command"), memuat("gre"))),
+     gabung(salah_satu("not found", "Unknown command"), memuat("gre"))),
     ("opsi panjang dengan sama dengan",
      [b"kubectl", b" ", b"get", b" ", b"pods", b" ", b"--output", b"="], memuat("json")),
 
