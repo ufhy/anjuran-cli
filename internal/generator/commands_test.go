@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,5 +93,42 @@ func TestCommandsTidakPeduliHurufBesar(t *testing.T) {
 
 	if got := Commands("doc"); !punya(got, "Docker") {
 		t.Errorf("mau Docker, dapat %v", got)
+	}
+}
+
+// Direktori PATH yang lebih besar daripada batas berkas biasa tetap terbaca
+// SELURUHNYA.
+//
+// os.ReadDir mengembalikan entrinya terurut, sehingga batas apa pun memotong
+// ekor abjadnya. Pada /usr/bin runner Ubuntu — lebih dari dua ribu biner —
+// batas lama membuat `zsh` tidak pernah muncul sebagai kandidat, sementara
+// perintah berhuruf awal tetap muncul. Yang hilang bukan panjang daftarnya,
+// melainkan perintahnya sendiri, tanpa satu pun tanda.
+func TestPerintahDiUjungAbjadTetapTerbaca(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bit eksekusi tidak berlaku di Windows")
+	}
+	dir := t.TempDir()
+	// Lebih banyak daripada batas berkas biasa (2000), dengan yang dicari
+	// berada SESUDAHNYA dalam urutan abjad.
+	for i := 0; i < 2100; i++ {
+		tulisBiner(t, dir, fmt.Sprintf("aaa-%04d", i))
+	}
+	tulisBiner(t, dir, "zzz-paling-akhir")
+
+	t.Setenv("PATH", dir)
+	sekaliPath = onceBaru()
+
+	got := Commands("zzz")
+	if len(got) != 1 || got[0] != "zzz-paling-akhir" {
+		t.Errorf("Commands(\"zzz\") = %v, mau [zzz-paling-akhir]", got)
+	}
+}
+
+func tulisBiner(t *testing.T, dir, nama string) {
+	t.Helper()
+	p := filepath.Join(dir, nama)
+	if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 }

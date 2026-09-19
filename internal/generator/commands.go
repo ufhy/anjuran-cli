@@ -19,6 +19,20 @@ const TemplateCommands = "commands"
 // serta penggambaran membayar harga yang tidak ada gunanya.
 const maxPerintah = 200
 
+// maxEntriPath membatasi entri yang dibaca dari SATU direktori PATH.
+//
+// Jauh lebih besar daripada maxEntries, dan itu bukan kelonggaran melainkan
+// koreksi: batas 2000 yang dipakai untuk melengkapi nama berkas salah
+// diterapkan di sini. os.ReadDir mengembalikan entrinya TERURUT, sehingga
+// batas itu memotong ekor abjadnya — di /usr/bin runner Ubuntu yang memuat
+// lebih dari dua ribu biner, `zsh` hilang sementara perintah berhuruf awal
+// hilang. Bukan daftar yang dipendekkan, melainkan perintah yang tidak
+// pernah bisa dilengkapi sama sekali, tanpa satu pun tanda.
+//
+// Penjagaan terhadap direktori yang benar-benar patologis tetap ada; yang
+// berubah hanya letaknya, dari "sering tercapai" menjadi "tidak pernah".
+const maxEntriPath = 100000
+
 var (
 	sekaliPath = onceBaru()
 	daftarPath []string
@@ -72,7 +86,7 @@ func muatPath() {
 			continue
 		}
 		for i, en := range entri {
-			if i >= maxEntries {
+			if i >= maxEntriPath {
 				break
 			}
 			nama := en.Name()
