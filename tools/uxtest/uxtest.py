@@ -206,7 +206,15 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         s.siap()
         for baris in persiapan:
             s.ketik(baris + "\r")
-        s.bersihkan_layar()
+        # Sesudah persiapan, yang ditunggu KEADAAN siap — bukan sekadar layar
+        # yang berhenti berubah.
+        #
+        # ketik() berhenti saat keluarannya diam sesaat, dan itu terjadi juga
+        # di tengah perintah persiapan yang belum selesai. Layar lalu
+        # dikosongkan di tengah jalan, sisa keluarannya mendarat sesudahnya,
+        # dan skenario membaca gema perintah persiapan sebagai bagian dari
+        # ketikannya sendiri.
+        s.siap()
         for k in ketikan:
             s.ketik(k)
         return periksa(s.layar.teks())

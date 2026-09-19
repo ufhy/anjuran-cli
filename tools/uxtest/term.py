@@ -88,7 +88,15 @@ class Layar:
                         for x in range(self.col, self.cols):
                             self.grid[self.row][x] = " "
                     elif op == "J":
-                        for y in range(self.row, self.rows):
+                        # 0 (bawaan) sampai akhir layar, 1 sampai awal layar,
+                        # 2 dan 3 seluruhnya. Sebelumnya n diabaikan dan
+                        # SEMUA bentuk diperlakukan sebagai 0, sehingga
+                        # ESC[2J — yang dikirim `clear` dan sebagian prompt —
+                        # meninggalkan seluruh isi di atas kursor.
+                        mode = int(arg) if arg.isdigit() else 0
+                        mulai = 0 if mode in (1, 2, 3) else self.row
+                        akhir = self.row + 1 if mode == 1 else self.rows
+                        for y in range(mulai, akhir):
                             for x in range(self.cols):
                                 self.grid[y][x] = " "
                     elif op == "G":
@@ -125,8 +133,18 @@ class Layar:
                 # NUL dan pemilih charset juga tidak menggambar apa pun.
                 pass
             else:
-                if self.col < self.cols:
-                    self.grid[self.row][self.col] = c
+                # Baris yang penuh BERGULUNG ke baris berikutnya.
+                #
+                # Sebelumnya kolom di luar lebar layar hanya dibuang dan
+                # kursornya tidak pernah turun. Setiap baris yang lebih
+                # panjang dari lebar terminal — dan perintah persiapan di
+                # rangkaian ini memang begitu — membuat model ini tertinggal
+                # satu baris atau lebih dari shell-nya. Sesudah itu setiap
+                # penempatan mutlak meleset sejauh selisih itu.
+                if self.col >= self.cols:
+                    self.col = 0
+                    self._turun()
+                self.grid[self.row][self.col] = c
                 self.col += 1
             i += 1
 
@@ -168,7 +186,12 @@ def potong_tak_lengkap(teks):
 _ST = "\x1b\\"
 
 
-def jawab_kueri(chunk):
+def jawab_kueri(chunk, posisi=None):
+    """Susun jawaban atas kueri kemampuan yang ada di chunk.
+
+    posisi adalah (baris, kolom) berbasis nol milik emulator, dipakai untuk
+    menjawab CPR.
+    """
     out = []
     if re.search(r"\x1b\[(0)?c", chunk):
         out.append("\x1b[?62;1;6c")
@@ -180,7 +203,15 @@ def jawab_kueri(chunk):
         if f"\x1b]{n};?" in chunk:
             out.append(f"\x1b]{n};rgb:0000/0000/0000" + _ST)
     if "\x1b[6n" in chunk:
-        out.append("\x1b[1;1R")
+        # CPR dijawab dengan posisi kursor yang SEBENARNYA, bukan 1;1.
+        #
+        # Shell menanyakan ini untuk mengetahui di mana ia berada sebelum
+        # menggambar ulang. Jawaban tetap 1;1 adalah kebohongan yang kebetulan
+        # benar hanya di baris pertama; di baris mana pun selain itu ia
+        # menyesatkan, dan emulator yang berbohong tidak bisa dipakai untuk
+        # menilai gambar orang lain.
+        baris, kolom = posisi or (0, 0)
+        out.append("\x1b[%d;%dR" % (baris + 1, kolom + 1))
     # XTGETTCAP sengaja TIDAK dijawab: jawaban yang tidak dikenali shell
     # tersisa di buffer masukan dan ikut terketik sebagai perintah.
     return "".join(out).encode()
@@ -257,7 +288,10 @@ class Sesi:
             teks = self._sisa + chunk.decode(errors="replace")
             teks, self._sisa = potong_tak_lengkap(teks)
             self.layar.tulis(teks)
-            balas = jawab_kueri(teks)
+            # Dijawab SESUDAH teksnya diputar ulang, supaya posisi yang
+            # dilaporkan adalah posisi sesudah keluaran itu tergambar —
+            # persis seperti yang dilihat terminal sungguhan.
+            balas = jawab_kueri(teks, (self.layar.row, self.layar.col))
             if balas:
                 os.write(self.fd, balas)
 
@@ -291,12 +325,60 @@ class Sesi:
         # Tanpa pemisahan ini, penanda cocok begitu barisnya tergema — sebelum
         # shell benar-benar mengerjakan apa pun.
         tanda = "SIAP%d" % os.getpid()
-        os.write(self.fd, ('echo SIA""P%d\r' % os.getpid()).encode())
+        # Penandanya sendiri MEMICU anjuran: ia memuat spasi, dan spasi adalah
+        # tombol pemicu. Kotak yang terbuka karenanya menangkap Enter sebagai
+        # "pilih kandidat", bukan "jalankan baris" — sehingga perintah penanda
+        # tidak pernah dijalankan dan menumpuk di baris masukan bersama
+        # ketikan skenario berikutnya. Yang terbaca lalu berupa
+        # '% echo SIA""P2486echo SIA""P2486cd', dan seluruh skenario sesudahnya
+        # gagal karena alasan yang tidak ada hubungannya dengan yang diuji.
+        #
+        # Esc ditekan lebih dulu, persis seperti yang dilakukan orang.
+        os.write(self.fd, ('echo SIA""P%d' % os.getpid()).encode())
+        self.tunggu(2.0, diam=0.3)
+        if "╭" in self.layar.teks():
+            os.write(self.fd, b"\x1b")
+            # Jeda PENUH, bukan sampai keluarannya diam.
+            #
+            # Esc yang menutup kotak tidak menghasilkan keluaran apa pun, jadi
+            # menunggu "diam" selesai dalam sepersekian detik — lebih cepat
+            # daripada KEYTIMEOUT zsh yang 0,4 detik. Esc dan Enter lalu tiba
+            # dalam satu bacaan dan zsh membacanya sebagai satu urutan meta,
+            # bukan dua tombol. Dua puluh empat skenario zsh gagal karena itu.
+            self.tunggu(0.7)
+        os.write(self.fd, b"\r")
         self.tunggu(batas, sampai=tanda)
+        # Penanda yang muncul belum berarti shell-nya selesai menggambar.
+        #
+        # fish menggambar ulang baris masukannya secara TERTUNDA — penyorotan
+        # sintaks dan saran otomatisnya dihitung sesudah barisnya dikirim —
+        # sehingga cat ulang baris sebelumnya tiba beberapa puluh milidetik
+        # setelah keluaran penandanya. Tanpa jeda ini cat ulang itu mendarat
+        # sesudah layar dikosongkan, lalu bercampur dengan ketikan skenario:
+        # yang terbaca menjadi 'ececho SIA""P2497echo $((20+30))'. Kegagalan
+        # seperti itu tampak seperti cacat anjuran, padahal milik harness.
+        self.tunggu(1.5, diam=0.3)
         self.bersihkan_layar()
 
     def bersihkan_layar(self):
-        self.layar = Layar(self.rows, self.cols)
+        """Kosongkan riwayat layar TANPA memindahkan kursor atau baris aktif.
+
+        Dulu ini mengganti seluruh Layar dengan yang baru, sehingga kursornya
+        kembali ke 0;0 dan prompt yang sedang tampil ikut hilang. Itu memutus
+        kesepakatan dengan shell-nya: fish memposisikan ulang kursor secara
+        MUTLAK per kolom — ia mengirim '\\r' lalu 'ESC[5C' untuk kembali ke
+        ujung "git" di belakang prompt dua karakter. Dengan prompt yang sudah
+        dihapus, kolom 5 di model kita menunjuk dua karakter terlalu jauh, dan
+        hasilnya terbaca sebagai 'gigit commit --am'.
+
+        zsh dan bash tidak terpengaruh karena keduanya menggambar ulang
+        promptnya sendiri di setiap perubahan, sehingga apa pun yang hilang
+        segera dikembalikan. Itulah sebabnya cacat ini hanya tampak di fish,
+        dan tampak seperti cacat anjuran.
+        """
+        for r in range(self.rows):
+            if r != self.layar.row:
+                self.layar.grid[r] = [" "] * self.cols
 
     def tutup(self):
         try:
