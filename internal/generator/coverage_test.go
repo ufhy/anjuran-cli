@@ -3,6 +3,7 @@ package generator
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -134,6 +135,18 @@ func TestCakupanOpsi(t *testing.T) {
 // TestCakupanBentukPath menutup kelas bug yang paling sering muncul:
 // completion berkas yang diam pada bentuk path tertentu.
 func TestCakupanBentukPath(t *testing.T) {
+	// Bentuk path di sini ditulis dengan garis miring, dan sebagiannya —
+	// "/etc/hosts" — memang khas Unix. Pemisah yang dipakai anjuran kini
+	// mengikuti yang diketik pengguna, dan bila belum ada satu pun ia memakai
+	// milik sistem: di Windows "cd " menjawab "assets\", bukan "assets/".
+	//
+	// Menyesuaikan tabel ini per sistem hanya akan menguji hal yang berbeda
+	// dengan nama yang sama. Bentuk path Windows sudah punya ujinya sendiri di
+	// template_test.go.
+	if runtime.GOOS == "windows" {
+		t.Skip("bentuk path POSIX; Windows diuji terpisah di template_test.go")
+	}
+
 	eng, src, root := coverageEnv(t)
 
 	home, _ := os.UserHomeDir()

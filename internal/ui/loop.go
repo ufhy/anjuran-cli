@@ -3,7 +3,6 @@ package ui
 import (
 	"io"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -191,16 +190,6 @@ type Session struct {
 	// leftover menampung tombol yang harus dikembalikan ke shell.
 	leftover Leftover
 
-	// runeTerakhir adalah waktu rune terakhir diterima, dipakai mengenali
-	// ketikan yang datang terlalu cepat untuk berasal dari jari manusia.
-	runeTerakhir time.Time
-
-	// tempelanTerlihat menandai sesi ini ditutup karena mengenali tempelan.
-	// Dibawa keluar supaya pemanggil bisa mencatatnya untuk proses berikutnya:
-	// setiap pemicu adalah proses baru, dan tempelan yang sama akan memicu
-	// lagi beberapa kali.
-	tempelanTerlihat bool
-
 	// manual menandakan sesi dibuka karena pengguna menekan tombol completion,
 	// bukan karena mengetik karakter pemicu.
 	manual bool
@@ -208,9 +197,6 @@ type Session struct {
 
 // Leftover mengembalikan tombol yang belum ditangani sesi, bila ada.
 func (s *Session) Leftover() Leftover { return s.leftover }
-
-// TempelanTerlihat menjawab apakah sesi ditutup karena mengenali tempelan.
-func (s *Session) TempelanTerlihat() bool { return s.tempelanTerlihat }
 
 // selesai mengakhiri sesi, mengembalikan tombol yang mengakhirinya BESERTA
 // seluruh ketikan yang sudah telanjur terbaca.
@@ -341,37 +327,6 @@ func (s *Session) Run() (State, Outcome, error) {
 		}
 		if err != nil {
 			return s.st, Cancelled, err
-		}
-
-		// Tempelan MENUTUP kotaknya, bukan menyaringnya.
-		//
-		// Menempel satu baris perintah mengirim seluruh isinya sebagai
-		// ketikan. Karakter pertama yang mengakhiri kata membuka kotak, dan
-		// sisa tempelannya lalu masuk ke sini sebagai penyaring — pengguna
-		// menekan Esc berkali-kali hanya untuk menempel satu perintah.
-		//
-		// Shell tidak bisa menjaga ini sendirian: zsh dan bash punya cara
-		// menanyakan "apakah ada ketikan yang antre", fish tidak punya sama
-		// sekali, dan PSReadLine menarik tombolnya ke antrean sendiri sehingga
-		// buffer konsolnya tampak kosong. Yang memegang masukan saat kotak
-		// terbuka adalah anjuran, jadi di sinilah tempat menjaganya.
-		//
-		// Yang dijadikan tanda adalah KECEPATANNYA. Pengetik tercepat pun
-		// memerlukan puluhan milidetik antar tombol; tempelan datang dalam
-		// hitungan mikrodetik. Karakter yang sudah telanjur diketik tetap
-		// disimpan ke dalam baris, lalu sesi ditutup — sisanya mendarat di
-		// shell sebagaimana mestinya.
-		if s.tempelan(key) {
-			// TIDAK memakai selesai(): ia menguras sisa masukan menjadi
-			// leftover, dan leftover hanya bisa dikembalikan ke antrean oleh
-			// zsh. Di shell lain sisa tempelan itu akan hilang — persis
-			// kerusakan yang paling mahal, karena yang hilang adalah perintah
-			// yang sedang disalin orang.
-			//
-			// Dibiarkan di penyangga terminal, sisanya dibaca shell sendiri
-			// begitu proses widget ini keluar.
-			s.tempelanTerlihat = true
-			return s.st, Accepted, nil
 		}
 
 		switch key.Type {
@@ -732,36 +687,6 @@ func min(a, b int) int {
 	}
 	return b
 }
-
-// jedaTempelan adalah jarak waktu antar tombol yang sudah tidak mungkin
-// berasal dari jari manusia.
-//
-// Pengetik 200 kata per menit menghasilkan sekitar satu tombol tiap 60 ms.
-// Lima milidetik memberi ruang lebih dari sepuluh kali lipat, sehingga
-// ketikan cepat tidak pernah disalahartikan sebagai tempelan.
-const jedaTempelan = 5 * time.Millisecond
-
-// tempelan menjawab apakah tombol ini bagian dari teks yang ditempel.
-//
-// Hanya rune yang dihitung. Tombol kendali — panah, Enter, Esc — bisa datang
-// beruntun dari penekanan yang wajar, misalnya menahan panah bawah, dan
-// menutup kotak di situ akan merusak pemakaian yang paling biasa.
-func (s *Session) tempelan(key Key) bool {
-	if key.Type != KeyRune {
-		s.runeTerakhir = time.Time{}
-		return false
-	}
-	sekarang := waktuSekarang()
-	sebelumnya := s.runeTerakhir
-	s.runeTerakhir = sekarang
-
-	// Rune pertama tidak punya pembanding; ia selalu dianggap ketikan.
-	return !sebelumnya.IsZero() && sekarang.Sub(sebelumnya) < jedaTempelan
-}
-
-// waktuSekarang dipisahkan supaya pengujian bisa mengendalikan waktu tanpa
-// benar-benar menunggu.
-var waktuSekarang = time.Now
 
 // geserKursor menutup sesi dengan kursor bergeser satu karakter.
 //

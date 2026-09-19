@@ -136,17 +136,6 @@ func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State
 	// gambar apa pun, jadi terminal tidak perlu dimasukkan ke mode raw.
 	// Ingatan pilihan disimpan di disk: setiap penekanan tombol pemicu adalah
 	// proses anjuran yang baru, jadi ingatan dalam memori tidak akan pernah terpakai.
-	// Tempelan yang masih berlangsung tidak membuka kotak sama sekali.
-	//
-	// Satu baris yang ditempel memuat banyak spasi, dan setiap spasi adalah
-	// pemicu — masing-masing menumbuhkan proses anjuran yang baru. Mengenali
-	// tempelan di dalam satu sesi saja tidak cukup: sesi itu menutup dirinya,
-	// lalu spasi berikutnya membuka kotak lagi, dan seterusnya sampai
-	// tempelannya habis.
-	if recall.SedangMenempel() {
-		return st, ui.NoCandidates, nil, nil
-	}
-
 	rec := recall.Open()
 	defer rec.Save()
 
@@ -174,12 +163,6 @@ func interact(eng *engine.Engine, st ui.State, start int, manual bool) (ui.State
 
 	sesi := pre.Session(term, rend).StartAt(start)
 	st2, outcome, err := sesi.Run()
-
-	// Dicatat ke disk supaya pemicu BERIKUTNYA dari tempelan yang sama — yang
-	// dijalankan sebagai proses lain — tahu untuk tidak membuka kotak.
-	if sesi.TempelanTerlihat() {
-		recall.TandaiTempelan()
-	}
 	return st2, outcome, sesi.Leftover(), err
 }
 

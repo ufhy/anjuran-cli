@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -479,10 +481,32 @@ func (r *Registry) readSpecIn(dir, rel string) ([]byte, error) {
 	if err == nil {
 		return b, nil
 	}
-	if os.IsNotExist(err) {
+	if takAdaSpec(err) {
 		return nil, nil
 	}
 	return nil, err
+}
+
+// takAdaSpec menjawab apakah galat ini berarti "spec-nya memang tidak ada".
+//
+// Bukan hanya IsNotExist. Nama spec disusun dari nama perintah yang sedang
+// diketik, dan orang mengetik apa saja — termasuk karakter yang tidak sah
+// sebagai nama berkas. Windows menolaknya dengan ENOTDIR atau EINVAL alih-alih
+// ENOENT, dan memperlakukan itu sebagai kegagalan membuat SELURUH completion
+// mati hanya karena satu karakter aneh di baris perintah.
+//
+// Ditemukan oleh penyapuan acak: `for <tab><tab>`日*|🚀日~="<<=&` menghasilkan
+// nama berkas yang sah di Unix tetapi tidak di Windows.
+func takAdaSpec(err error) bool {
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrInvalid) {
+		return true
+	}
+	// Sisanya khas per sistem dan tidak punya nilai errors.Is yang portabel —
+	// ENOTDIR di Unix, ERROR_INVALID_NAME di Windows. Yang menentukan: galat
+	// ini muncul saat MEMBUKA nama yang kita susun sendiri, jadi apa pun
+	// sebabnya, artinya tetap "tidak ada spec di sana".
+	var e *os.PathError
+	return errors.As(err, &e)
 }
 
 // readSpecFile menelusuri direktori sesuai urutan, mencari bentuk terkompresi
@@ -513,7 +537,7 @@ func (r *Registry) readSpecFile(rel string) ([]byte, error) {
 		if err == nil {
 			return b, nil
 		}
-		if !os.IsNotExist(err) {
+		if !takAdaSpec(err) {
 			return nil, err
 		}
 	}
