@@ -64,15 +64,35 @@ jobs:
       - name: bangun spec
         run: make specs
 
-      # Sementara: satu skenario gagal HANYA di sini, dan panggilan engine
-      # langsung di container pengembangan menjawabnya dengan benar. Langkah
-      # ini memisahkan dua kemungkinan yang tersisa — enginenya yang berbeda
-      # di runner ini, atau integrasi shellnya — tanpa menebak lagi.
-      - name: periksa engine langsung
+      # Sementara. Engine di runner ini sudah terbukti menjawab benar —
+      # `kubectl get pods --output=` mengembalikan json, exit 0 — jadi yang
+      # tersisa hanya jalur integrasi shell. Langkah ini merekam argumen
+      # persis yang dikirim shell ke anjuran pada skenario yang gagal.
+      - name: rekam argumen yang dikirim shell
         run: |
-          set -x
-          ./bin/anjuran complete --line "kubectl get pods --output=" ; echo "exit=$?"
-          ./bin/anjuran complete --line "kubectl get pods " | head -3 ; echo "exit=$?"
+          python3 - <<'EOF'
+          import os, sys, shutil
+          sys.path.insert(0, "tools/uxtest")
+          import uxtest
+          d = uxtest.siapkan_pemasangan()
+          shutil.move(os.path.join(d, "anjuran"), os.path.join(d, "anjuran-asli"))
+          with open(os.path.join(d, "anjuran"), "w") as f:
+              f.write('#!/bin/sh
+printf "%s\n" "$*" >> /tmp/argv.log
+'
+                      'exec "$(dirname "$0")/anjuran-asli" "$@"
+')
+          os.chmod(os.path.join(d, "anjuran"), 0o755)
+          sandbox = uxtest.siapkan_sandbox()
+          open("/tmp/argv.log", "w").close()
+          alasan = uxtest.jalankan(
+              "opsi", [b"kubectl", b" ", b"get", b" ", b"pods", b" ", b"--output", b"="],
+              uxtest.memuat("json"), sandbox, d, "/tmp/cache-dbg",
+              shell=os.environ["SHELL_UJI"])
+          print("HASIL:", alasan)
+          print("=== argv ===")
+          print(open("/tmp/argv.log").read())
+          EOF
 
       - name: skenario UX
         env:
