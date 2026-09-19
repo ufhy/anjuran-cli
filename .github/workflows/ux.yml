@@ -70,6 +70,15 @@ jobs:
           # Runner CI berbagi inti dengan pekerjaan lain; terlalu banyak sesi
           # sekaligus membuat penantian berbasis keadaan ikut melambat.
           PARALEL: '4'
+          # Dan karena itu ia juga harus lebih sabar. Dengan batas bawaan,
+          # pemindaian PATH dan pemuatan spec kubectl sempat melewati tiga
+          # detik di sini: ketikan berikutnya dikirim ke kotak yang belum
+          # selesai digambar, dan rangkaian ini merah delapan kali berturut-
+          # turut karena alasan yang tidak ada hubungannya dengan anjuran.
+          #
+          # Keduanya batas ATAS. Skenario yang memang cepat tidak membayarnya.
+          UX_JEDA: '10'
+          UX_DIAM: '0.6'
         run: python3 -u tools/uxtest/uxtest.py
 
       - name: rekam layar saat gagal

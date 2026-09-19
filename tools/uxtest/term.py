@@ -295,7 +295,7 @@ class Sesi:
             if balas:
                 os.write(self.fd, balas)
 
-    def ketik(self, data, jeda=3.0, diam=0.35):
+    def ketik(self, data, jeda=None, diam=None):
         """Kirim ketikan, lalu tunggu sampai layarnya berhenti berubah.
 
         diam dipilih longgar dengan sengaja: membuka kotak berarti menjalankan
@@ -308,7 +308,18 @@ class Sesi:
         ketat justru berbahaya: saat mesin sibuk, ia memotong kotak yang sedang
         digambar dan menghasilkan kegagalan yang tidak ada hubungannya dengan
         kode.
+
+        Keduanya bisa dinaikkan lewat UX_JEDA dan UX_DIAM. Runner CI jauh
+        lebih lambat daripada mesin pengembangan dan berbagi intinya dengan
+        pekerjaan lain: di sana pemindaian PATH dan pemuatan spec kubectl
+        sempat melewati batas tiga detik, sehingga ketikan berikutnya dikirim
+        ke kotak yang belum selesai digambar. Yang gagal bukan anjuran, dan
+        kegagalan seperti itu membuat seluruh rangkaian berhenti dipercaya.
         """
+        if jeda is None:
+            jeda = float(os.environ.get("UX_JEDA", "3.0"))
+        if diam is None:
+            diam = float(os.environ.get("UX_DIAM", "0.35"))
         os.write(self.fd, data if isinstance(data, bytes) else data.encode())
         self.tunggu(jeda, diam=diam)
 
