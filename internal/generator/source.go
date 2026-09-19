@@ -85,8 +85,15 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 	// sendiri tidak diganti, karena di sanalah tipe argumen dan generator
 	// tersimpan: menukar `git checkout` versi spec dengan versi --help berarti
 	// kehilangan daftar branch-nya.
-	if res.Command != "" {
-		bantuan := s.Bantuan([]string{res.Command}, strings.HasPrefix(res.Prefix, "-"))
+	if len(res.Path) > 0 {
+		// Ditanyakan pada POSISI kursor, bukan pada nama perintahnya saja:
+		// `git commit -h` menyebut --amend, `git -h` tidak pernah.
+		//
+		// Path hanya memuat subcommand yang benar-benar dikenali spec. Untuk
+		// perintah tanpa spec ia berisi nama perintahnya saja, dan itu
+		// disengaja: menebak mana di antara kata yang sudah diketik adalah
+		// subcommand berarti sesekali menjalankan `<alat> <nama-berkas> -h`.
+		bantuan := s.Bantuan(res.Path, strings.HasPrefix(res.Prefix, "-"))
 
 		dibenarkan := make(map[string]bool, len(bantuan))
 		for _, c := range bantuan {

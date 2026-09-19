@@ -172,8 +172,22 @@ spec dengan versi `--help` berarti kehilangan daftar branch-nya. Jadi `--help`
 menentukan peringkat, spec menentukan perilaku, dan nama yang tidak dikenal
 spec sama sekali ikut ditawarkan.
 
-`--help` dijalankan dengan kebijakan generator yang sama seperti di bawah, dan
-hasilnya di-cache 30 menit per biner.
+Bantuan ditanyakan pada **posisi kursor**, bukan pada nama perintahnya saja:
+`git commit -h` menyebut `--amend`, `git -h` tidak pernah. Untuk perintah
+tanpa spec yang ditanyakan hanya perintahnya sendiri — menebak mana di antara
+kata yang sudah diketik adalah subcommand berarti sesekali menjalankan
+`<alat> <nama-berkas> -h`.
+
+Flag yang ada di spec tetapi TIDAK disebut `--help` hanya turun peringkat; ia
+tidak dibuang. Absennya sebuah flag di `--help` bukan bukti ia sudah dihapus:
+banyak alat menyembunyikan sebagian flagnya, dan penguraian teks bebas ini
+sendiri sebuah tebakan. Menawarkan flag basi di urutan bawah dikoreksi oleh
+alatnya sendiri dalam satu Enter; menghilangkan flag yang masih ada tidak
+terkoreksi sama sekali.
+
+`--help` dijalankan dengan kebijakan generator yang sama seperti di bawah,
+pager dan peramban dimatikan agar ia tidak pernah menggantung, dan hasilnya
+di-cache 30 menit per biner.
 
 ### Generator
 

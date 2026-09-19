@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"context"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -82,14 +83,22 @@ func (s *Source) Bantuan(argv []string, mauFlag bool) []engine.Candidate {
 
 // jalankanBantuan mencoba bentuk permintaan bantuan yang lazim.
 //
-// Urutannya disengaja: --help paling luas didukung, -h dipakai alat yang
-// lebih tua, dan `help <sub>` dipakai alat bergaya git. Yang pertama
-// menghasilkan sesuatu yang bisa diurai dipakai; sisanya tidak dicoba, karena
-// setiap percobaan berarti satu proses lagi.
+// Pada perintah tunggal --help didahulukan: ia paling luas didukung, dan -h
+// punya arti lain di sebagian alat (`ls -h` adalah ukuran terbaca manusia,
+// bukan bantuan).
+//
+// Pada SUBCOMMAND urutannya dibalik, dan itu hasil pengukuran: `git commit
+// --help` tidak mencetak apa pun — ia berusaha membuka halaman manual atau
+// peramban dan menyerah — sedangkan `git commit -h` mencetak daftar flagnya
+// langsung. Alat bergaya git berperilaku sama. Di posisi subcommand, arti
+// lain dari -h itu juga tidak berlaku lagi.
 func (s *Source) jalankanBantuan(argv []string) (string, bool) {
-	bentuk := [][]string{
-		append(append([]string{}, argv...), "--help"),
-		append(append([]string{}, argv...), "-h"),
+	panjang := append(append([]string{}, argv...), "--help")
+	pendek := append(append([]string{}, argv...), "-h")
+
+	bentuk := [][]string{panjang, pendek}
+	if len(argv) > 1 {
+		bentuk = [][]string{pendek, panjang}
 	}
 
 	pol := PolicyFromEnv(argv[0])
@@ -108,7 +117,14 @@ func (s *Source) jalankanBantuan(argv []string) (string, bool) {
 		// yang pernah dimasuki.
 		if s.Cache != nil {
 			if out, ok := s.Cache.Get(cmd, ""); ok {
-				return out, out != ""
+				if strings.TrimSpace(out) != "" {
+					return out, true
+				}
+				// Tercatat TIDAK menghasilkan apa-apa. Itu jawaban untuk
+				// bentuk ini saja; bentuk berikutnya tetap harus dicoba,
+				// atau `git commit` diam selamanya sesudah percobaan
+				// pertamanya.
+				continue
 			}
 		}
 
@@ -143,6 +159,20 @@ func jalankanPerintah(argv []string, dir string, timeout time.Duration) (string,
 
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
+	// Pager dan peramban dimatikan secara eksplisit. Sebagian alat menyalurkan
+	// bantuannya lewat `less` atau membuka halaman manual, dan keduanya
+	// menahan proses ini sampai batas waktu habis — yang terasa sebagai shell
+	// yang membeku, bukan sebagai bantuan yang tidak tersedia.
+	cmd.Env = append(os.Environ(),
+		"PAGER=cat",
+		"GIT_PAGER=cat",
+		"MANPAGER=cat",
+		"BROWSER=true",
+		// Warna ANSI di dalam teks bantuan merusak penguraian jarak dua spasi
+		// yang memisahkan flag dari keterangannya.
+		"NO_COLOR=1",
+		"TERM=dumb",
+	)
 	// Bantuan tidak pernah membaca masukan. Membiarkan stdin terbuka membuat
 	// alat yang salah menebak mode interaktifnya menggantung sampai batas
 	// waktu — dan itu terasa sebagai shell yang membeku.

@@ -188,6 +188,13 @@ type Result struct {
 	// Command adalah nama perintah yang sedang dilengkapi. Dibawa keluar
 	// karena kebijakan generator memutuskan berdasarkan nama itu.
 	Command string `json:"command,omitempty"`
+	// Path adalah Command beserta subcommand yang sudah diketik, berurutan:
+	// ["git", "commit"]. Kosong bila belum ada nama perintah sama sekali.
+	//
+	// Dibawa keluar karena bantuan sebuah alat hanya relevan bila ditanyakan
+	// pada posisi yang sama dengan kursor. `git -h` tidak pernah menyebut
+	// --amend; `git commit -h` menyebutnya.
+	Path []string `json:"path,omitempty"`
 	// Prefix adalah teks yang sudah diketik pada token kursor.
 	Prefix string `json:"prefix"`
 	// FilterPrefix adalah bagian dari Prefix yang dipakai MENYARING kandidat.
@@ -297,6 +304,7 @@ func (e *Engine) hitung(l *parser.Line) (*Result, error) {
 	words, _ := l.Words()
 	if len(words) > 0 {
 		res.Command = words[0].Value
+		res.Path = []string{res.Command}
 	}
 	if len(words) == 0 {
 		// Kursor berada di posisi nama PERINTAH — di awal baris, atau sesudah
@@ -330,6 +338,7 @@ func (e *Engine) hitung(l *parser.Line) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	res.Path = append(res.Path, st.path...)
 	e.suggest(res, st, l.Prefix)
 	res.Candidates = dedup(res.Candidates)
 	return res, nil
@@ -546,6 +555,11 @@ func (e *Engine) saranPerintah(res *Result, prefix string) {
 type state struct {
 	// current adalah subcommand terdalam yang sudah dimasuki.
 	current *spec.Subcommand
+	// path mencatat nama subcommand yang benar-benar DIMASUKI, berurutan.
+	//
+	// Dipakai untuk menanyakan bantuan pada posisi yang tepat: `git commit -h`
+	// menyebut --amend, sedangkan `git -h` tidak pernah menyebutnya.
+	path []string
 	// persistent mengumpulkan opsi ber-isPersistent dari semua leluhur,
 	// karena opsi seperti `git --git-dir` tetap berlaku di subcommand.
 	persistent []spec.Option
@@ -610,6 +624,7 @@ func (e *Engine) walk(root *spec.Subcommand, words []parser.Token) (*state, erro
 				}
 			}
 			st.current = resolved
+			st.path = append(st.path, tok)
 			st.argIndex = 0
 			i++
 			continue

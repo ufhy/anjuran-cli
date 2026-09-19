@@ -159,6 +159,7 @@ func TestBantuanMengangkatEntriSpecTanpaMenggantinya(t *testing.T) {
 
 	res := &engine.Result{
 		Command: "go",
+		Path:    []string{"go"},
 		Candidates: []engine.Candidate{
 			// `go help` menyebut "build"; ini yang harus terangkat.
 			{Name: "build", Insert: "build", Description: "dari spec", Priority: engine.DefaultPriority},
