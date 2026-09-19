@@ -11,6 +11,16 @@
 name: pemasang-nyata
 
 on:
+  # Dipicu dari SELESAINYA workflow rilis, bukan dari event release.
+  #
+  # GitHub sengaja tidak memicu workflow lain dari event yang dibuat
+  # GITHUB_TOKEN — aturan itu mencegah workflow saling memanggil tanpa henti.
+  # Rilis diterbitkan goreleaser memakai token itu, sehingga `release:
+  # published` tidak pernah menyalakan apa pun: rangkaian ini diam di setiap
+  # rilis, dan diamnya terbaca seperti lulus.
+  workflow_run:
+    workflows: [release]
+    types: [completed]
   release:
     types: [published]
   workflow_dispatch:
@@ -35,6 +45,8 @@ env:
 jobs:
   unix:
     name: ${{ matrix.nama }}
+    # Rilis yang gagal tidak perlu diuji pemasangannya.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.container }}
     strategy:
@@ -147,6 +159,7 @@ jobs:
 
   windows:
     name: ${{ matrix.nama }}
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
