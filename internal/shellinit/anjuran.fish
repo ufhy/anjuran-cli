@@ -69,6 +69,25 @@ function _anjuran_widget --description 'Dropdown completion anjuran'
             set -l ekor (string trim -r -c '\'"' -- $body)
             if test "$body" != "$sebelum" -a -z "$sisa"
                 if string match -q '*/' -- $ekor
+                    # Yang disisipkan digemakan sendiri sebelum turun.
+                    #
+                    # fish menggambar ulang barisnya SESUDAH fungsi binding
+                    # ini selesai, dan rekursi di bawah tidak pernah
+                    # membiarkannya selesai: kotak berikutnya sudah terbuka
+                    # lebih dulu. Tanpa gema ini, memilih "proyek/" pada
+                    # `cd proy` menampilkan isi proyek/ di bawah baris yang
+                    # masih berbunyi "cd" — benar isinya, bohong tampilannya,
+                    # dan itu persis kelas cacat yang membuat rangkaian ini
+                    # ada.
+                    #
+                    # Hanya penambahan di UJUNG baris yang digemakan. Di
+                    # tengah baris, kursor terminal tidak berada di tempat
+                    # teks barunya, dan menggemakannya justru menimpa yang
+                    # sudah ada.
+                    set -l tambahan (string replace -- "$sebelum" '' "$body")
+                    if test "$sebelum$tambahan" = "$body"
+                        printf '%s' $tambahan > /dev/tty 2>/dev/null
+                    end
                     _anjuran_widget auto none
                 end
             end

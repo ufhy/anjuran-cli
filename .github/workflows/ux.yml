@@ -6,9 +6,9 @@
 # karakter pemicu yang tidak pernah tampil, atau kotak yang menuntut ruang
 # lebih banyak daripada tinggi layar.
 #
-# Sampai hari ini rangkaian ini hanya pernah jalan di mesin penulisnya, dan
-# hanya untuk zsh. Tiga rilis berturut-turut memuat bug tampilan yang
-# ditemukan pengguna, bukan CI.
+# Rangkaian ini dulu hanya pernah jalan di mesin penulisnya, dan hanya untuk
+# zsh — tiga rilis berturut-turut memuat bug tampilan yang ditemukan pengguna,
+# bukan CI. Kini ia jalan di sini untuk zsh, bash, dan fish.
 name: ux
 
 on:
@@ -31,14 +31,15 @@ jobs:
         # paling sering rusak: zsh menggambar ulang barisnya sendiri lewat
         # zle, bash menghapus baris sebelum menjalankan `bind -x`, fish tidak
         # menggambar karakter yang disisipkan sampai binding-nya selesai.
-        # fish belum ikut. Penggambaran ulangnya berbeda cukup jauh sehingga
-        # penantian berbasis keadaan milik harness belum cocok di sana: 50 dari
-        # 85 skenario lulus, sisanya gagal karena penanda kesiapan harness
-        # sendiri tertinggal di layar — bukan karena anjuran. Ditangani di #1.
         #
-        # Memasukkannya sekarang berarti CI merah terus, dan CI yang selalu
-        # merah tidak lagi dibaca siapa pun.
-        shell: [zsh, bash]
+        # fish sempat ditahan di luar dengan alasan "penggambaran ulangnya
+        # terlalu berbeda": 50 dari 85 lulus. Alasan itu keliru. Empat
+        # penyebabnya ada di harness — baris penuh tidak bergulung, ESC[2J
+        # dibaca sebagai ESC[0J, CPR selalu dijawab 1;1, dan penanda kesiapan
+        # harness sendiri membuka kotak sehingga Enter-nya tertangkap — dan
+        # dua sisanya cacat sungguhan di fish yang tidak pernah terlihat
+        # justru KARENA angkanya tidak dipercaya. Ketiganya kini 85, 88, 85.
+        shell: [zsh, bash, fish]
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +56,7 @@ jobs:
           node-version: '22'
 
       - name: pasang shell
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh fish
 
       - name: bangun
         run: make build
