@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"strings"
 	"time"
 
 	"github.com/ufhy/anjuran-cli/internal/engine"
@@ -68,6 +69,30 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 		}
 		for _, sk := range SkripDari(t, s.Dir) {
 			add(sk.Nama, sk.Perintah)
+		}
+	}
+
+	// Bantuan dibaca HANYA di tempat korpusnya diam.
+	//
+	// Korpus spec berhenti dirawat pada Mei 2025, sehingga perintah yang lebih
+	// baru — dan flag baru pada perintah lama — tidak ada di sana sama sekali.
+	// Keluaran `--help` milik biner yang benar-benar terpasang di mesin ini
+	// tetap ikut berubah, dan itu satu-satunya sumber yang tidak menua.
+	//
+	// Syaratnya ketat dengan sengaja: hanya bila engine tidak punya satu pun
+	// kandidat untuk posisi ini. Menjalankannya di samping spec yang sudah ada
+	// berarti menumbuhkan proses pada setiap ketikan demi jawaban yang lebih
+	// buruk daripada yang sudah dimiliki.
+	if len(res.Candidates) == 0 && res.Command != "" {
+		// Dimasukkan langsung, bukan lewat add(): yang dari bantuan sudah
+		// membawa jenisnya sendiri — flag adalah flag, subcommand adalah
+		// subcommand — dan nama flag tidak boleh dikutip seperti nama berkas.
+		for _, c := range s.Bantuan([]string{res.Command}, strings.HasPrefix(res.Prefix, "-")) {
+			if seen[c.Name] {
+				continue
+			}
+			seen[c.Name] = true
+			out = append(out, c)
 		}
 	}
 

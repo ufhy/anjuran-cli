@@ -157,6 +157,16 @@ Platform: Linux, macOS, dan Windows; amd64 dan arm64.
   `composer.json`, `Makefile`, `justfile` — sehingga `bun run ` menawarkan
   skrip yang memang ada di proyek itu
 - **isi PATH** untuk nama perintah
+- **keluaran `--help`** sebagai cadangan, hanya bila tak satu pun sumber di
+  atas punya jawaban untuk posisi itu
+
+Korpus Fig berhenti dirawat pada Mei 2025, sehingga perintah yang lebih baru
+— dan flag baru pada perintah lama — tidak akan pernah datang dari sana.
+Keluaran `--help` milik biner yang benar-benar terpasang di mesin ini tetap
+ikut berubah, dan itulah satu-satunya sumber yang tidak menua. Ia dibaca
+dengan kebijakan generator yang sama, dan hasilnya selalu berperingkat di
+bawah spec: yang ditulis tangan lebih tepat daripada yang ditebak dari teks
+bebas. Tipe argumen tidak ikut terbaca dari sana.
 
 ### Generator
 
