@@ -456,3 +456,32 @@ func TestBashMembersihkanBarisSebelumKembali(t *testing.T) {
 		t.Error("baris tidak dibersihkan sesudah sesi selesai")
 	}
 }
+
+// Di fish, alias harus dibedakan dari fungsi biasa.
+//
+// Setiap alias fish adalah fungsi, tetapi tidak setiap fungsi adalah alias —
+// dan fish sendiri mengirimkan banyak fungsi biasa: cd, ls, man, open, nextd.
+// Selama beberapa rilis baris pertama badan fungsi apa pun diperlakukan
+// sebagai arti alias, sehingga `cd ` mengirim "set -l MAX_DIR_HIST 25" — baris
+// pertama cd.fish bawaan fish — dan anjuran melengkapi `set` alih-alih `cd`:
+// yang muncul seluruh isi direktori, bukan daftar foldernya saja.
+//
+// Pembedanya keterangan fungsi, yang dicatat `alias` dalam bentuk
+// "alias <nama>=<arti>". Diperiksa di sini karena satu-satunya lapisan lain
+// yang menangkapnya adalah rangkaian UX, dan rangkaian itu butuh fish yang
+// benar-benar terpasang.
+func TestAliasFishTidakDitebakDariBadanFungsi(t *testing.T) {
+	s, err := Script("fish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(s, "--description") {
+		t.Error("pencarian alias fish tidak membaca keterangan fungsi, " +
+			"jadi fungsi bawaan seperti cd akan terbaca sebagai alias")
+	}
+	// Badan fungsi tidak boleh lagi menjadi sumbernya. Pola lama mencocokkan
+	// baris menjorok mana pun, dan itulah yang membuat cd rusak.
+	if strings.Contains(s, `string match -r '^\s+(?:command )?(\S.*)$'`) {
+		t.Error("pola lama masih ada: arti alias diambil dari baris pertama badan fungsi")
+	}
+}

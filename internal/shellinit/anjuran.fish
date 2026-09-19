@@ -141,13 +141,28 @@ function _anjuran_alias
     test -n "$pertama"; or return
 
     functions -q $pertama; or return
-    # Badan fungsi alias fish berbentuk "command git status $argv"; yang
-    # dibutuhkan hanya perintahnya, tanpa pembungkus dan tanpa $argv.
-    set -l badan (functions $pertama 2>/dev/null \
-        | string match -r '^\s+(?:command )?(\S.*)$' \
-        | string replace -r ' \$argv.*$' '' )
-    test (count $badan) -ge 2; or return
-    echo $badan[2]
+
+    # Yang dibaca KETERANGANNYA, bukan badannya.
+    #
+    # Di fish setiap alias adalah fungsi, tetapi tidak setiap fungsi adalah
+    # alias — dan fish sendiri mengirimkan banyak fungsi biasa: cd, ls, man,
+    # open, nextd. Dulu baris pertama badan fungsi apa pun diperlakukan
+    # sebagai arti alias, sehingga `cd ` mengirim "set -l MAX_DIR_HIST 25"
+    # sebagai alias milik cd. anjuran lalu melengkapi `set`, bukan `cd`:
+    # yang muncul seluruh isi direktori, bukan daftar foldernya saja.
+    #
+    # `alias` mencatat asal-usulnya di keterangan fungsi, tepat dalam bentuk
+    # "alias <nama>=<arti>". Fungsi yang ditulis tangan tidak punya itu, dan
+    # memang tidak boleh diperlakukan sebagai alias.
+    set -l nama_re (string escape --style=regex -- $pertama)
+    set -l cocok (functions $pertama 2>/dev/null | string collect \
+        | string match -r -- "--description '"$nama_re"=([^']*)'|--description 'alias "$nama_re"=([^']*)'")
+    for i in 2 3
+        if test (count $cocok) -ge $i -a -n "$cocok[$i]"
+            echo $cocok[$i]
+            return
+        end
+    end
 end
 
 # _anjuran_pemicu menyisipkan karakternya sendiri, lalu membuka sesi.
