@@ -64,6 +64,16 @@ jobs:
       - name: bangun spec
         run: make specs
 
+      # Sementara: satu skenario gagal HANYA di sini, dan panggilan engine
+      # langsung di container pengembangan menjawabnya dengan benar. Langkah
+      # ini memisahkan dua kemungkinan yang tersisa — enginenya yang berbeda
+      # di runner ini, atau integrasi shellnya — tanpa menebak lagi.
+      - name: periksa engine langsung
+        run: |
+          set -x
+          ./bin/anjuran complete --line "kubectl get pods --output=" ; echo "exit=$?"
+          ./bin/anjuran complete --line "kubectl get pods " | head -3 ; echo "exit=$?"
+
       - name: skenario UX
         env:
           SHELL_UJI: ${{ matrix.shell }}
