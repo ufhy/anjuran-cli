@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,4 +256,47 @@ func tungguCache(t *testing.T, s *Source, cmd []string) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("cache bantuan untuk %v tidak pernah terisi", cmd)
+}
+
+// Bantuan DIAM di posisi nilai sebuah opsi.
+//
+// Penguraian teks bantuan hanya mengenali nama flag dan nama subcommand; ia
+// tidak tahu apa pun tentang nilai yang sah untuk sebuah opsi. Di
+// `kubectl get pods --output=` yang sedang diisi justru nilai itu, dan
+// res.Prefix yang berbunyi "--output=" terbaca sebagai "sedang mengetik
+// flag" hanya karena diawali minus. Akibatnya seluruh daftar flag ikut
+// ditawarkan — dan karena bantuan berperingkat di atas spec, ia mendorong
+// json dan yaml keluar dari layar.
+func TestBantuanDiamDiPosisiNilaiOpsi(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("perlu `go` di PATH")
+	}
+	t.Setenv("ANJURAN_GENERATOR_ALLOW_ROOT", "1")
+
+	res := &engine.Result{
+		Command: "go",
+		Path:    []string{"go"},
+		// Token kursornya "--x=", yang disaring hanya bagian sesudah "=".
+		Prefix:          "--x=",
+		FilterPrefix:    "",
+		FilterPrefixSet: true,
+		Candidates: []engine.Candidate{
+			{Name: "nilai-dari-spec", Insert: "nilai-dari-spec", Priority: engine.DefaultPriority},
+		},
+	}
+
+	s := &Source{Dir: t.TempDir(), Cache: &Cache{Dir: t.TempDir()}}
+	// Dipanggil dua kali: bila bantuan memang dibaca, panggilan kedua sudah
+	// memanennya dari cache. Diamnya karena itu bukan sekadar soal waktu.
+	s.Candidates(res)
+	out := s.Candidates(res)
+
+	for _, c := range out {
+		if strings.HasPrefix(c.Name, "-") {
+			t.Errorf("flag %q ditawarkan sebagai nilai opsi", c.Name)
+		}
+	}
+	if got := res.Candidates[0].Priority; got != engine.DefaultPriority {
+		t.Errorf("kandidat spec ikut terangkat bantuan: Priority = %d", got)
+	}
 }

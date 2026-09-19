@@ -85,7 +85,26 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 	// sendiri tidak diganti, karena di sanalah tipe argumen dan generator
 	// tersimpan: menukar `git checkout` versi spec dengan versi --help berarti
 	// kehilangan daftar branch-nya.
-	if len(res.Path) > 0 {
+	// Bantuan DIAM di posisi nilai sebuah opsi.
+	//
+	// Penguraian teks bantuan hanya bisa mengenali dua hal: nama flag dan
+	// nama subcommand. Ia tidak tahu apa pun tentang NILAI yang sah untuk
+	// sebuah opsi — dan di `kubectl get pods --output=` yang sedang diisi
+	// justru nilai itu.
+	//
+	// Tanpa penjagaan ini, res.Prefix yang berbunyi "--output=" terbaca
+	// sebagai "sedang mengetik flag" karena diawali minus, sehingga seluruh
+	// daftar flag `kubectl get -h` ikut ditawarkan — dan karena bantuan
+	// berperingkat di atas spec, ia mendorong json, yaml, dan wide keluar
+	// dari layar. Yang terlihat: mengetik `--output=` menjawab dengan daftar
+	// flag lain.
+	//
+	// Pembedanya res.Match(): ia berisi bagian yang benar-benar disaring,
+	// yaitu teks SESUDAH tanda sama dengan. Berbeda dari Prefix berarti
+	// token ini memuat lebih daripada yang sedang dilengkapi.
+	nilaiOpsi := res.FilterPrefixSet && res.FilterPrefix != res.Prefix
+
+	if len(res.Path) > 0 && !nilaiOpsi {
 		// Ditanyakan pada POSISI kursor, bukan pada nama perintahnya saja:
 		// `git commit -h` menyebut --amend, `git -h` tidak pernah.
 		//
