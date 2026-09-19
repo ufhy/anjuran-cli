@@ -380,7 +380,13 @@ main() {
   fi
 
   info ""
-  if [ "${RC_JENIS:-}" = polos ]; then
+  # Tanpa penyetelan shell, tidak ada berkas rc yang bisa disebut — dan
+  # menyebutnya tetap akan menghentikan skripnya, karena `set -u` menolak
+  # variabel yang tidak pernah diisi. Pemasangan dengan --no-shell karena itu
+  # sempat berakhir dengan galat padahal seluruh berkasnya sudah mendarat.
+  if [ -z "${RC_JENIS:-}" ]; then
+    info "Tambahkan sendiri baris integrasinya ke berkas konfigurasi shell-mu."
+  elif [ "$RC_JENIS" = polos ]; then
     peringatan_tanpa_integrasi
   else
     info "Buka sesi shell baru, lalu tekan spasi sesudah sebuah perintah."
