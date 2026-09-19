@@ -93,6 +93,58 @@ jobs:
           }
           'install.ps1 terurai bersih'
 
+  # Kecepatan adalah fitur di sini: anjuran dipanggil setiap kali tombol
+  # pemicu ditekan, dan target yang ditetapkan saat arsitekturnya diputuskan
+  # adalah di bawah 16 ms per ketikan. `make bench` sudah lama ada, tetapi
+  # tidak pernah dijalankan CI — sehingga regresi kecepatan tidak akan
+  # ketahuan sampai seseorang merasakannya, dan pada alat seperti ini "terasa
+  # lambat" datang jauh sesudah kerusakannya masuk.
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: benchmark
+        run: make bench | tee bench.txt
+
+      - name: periksa ambang
+        run: |
+          # Ambangnya SANGAT longgar, dan itu disengaja. Runner CI berbagi
+          # inti dengan pekerjaan lain, sehingga angka yang ketat hanya akan
+          # menghasilkan kegagalan palsu — dan penjaga yang sering salah
+          # berhenti dibaca orang. Yang dikejar perubahan besar: jalur panas
+          # diukur 3,5 mikrodetik dan muat dingin 1,3 milidetik, jadi
+          # ambang di bawah ini memberi puluhan kali lipat ruang.
+          gagal=0
+          periksa() {
+            nama=$1; batas=$2
+            ns=$(awk -v n="$nama" '$1 ~ n {print $3; exit}' bench.txt)
+            if [ -z "$ns" ]; then
+              echo "::error::benchmark $nama tidak ditemukan di keluaran"
+              gagal=1
+              return
+            fi
+            ns=${ns%.*}
+            echo "$nama: ${ns} ns/op (batas ${batas})"
+            if [ "$ns" -gt "$batas" ]; then
+              echo "::error::$nama = ${ns} ns/op, melewati batas ${batas}"
+              gagal=1
+            fi
+          }
+          periksa '^BenchmarkComplete' 200000
+          periksa '^BenchmarkMuatDingin' 20000000
+          exit $gagal
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench
+          path: bench.txt
+
   cross:
     runs-on: ubuntu-latest
     steps:
