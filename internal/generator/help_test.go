@@ -1,7 +1,9 @@
 package generator
 
 import (
+	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/ufhy/anjuran-cli/internal/engine"
 )
@@ -113,18 +115,18 @@ func TestSubcommandHanyaDariBagiannya(t *testing.T) {
 	}
 }
 
-// Kandidat dari --help berada DI BAWAH kandidat dari spec.
+// Kandidat dari --help berada DI ATAS kandidat yang hanya diketahui spec.
 //
-// Yang ditulis tangan selalu lebih tepat daripada yang ditebak dari teks
-// bebas; bila keduanya menawarkan nama yang sama, yang ditulis tangan harus
-// menang.
-func TestPrioritasDiBawahSpec(t *testing.T) {
+// Spec menggambarkan versi perintah pada Mei 2025, ketika korpusnya berhenti
+// dirawat. --help menggambarkan versi yang benar-benar terpasang. Bila
+// keduanya berbeda, yang terpasanglah yang benar.
+func TestPrioritasDiAtasSpec(t *testing.T) {
 	cs := uraiBantuan("  --verbose   rinci\n", true)
 	if len(cs) == 0 {
 		t.Fatal("tidak menghasilkan kandidat")
 	}
-	if cs[0].Priority >= engine.DefaultPriority {
-		t.Errorf("Priority = %d, harus di bawah %d", cs[0].Priority, engine.DefaultPriority)
+	if cs[0].Priority <= engine.DefaultPriority {
+		t.Errorf("Priority = %d, harus di atas %d", cs[0].Priority, engine.DefaultPriority)
 	}
 }
 
@@ -141,5 +143,45 @@ func TestKeteranganPanjangDipangkas(t *testing.T) {
 	}
 	if len(cs[0].Description) > 120 {
 		t.Errorf("keterangan %d karakter, harus dipangkas", len(cs[0].Description))
+	}
+}
+
+// Entri spec yang dibenarkan --help naik peringkat, TETAPI entrinya sendiri
+// tidak diganti.
+//
+// Di entri spec itulah tipe argumen dan generator tersimpan. Menukarnya
+// dengan hasil uraian teks bebas berarti `git checkout ` kehilangan daftar
+// branch-nya — jadi yang didahulukan hanya urutannya, bukan isinya.
+func TestBantuanMengangkatEntriSpecTanpaMenggantinya(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("perlu `go` di PATH")
+	}
+
+	res := &engine.Result{
+		Command: "go",
+		Candidates: []engine.Candidate{
+			// `go help` menyebut "build"; ini yang harus terangkat.
+			{Name: "build", Insert: "build", Description: "dari spec", Priority: engine.DefaultPriority},
+			// Tidak disebut `go help`: peringkatnya tidak boleh berubah.
+			{Name: "hanya-di-spec", Insert: "hanya-di-spec", Priority: engine.DefaultPriority},
+		},
+	}
+
+	s := &Source{Dir: t.TempDir(), Timeout: 5 * time.Second}
+	out := s.Candidates(res)
+
+	if got := res.Candidates[0].Priority; got != BantuanPrioritas {
+		t.Errorf("entri spec yang dibenarkan --help: Priority = %d, mau %d", got, BantuanPrioritas)
+	}
+	if got := res.Candidates[0].Description; got != "dari spec" {
+		t.Errorf("entri spec diganti isinya: Description = %q", got)
+	}
+	if got := res.Candidates[1].Priority; got != engine.DefaultPriority {
+		t.Errorf("entri yang tak disebut --help ikut terangkat: Priority = %d", got)
+	}
+	for _, c := range out {
+		if c.Name == "build" {
+			t.Error("nama yang sudah ada di spec ditambahkan lagi sebagai kandidat kedua")
+		}
 	}
 }

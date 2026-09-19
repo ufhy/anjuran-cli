@@ -72,22 +72,43 @@ func (s *Source) Candidates(res *engine.Result) []engine.Candidate {
 		}
 	}
 
-	// Bantuan dibaca HANYA di tempat korpusnya diam.
+	// Bantuan menentukan PERINGKAT; spec tetap menentukan perilaku.
 	//
-	// Korpus spec berhenti dirawat pada Mei 2025, sehingga perintah yang lebih
-	// baru — dan flag baru pada perintah lama — tidak ada di sana sama sekali.
-	// Keluaran `--help` milik biner yang benar-benar terpasang di mesin ini
-	// tetap ikut berubah, dan itu satu-satunya sumber yang tidak menua.
+	// Korpus spec berhenti dirawat pada Mei 2025, sehingga isinya menggambarkan
+	// versi perintah yang belum tentu terpasang di sini: flag yang sudah dibuang
+	// masih tercantum, flag yang baru tidak ada sama sekali. Keluaran `--help`
+	// milik biner yang benar-benar ada di mesin ini selalu menggambarkan versi
+	// yang benar, dan karena itu ia yang didahulukan.
 	//
-	// Syaratnya ketat dengan sengaja: hanya bila engine tidak punya satu pun
-	// kandidat untuk posisi ini. Menjalankannya di samping spec yang sudah ada
-	// berarti menumbuhkan proses pada setiap ketikan demi jawaban yang lebih
-	// buruk daripada yang sudah dimiliki.
-	if len(res.Candidates) == 0 && res.Command != "" {
+	// Yang didahulukan hanya urutannya. Kandidat yang dibenarkan --help naik ke
+	// atas, dan yang hanya ada di spec turun ke bawah — tetapi entri spec-nya
+	// sendiri tidak diganti, karena di sanalah tipe argumen dan generator
+	// tersimpan: menukar `git checkout` versi spec dengan versi --help berarti
+	// kehilangan daftar branch-nya.
+	if res.Command != "" {
+		bantuan := s.Bantuan([]string{res.Command}, strings.HasPrefix(res.Prefix, "-"))
+
+		dibenarkan := make(map[string]bool, len(bantuan))
+		for _, c := range bantuan {
+			dibenarkan[c.Name] = true
+		}
+
+		// Diubah di tempat, bukan lewat penggantian slice: pemanggil sudah
+		// memegang slice yang sama.
+		for i := range res.Candidates {
+			if dibenarkan[res.Candidates[i].Name] {
+				res.Candidates[i].Priority = BantuanPrioritas
+				seen[res.Candidates[i].Name] = true
+			}
+		}
+
+		// Sisanya adalah yang TIDAK diketahui spec sama sekali — justru inilah
+		// bagian yang hilang selama korpusnya beku.
+		//
 		// Dimasukkan langsung, bukan lewat add(): yang dari bantuan sudah
 		// membawa jenisnya sendiri — flag adalah flag, subcommand adalah
 		// subcommand — dan nama flag tidak boleh dikutip seperti nama berkas.
-		for _, c := range s.Bantuan([]string{res.Command}, strings.HasPrefix(res.Prefix, "-")) {
+		for _, c := range bantuan {
 			if seen[c.Name] {
 				continue
 			}

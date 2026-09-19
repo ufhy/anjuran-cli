@@ -157,16 +157,23 @@ Platform: Linux, macOS, dan Windows; amd64 dan arm64.
   `composer.json`, `Makefile`, `justfile` — sehingga `bun run ` menawarkan
   skrip yang memang ada di proyek itu
 - **isi PATH** untuk nama perintah
-- **keluaran `--help`** sebagai cadangan, hanya bila tak satu pun sumber di
-  atas punya jawaban untuk posisi itu
+- **keluaran `--help`** dari biner yang benar-benar terpasang
 
-Korpus Fig berhenti dirawat pada Mei 2025, sehingga perintah yang lebih baru
-— dan flag baru pada perintah lama — tidak akan pernah datang dari sana.
-Keluaran `--help` milik biner yang benar-benar terpasang di mesin ini tetap
-ikut berubah, dan itulah satu-satunya sumber yang tidak menua. Ia dibaca
-dengan kebijakan generator yang sama, dan hasilnya selalu berperingkat di
-bawah spec: yang ditulis tangan lebih tepat daripada yang ditebak dari teks
-bebas. Tipe argumen tidak ikut terbaca dari sana.
+Korpus Fig berhenti dirawat pada Mei 2025, jadi isinya menggambarkan versi
+perintah pada tanggal itu — flag yang sejak itu dibuang masih tercantum, flag
+yang sejak itu ditambahkan tidak ada sama sekali. Keluaran `--help` selalu
+menggambarkan versi yang terpasang di mesin ini, jadi **ia yang didahulukan**:
+kandidat yang dibenarkan `--help` naik ke atas, yang hanya diketahui spec
+turun ke bawah.
+
+Yang didahulukan hanya urutannya. Entri spec-nya sendiri tidak diganti, karena
+di sanalah tipe argumen dan generator tersimpan — menukar `git checkout` versi
+spec dengan versi `--help` berarti kehilangan daftar branch-nya. Jadi `--help`
+menentukan peringkat, spec menentukan perilaku, dan nama yang tidak dikenal
+spec sama sekali ikut ditawarkan.
+
+`--help` dijalankan dengan kebijakan generator yang sama seperti di bawah, dan
+hasilnya di-cache 30 menit per biner.
 
 ### Generator
 

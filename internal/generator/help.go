@@ -37,6 +37,15 @@ const bantuanTTL = 30 * time.Minute
 // ketikan bukan pertukaran yang sepadan.
 const bantuanMaks = 400
 
+// BantuanPrioritas mengangkat kandidat yang dibenarkan oleh `--help` di atas
+// yang hanya diketahui spec.
+//
+// Spec menggambarkan versi perintah pada Mei 2025; `--help` menggambarkan
+// versi yang terpasang sekarang. Bila keduanya berbeda, yang terpasanglah
+// yang benar — flag yang sudah dibuang tidak boleh ditawarkan lebih dulu
+// daripada flag yang masih ada.
+const BantuanPrioritas = engine.DefaultPriority + 1
+
 var (
 	// Nama flag panjang dan pendek, dicari di dalam bagian KIRI sebuah baris.
 	//
@@ -93,8 +102,12 @@ func (s *Source) jalankanBantuan(argv []string) (string, bool) {
 			return "", false
 		}
 
+		// Kunci cache sengaja TANPA direktori. Keluaran --help adalah sifat
+		// binernya, bukan sifat folder tempat ia dipanggil; ikut membedakan
+		// per direktori berarti menjalankan prosesnya lagi di setiap folder
+		// yang pernah dimasuki.
 		if s.Cache != nil {
-			if out, ok := s.Cache.Get(cmd, s.Dir); ok {
+			if out, ok := s.Cache.Get(cmd, ""); ok {
 				return out, out != ""
 			}
 		}
@@ -106,7 +119,7 @@ func (s *Source) jalankanBantuan(argv []string) (string, bool) {
 			continue
 		}
 		if s.Cache != nil {
-			s.Cache.Put(cmd, s.Dir, out, bantuanTTL)
+			s.Cache.Put(cmd, "", out, bantuanTTL)
 		}
 		if strings.TrimSpace(out) != "" {
 			return out, true
@@ -161,9 +174,7 @@ func uraiBantuan(teks string, mauFlag bool) []engine.Candidate {
 			CursorOffset: len(nama),
 			Description:  rapikanKeterangan(ket),
 			Kind:         kind,
-			// Di bawah kandidat dari spec: yang ditulis tangan selalu lebih
-			// tepat daripada yang ditebak dari teks bebas.
-			Priority: engine.DefaultPriority - 1,
+			Priority:     BantuanPrioritas,
 		})
 	}
 
