@@ -231,6 +231,23 @@ def memuat(*bagian):
     return f
 
 
+def salah_satu(*bagian):
+    """Cukup SATU yang muncul.
+
+    Dipakai saat yang diuji adalah kejadiannya, bukan kalimat yang dipakai
+    shell untuk melaporkannya: zsh menulis "command not found: gre", bash
+    "bash: gre: command not found", fish "Unknown command: gre".
+    Mengharuskan satu susunan kalimat berarti menguji shell-nya, bukan
+    anjuran.
+    """
+    def f(teks):
+        for b in bagian:
+            if b in teks:
+                return None
+        return f"tidak memuat satu pun dari {bagian!r}\n--- layar ---\n{teks[-400:]}"
+    return f
+
+
 def tanpa(*bagian):
     def f(teks):
         for b in bagian:
@@ -546,11 +563,18 @@ SKENARIO = [
     # mengembalikan status bukan-nol saat kursor di awal baris — di situ
     # builtin-nya ikut dijalankan sesudahnya.
     #
-    # Diperiksa lewat HASIL hitungannya: "50" tidak pernah diketik, jadi ia
-    # hanya bisa muncul bila barisnya terpotong tepat tiga huruf.
+    # Diperiksa lewat HASIL perintahnya: nama sandbox tidak pernah diketik,
+    # jadi ia hanya bisa muncul bila barisnya terpotong tepat tiga huruf —
+    # "pwdz" bukan perintah apa pun.
+    #
+    # Dulu ini `echo $((20+30))zzz`, dan fish tidak mengenal aritmetika gaya
+    # POSIX itu sama sekali. Yang gagal di sana sintaks shell-nya, bukan
+    # backspace milik anjuran. Perintah tanpa spasi tetap dipertahankan:
+    # spasi adalah tombol pemicu, dan kotak yang terbuka akan menangkap Enter
+    # di akhir skenario ini.
     ("backspace menghapus tepat satu huruf",
-     [b"echo $((20+30))zzz", b"\x7f", b"\x7f", b"\x7f", b"\r"],
-     memuat("50")),
+     [b"pwdzzz", b"\x7f", b"\x7f", b"\x7f", b"\r"],
+     memuat("anjuran-ux-")),
     ("backspace mempertahankan ketikan",
      [b"git", b" ", b"zz", b"\x7f"], memuat("git z")),
     ("mengetik yang tidak cocok menutup kotak",
@@ -570,7 +594,7 @@ SKENARIO = [
     # utuh ke shell, bukan kalimat siapa yang dipakai.
     ("pemicu sesudah pipa tidak merusak baris",
      [b"echo hai", b" ", b"|", b" ", b"gre", b"\x1b", b"\r"],
-     gabung(memuat("command not found"), memuat("gre"))),
+     gabung(salah_satu("command not found", "Unknown command"), memuat("gre"))),
     ("opsi panjang dengan sama dengan",
      [b"kubectl", b" ", b"get", b" ", b"pods", b" ", b"--output", b"="], memuat("json")),
 
