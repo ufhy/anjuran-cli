@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ufhy/anjuran-cli/internal/config"
 	"github.com/ufhy/anjuran-cli/internal/engine"
 	"github.com/ufhy/anjuran-cli/internal/generator"
 	"github.com/ufhy/anjuran-cli/internal/spec"
@@ -32,6 +33,7 @@ Penggunaan:
   anjuran init      <zsh|bash|fish|powershell>
   anjuran up        [user@]host [--from <dir>] [--dry-run]
   anjuran update    [--check] [--pre] [--version <tag>]
+  anjuran config    [--contoh]
   anjuran version
   anjuran complete --line <baris> [--cursor N] [--json]
   anjuran widget   --line <baris> --cursor <N>
@@ -65,6 +67,12 @@ dengan sadar, lalu selesai.
 widget adalah mode interaktif yang dipanggil integrasi shell; dropdown digambar
 ke /dev/tty dan hasilnya dikembalikan lewat stdout.
 
+Konfigurasi:
+  Setelan tetap ditulis di berkas TOML; lokasinya dicetak "anjuran config".
+  Urutannya: bawaan, lalu berkas, lalu lingkungan, lalu flag — jadi apa yang
+  kamu nyatakan untuk sesi ini selalu menang atas yang kamu tuliskan dulu.
+  Tanpa berkas apa pun, semuanya berjalan persis seperti di bawah.
+
 Lingkungan:
   ANJURAN_SPECS      direktori spec
   ANJURAN_SIMPLE     bila diisi, matikan warna dan sorotan
@@ -89,6 +97,24 @@ dan tidak pernah menjalankan interpreter seperti bash, python, atau sudo.
 `
 
 func main() {
+	// Berkas konfigurasi dibaca PALING AWAL, dan hasilnya dipasang ke
+	// lingkungan proses ini tanpa menimpa apa pun yang sudah ada.
+	//
+	// Di situ seluruh urutan kewenangannya terwujud sekaligus — bawaan,
+	// berkas, lingkungan, flag — tanpa satu pun tempat pembacaan setelan
+	// perlu tahu bahwa berkas itu ada. Tempat yang terlupa tidak mungkin
+	// terjadi, karena tidak ada yang perlu diingat.
+	if cfg, err := config.Muat(); err != nil {
+		// Berkas yang TIDAK ADA sudah ditangani sebagai keadaan normal di
+		// dalam Muat. Sampai di sini berarti berkasnya ada dan rusak, dan di
+		// situ pengguna sudah menyatakan niat: diam berarti niatnya hilang
+		// tanpa ia tahu. Tetap dilanjutkan dengan bawaan, karena shell yang
+		// mati total gara-gara satu baris salah ketik jauh lebih merugikan.
+		fmt.Fprintf(os.Stderr, "anjuran: konfigurasi diabaikan: %v\n", err)
+	} else {
+		cfg.Terapkan()
+	}
+
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
@@ -102,6 +128,8 @@ func main() {
 	// tidak pantas mendadak gagal.
 	case "up", "bootstrap":
 		os.Exit(runUp(os.Args[2:]))
+	case "config":
+		os.Exit(runConfig(os.Args[2:]))
 	case "update":
 		os.Exit(runUpdate(os.Args[2:]))
 	case "complete":

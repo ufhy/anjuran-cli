@@ -239,7 +239,38 @@ tujuan.
 Host Windows ikut: arsip rilisnya berbentuk zip, dan dibongkar lewat jalur
 yang sama.
 
+## Konfigurasi
+
+Setelan yang kamu pakai terus-menerus ditulis sekali di sebuah berkas:
+
+```sh
+anjuran config              # di mana berkasnya, dan apa yang terbaca
+anjuran config --contoh     # berkas contoh, seluruhnya dikomentari
+```
+
+```toml
+# ~/.config/anjuran/config.toml  (Windows: %AppData%\anjuran\config.toml)
+auto = false          # jangan munculkan kotak sendiri; Tab saja
+key = "\t"
+ikon = "nerd"
+
+[generator]
+allow = ["kubectl", "docker"]
+timeout = "800ms"
+```
+
+Urutannya: **bawaan, lalu berkas, lalu lingkungan, lalu flag.** Variabel
+lingkungan selalu menang, jadi apa yang kamu setel untuk satu sesi tidak perlu
+diubah di berkas lebih dulu — dan itu berlaku juga di dalam shell, karena
+`anjuran init` memasang nilainya dengan bentuk "setel bila belum disetel".
+
+Berkasnya tidak pernah menjadi syarat: tanpa berkas apa pun, anjuran berjalan
+persis seperti tanpa bagian ini. Setelan yang salah ketik **ditolak dengan
+berisik** alih-alih diabaikan — setelan yang diam-diam tidak berlaku akan
+dicari penyebabnya di tempat yang salah.
+
 ## Lingkungan
+
 
 | Lingkungan | Arti |
 |---|---|
