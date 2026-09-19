@@ -290,16 +290,47 @@ case ${ANJURAN_AUTO:-1} in
 esac
 
 # ---------------------------------------------------------------------------
-# Saran dari riwayat (ghost text): TIDAK ADA di bash, dan tidak bisa ada.
+# Saran dari riwayat (ghost text): TIDAK ADA di bash. Ditelusuri, bukan
+# diasumsikan.
 #
-# Teks abu-abu yang melanjutkan ketikan membutuhkan dua hal yang readline
-# tidak punya. Pertama, kait pada setiap ketikan: zsh membungkus `self-insert`,
-# sedangkan di readline satu-satunya cara adalah mengikat kesembilan puluh
-# lima karakter cetak satu per satu — mahal, dan merusak binding orang lain.
-# Kedua, tempat menggambar teks yang BUKAN bagian dari buffer: zsh punya
-# POSTDISPLAY, readline tidak. Menaruh sarannya di READLINE_LINE berarti
-# menulis teks yang tidak diminta ke dalam perintah yang akan dijalankan.
+# Dugaan lama di tempat ini keliru separuhnya. Ia menyebut readline tidak
+# punya tempat menggambar teks di luar buffer, dan itu salah: kotak anjuran
+# sendiri digambar ke /dev/tty, dan trik yang sama MEMANG BISA dipakai untuk
+# teks abu-abu di belakang kursor. Diukur dengan merekam byte yang dikirim
+# bash, urutannya begini setiap kali sebuah fungsi `bind -x` dipanggil:
+#
+#     \r\033[K\r          readline MENGHAPUS barisnya
+#     ...                 fungsi kita berjalan di sini
+#     % ec                readline MENGGAMBAR ULANG barisnya
+#
+# Menggambar prompt, isi baris, lalu saran abu-abu — dan mengembalikan kursor
+# ke kolom nol — membuat gambar ulang readline menimpa bagian depannya dengan
+# isi yang sama persis dan MEMBIARKAN sarannya utuh di belakang. Ia bekerja.
+#
+# Yang tidak bisa adalah MENGHAPUSNYA lagi.
+#
+# Saat pengguna mengetik huruf berikutnya, readline hanya mengirim huruf itu
+# sendiri ke kolom kursor. Ia tidak menghapus sampai akhir baris kecuali
+# barisnya memendek. Jadi huruf yang menyimpang dari sarannya hanya menimpa
+# satu karakter, dan sisa sarannya tertinggal sebagai sampah:
+#
+#     bayangan       % echo hai
+#     ketik "x"      % ecxo hai      <- "o hai" sisa saran yang tidak terhapus
+#     ketik "y"      % ecxy hai
+#     Enter          bash: ecxy: command not found
+#
+# Buffer-nya benar, layarnya bohong — persis kelas cacat yang membuat
+# rangkaian uji layar proyek ini dibangun. Seseorang yang melihat
+# "ecxy hai" lalu menekan Enter menjalankan sesuatu yang lain.
+#
+# Membersihkannya menuntut kait pada SETIAP ketikan, dan readline tidak
+# punya. Satu-satunya jalan adalah mengikat kesembilan puluh lima karakter
+# cetak satu per satu, dan `bind -x` MENGAMBIL ALIH tombolnya sepenuhnya:
+# sesudah `bind -x '"a":_nop'`, mengetik "kata" menghasilkan "kt". Setiap
+# karakter harus menyisipkan dirinya sendiri, lengkap dengan kursor, undo,
+# dan masukan multibyte — yaitu menulis ulang self-insert milik readline,
+# sambil menimpa binding milik orang lain pada setiap huruf.
 #
 # Jadi ANJURAN_GHOST tidak berpengaruh di bash. Disebutkan di sini supaya
 # ketiadaannya menjadi keterangan, bukan kejutan. fish dan PowerShell memakai
-# fitur bawaan shell masing-masing; zsh memakai implementasi sendiri.
+# fitur bawaan shell masing-masing; zsh memakai POSTDISPLAY.
