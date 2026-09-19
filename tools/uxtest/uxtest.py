@@ -34,6 +34,7 @@ import threading
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import term  # noqa: E402
@@ -217,7 +218,27 @@ def jalankan(nama, ketikan, periksa, sandbox, bindir, cachedir, auto=True, ghost
         s.siap()
         for k in ketikan:
             s.ketik(k)
-        return periksa(s.layar.teks())
+
+        # Penantian TERAKHIR berbasis asersinya sendiri, bukan berbasis diam.
+        #
+        # ketik() berhenti saat keluarannya diam sesaat, dan diam itu terjadi
+        # juga SEBELUM sesuatu muncul: anjuran adalah proses baru yang harus
+        # memindai PATH dan memuat spec sebelum menggambar apa pun, dan di
+        # runner CI jeda sebelum byte pertamanya lebih panjang daripada ambang
+        # diam mana pun yang masih masuk akal. Menaikkan ambangnya hanya
+        # memperlambat semua skenario tanpa memperbaiki yang ini — sudah
+        # dicoba, dan kegagalannya identik.
+        #
+        # Yang ditunggu di sini keadaan yang memang diuji. Skenario yang sudah
+        # benar keluar pada pemeriksaan pertama dan tidak membayar apa pun;
+        # hanya yang belum benar yang menunggu, dan menunggu itu persis
+        # perbedaan antara "belum digambar" dan "salah digambar".
+        batas = time.time() + float(os.environ.get("UX_TUNGGU_AKHIR", "8"))
+        while True:
+            alasan = periksa(s.layar.teks())
+            if alasan is None or time.time() >= batas:
+                return alasan
+            s.tunggu(1.0, diam=0.3)
     finally:
         s.tutup()
 
